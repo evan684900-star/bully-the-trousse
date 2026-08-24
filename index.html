@@ -3,7 +3,9 @@
 <head>
     <link rel="icon" type="image/png" href="trousse-skin-1.png">
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- maximum-scale/user-scalable=no évite le zoom involontaire au double-tap,
+         viewport-fit=cover permet de gérer l'encoche des téléphones (voir env(safe-area-inset-*)) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Bully the Trousse</title>
     <style>
         /* Variables de couleur réutilisées partout dans l'interface */
@@ -21,25 +23,34 @@
             --text-dim: #aab0c8;
         }
 
-        * { box-sizing: border-box; }
+        /* touch-action: manipulation coupe le double-tap-zoom sur mobile tout en
+           gardant des taps réactifs (pas de délai de 300ms) */
+        * { box-sizing: border-box; touch-action: manipulation; }
 
         html, body {
             margin: 0;
             padding: 0;
             width: 100%;
             height: 100%;
+            /* 100dvh = hauteur qui tient compte de la barre d'adresse mobile qui
+               apparaît/disparaît ; on garde 100% en repli pour les vieux navigateurs */
+            height: 100dvh;
             overflow: hidden;
             font-family: "Segoe UI", "Trebuchet MS", Verdana, sans-serif;
             background: #10131c;
             color: var(--text);
             -webkit-tap-highlight-color: transparent;
+            -webkit-touch-callout: none; /* empêche le menu "enregistrer l'image" au appui long sur iOS */
             user-select: none;
+            overscroll-behavior: none; /* empêche le rebond/pull-to-refresh sur mobile */
+            touch-action: manipulation; /* tape réactif, sans double-tap zoom */
         }
 
         #app {
             position: relative;
             width: 100vw;
             height: 100vh;
+            height: 100dvh;
             overflow: hidden;
         }
 
@@ -146,8 +157,9 @@
             box-shadow: 0 5px 0 #2f374a, 0 8px 14px rgba(0,0,0,0.25);
         }
         .btn.secondary:active { box-shadow: 0 1px 0 #2f374a, 0 3px 6px rgba(0,0,0,0.2); }
-        .btn.small { padding: 8px 16px; font-size: 14px; border-radius: 10px; }
-        .menu-buttons { display: flex; gap: 14px; margin-top: 4px; }
+        /* padding un peu généreux pour rester confortable au doigt sur mobile */
+        .btn.small { padding: 10px 18px; font-size: 14px; border-radius: 10px; }
+        .menu-buttons { display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
 
         /* Rangée des "mondes" (niveaux) en bas du menu */
         .worlds-row {
@@ -178,12 +190,16 @@
             display: block;
             width: 100%;
             height: 100%;
+            /* aucun geste natif (scroll/zoom) : tous les taps sont gérés en JS */
+            touch-action: none;
         }
+        /* calc(...) + env(safe-area-inset-top) pousse le HUD sous l'encoche
+           des téléphones (iPhone) au lieu de passer dessous */
         .hud-top {
             position: absolute;
-            top: 10px;
-            left: 10px;
-            right: 10px;
+            top: calc(10px + env(safe-area-inset-top));
+            left: calc(10px + env(safe-area-inset-left));
+            right: calc(10px + env(safe-area-inset-right));
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
@@ -206,7 +222,7 @@
         #meter-wrap {
             position: absolute;
             left: 50%;
-            bottom: 30px;
+            bottom: calc(30px + env(safe-area-inset-bottom));
             transform: translateX(-50%);
             width: min(80vw, 420px);
             height: 26px;
@@ -252,6 +268,7 @@
             text-align: center;
             display: none;
             min-width: 260px;
+            max-width: 92vw; /* évite tout débordement sur les très petits écrans */
             box-shadow: 0 10px 30px rgba(0,0,0,0.4);
         }
         .result-panel.show { display: block; }
@@ -259,7 +276,7 @@
         .result-panel .distance { font-size: 34px; font-weight: 900; margin: 6px 0; }
         .result-panel .earn { color: var(--money); font-weight: 700; font-size: 18px; margin-bottom: 4px; }
         .result-panel .record { color: var(--accent-2); font-weight: 800; margin-bottom: 8px; }
-        .result-panel .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+        .result-panel .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 
         /* ---------- ÉCRAN BOUTIQUE ---------- */
         #screen-shop {
@@ -351,15 +368,15 @@
 
         .back-btn {
             position: absolute;
-            top: 10px;
-            left: 10px;
+            top: calc(10px + env(safe-area-inset-top));
+            left: calc(10px + env(safe-area-inset-left));
             z-index: 10;
         }
         /* Même emplacement que .back-btn mais collé à droite (ex: "Retour au jeu" dans la boutique) */
         .forward-btn {
             position: absolute;
-            top: 10px;
-            right: 10px;
+            top: calc(10px + env(safe-area-inset-top));
+            right: calc(10px + env(safe-area-inset-right));
             z-index: 10;
         }
     </style>
@@ -810,6 +827,10 @@
         canvas.height = canvas.clientHeight * devicePixelRatio;
     }
     window.addEventListener("resize", resizeCanvas);
+    // Sur mobile, les dimensions ne sont pas toujours à jour au moment même de
+    // l'évènement "orientationchange" (rotation d'écran) : un petit délai laisse
+    // le navigateur finir de recalculer la taille de la fenêtre avant de redessiner.
+    window.addEventListener("orientationchange", () => setTimeout(resizeCanvas, 200));
 
     // Machine à états du lancer : idle -> charging_power -> charging_angle -> flying -> landed
     let state = "idle";
