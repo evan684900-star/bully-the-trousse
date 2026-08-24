@@ -379,6 +379,25 @@
             right: calc(10px + env(safe-area-inset-right));
             z-index: 10;
         }
+
+        /* Bouton musique : visible sur les 3 écrans, en bas à droite */
+        .mute-btn {
+            position: fixed;
+            bottom: calc(10px + env(safe-area-inset-bottom));
+            right: calc(10px + env(safe-area-inset-right));
+            z-index: 20;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 2px solid var(--panel-border);
+            background: var(--panel-bg);
+            color: var(--text);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -451,6 +470,10 @@
     </section>
 
     <div class="toast" id="toast"></div>
+
+    <!-- Musique de fond, démarrée au premier clic de l'utilisateur (voir plus bas) -->
+    <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
+    <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
 </div>
 
 <script>
@@ -463,7 +486,7 @@
        2. Données statiques (mondes, skins)
        3. Sauvegarde (localStorage)
        4. Notification "toast"
-       5. Sons (WebAudio, sans fichiers audio)
+       5. Sons (WebAudio, sans fichiers audio) et musique de fond
        6. Navigation entre les 3 écrans
        7. Écran menu
        8. Écran boutique
@@ -528,6 +551,7 @@
             bestDistance: 0,
             ownedSkins: ["classique"],
             equippedSkin: "classique",
+            musicMuted: false,
         };
     }
 
@@ -576,7 +600,7 @@
         toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1600);
     }
 
-    /* ============ 5. SONS (WebAudio, aucun fichier audio requis) ============ */
+    /* ============ 5. SONS ET MUSIQUE DE FOND ============ */
     // On génère des petits bips synthétiques à la volée avec l'API WebAudio,
     // pas besoin d'assets .mp3/.wav supplémentaires.
     let audioCtx = null;
@@ -609,6 +633,33 @@
     function sfxBuy() { beep(700, 0.12, "sine", 0.1); beep(900, 0.15, "sine", 0.1); }
     function sfxError() { beep(140, 0.15, "square", 0.1); }
     function sfxRecord() { beep(600, 0.1, "sine", 0.12); beep(800, 0.1, "sine", 0.12); beep(1000, 0.2, "sine", 0.12); }
+
+    // Musique de fond en boucle. Les navigateurs bloquent la lecture audio tant
+    // qu'il n'y a pas eu d'interaction de l'utilisateur : on démarre donc la
+    // lecture au tout premier clic/tap détecté n'importe où sur la page, puis
+    // on ne s'en occupe plus (l'écouteur ne se déclenche qu'une seule fois).
+    const bgMusic = document.getElementById("bg-music");
+    const muteBtn = document.getElementById("btn-mute");
+    bgMusic.volume = 0.35;
+
+    function applyMuteState() {
+        bgMusic.muted = save.musicMuted;
+        muteBtn.textContent = save.musicMuted ? "🔇" : "🔊";
+    }
+    applyMuteState();
+
+    function tryStartMusic() {
+        bgMusic.play().then(() => {
+            document.removeEventListener("pointerdown", tryStartMusic);
+        }).catch(() => { /* toujours bloqué : on retentera au prochain clic */ });
+    }
+    document.addEventListener("pointerdown", tryStartMusic);
+
+    muteBtn.addEventListener("click", () => {
+        save.musicMuted = !save.musicMuted;
+        persist();
+        applyMuteState();
+    });
 
     /* ============ 6. NAVIGATION ENTRE LES 3 ÉCRANS ============ */
     const screens = {
