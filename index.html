@@ -256,9 +256,9 @@
         /* ---------- SHOP ---------- */
         #screen-shop {
             background: #171b28;
-            display: none;
             flex-direction: column;
         }
+        #screen-shop.active { display: flex; }
         .shop-header {
             display: flex;
             align-items: center;
@@ -807,7 +807,7 @@
         const g = BASE_G / (1 + vitesse * 0.09);
 
         vx = v0 * Math.cos(angleRad);
-        vy = -v0 * Math.sin(angleRad);
+        vy = v0 * Math.sin(angleRad);
         window.__g = g;
 
         rotSpeed = 6 + v0 / 55;
@@ -967,10 +967,10 @@
             const g = window.__g || BASE_G;
             worldX += vx * dt;
             worldY += vy * dt;
-            vy += g * dt;
+            vy -= g * dt;
             rotation += rotSpeed * dt;
 
-            if (worldY <= 0 && vy > 0) {
+            if (worldY <= 0 && vy < 0) {
                 worldY = 0;
                 onLanded();
             }
