@@ -355,6 +355,13 @@
             left: 10px;
             z-index: 10;
         }
+        /* Même emplacement que .back-btn mais collé à droite (ex: "Retour au jeu" dans la boutique) */
+        .forward-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -413,6 +420,8 @@
     <!-- ÉCRAN BOUTIQUE -->
     <section id="screen-shop" class="screen">
         <button class="btn secondary small back-btn" id="btn-shop-back">← Menu</button>
+        <!-- Permet de reprendre directement le jeu sans repasser par le menu -->
+        <button class="btn small forward-btn" id="btn-shop-play">🎮 Retour au jeu</button>
         <div class="shop-header" style="justify-content:center; padding-top:16px;">
             <div class="money-pill">💰 <span id="shop-money">0</span> $</div>
         </div>
@@ -951,6 +960,7 @@
     document.getElementById("btn-result-shop").addEventListener("click", () => showScreen("shop"));
     document.getElementById("btn-game-back").addEventListener("click", () => showScreen("menu"));
     document.getElementById("btn-shop-back").addEventListener("click", () => showScreen("menu"));
+    document.getElementById("btn-shop-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-shop").addEventListener("click", () => showScreen("shop"));
 
