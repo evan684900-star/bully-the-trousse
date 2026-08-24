@@ -4,4 +4,997 @@
     <link rel="icon" type="image/png" href="trousse-skin-1.png">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>bully the trousse</title>
+    <title>Bully the Trousse</title>
+    <style>
+        :root {
+            --sky-top: #7ec8e3;
+            --sky-bottom: #cdeffd;
+            --ground: #8a8f98;
+            --ground-dark: #6f7480;
+            --panel-bg: rgba(20, 24, 36, 0.92);
+            --panel-border: #3a4260;
+            --accent: #ffd23f;
+            --accent-2: #ff6b6b;
+            --money: #6bffb0;
+            --text: #f4f6ff;
+            --text-dim: #aab0c8;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: "Segoe UI", "Trebuchet MS", Verdana, sans-serif;
+            background: #10131c;
+            color: var(--text);
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+        }
+
+        #app {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .screen {
+            position: absolute;
+            inset: 0;
+            display: none;
+        }
+        .screen.active { display: block; }
+
+        /* ---------- MENU ---------- */
+        #screen-menu {
+            background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 60%, var(--ground) 60%, var(--ground-dark) 100%);
+        }
+        .menu-wrap {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding: 24px 16px 16px;
+            gap: 10px;
+        }
+        .title-card {
+            text-align: center;
+            text-shadow: 0 3px 0 rgba(0,0,0,0.25);
+        }
+        .title-card h1 {
+            margin: 0;
+            font-size: clamp(28px, 6vw, 46px);
+            color: #fff;
+            letter-spacing: 1px;
+        }
+        .title-card p {
+            margin: 2px 0 0;
+            color: #2c3550;
+            font-weight: 600;
+            font-size: clamp(12px, 2.5vw, 15px);
+        }
+        .money-pill {
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 999px;
+            padding: 8px 20px;
+            font-weight: bold;
+            font-size: 18px;
+            color: var(--money);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.25);
+        }
+        #trousse-preview-wrap {
+            width: min(38vw, 220px);
+            height: min(38vw, 220px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            filter: drop-shadow(0 10px 12px rgba(0,0,0,0.3));
+            animation: floaty 2.6s ease-in-out infinite;
+        }
+        #trousse-preview-wrap img { width: 100%; height: 100%; object-fit: contain; }
+        @keyframes floaty {
+            0%, 100% { transform: translateY(0) rotate(-3deg); }
+            50% { transform: translateY(-10px) rotate(3deg); }
+        }
+        .stats-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .stat-chip {
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+        .stat-chip b { color: var(--accent); }
+        .btn {
+            border: none;
+            border-radius: 14px;
+            padding: 14px 30px;
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+            color: #1a1a1a;
+            background: var(--accent);
+            box-shadow: 0 5px 0 #c79a1f, 0 8px 14px rgba(0,0,0,0.25);
+            transition: transform 0.08s ease;
+            letter-spacing: 0.5px;
+        }
+        .btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #c79a1f, 0 3px 6px rgba(0,0,0,0.2); }
+        .btn.secondary {
+            background: #4b5570;
+            color: #fff;
+            box-shadow: 0 5px 0 #2f374a, 0 8px 14px rgba(0,0,0,0.25);
+        }
+        .btn.secondary:active { box-shadow: 0 1px 0 #2f374a, 0 3px 6px rgba(0,0,0,0.2); }
+        .btn.small { padding: 8px 16px; font-size: 14px; border-radius: 10px; }
+        .menu-buttons { display: flex; gap: 14px; margin-top: 4px; }
+
+        .worlds-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+            max-width: 520px;
+        }
+        .world-card {
+            width: 108px;
+            padding: 10px 6px;
+            border-radius: 12px;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            text-align: center;
+            cursor: pointer;
+        }
+        .world-card.locked { opacity: 0.55; cursor: not-allowed; }
+        .world-card .emoji { font-size: 26px; }
+        .world-card .name { font-size: 12px; font-weight: 700; margin-top: 4px; }
+        .world-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
+
+        /* ---------- GAME ---------- */
+        #screen-game canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        .hud-top {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+        .hud-top > * { pointer-events: auto; }
+        .hint-text {
+            position: absolute;
+            bottom: 90px;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: clamp(14px, 3vw, 20px);
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 0 2px 6px rgba(0,0,0,0.6);
+            pointer-events: none;
+        }
+        #meter-wrap {
+            position: absolute;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            width: min(80vw, 420px);
+            height: 26px;
+            background: rgba(10,12,20,0.55);
+            border: 2px solid #222633;
+            border-radius: 999px;
+            overflow: hidden;
+            display: none;
+        }
+        #meter-fill {
+            position: absolute;
+            top: 0; bottom: 0; left: 0;
+            width: 0%;
+            background: linear-gradient(90deg, #6bffb0, var(--accent), var(--accent-2));
+        }
+        #meter-marker {
+            position: absolute;
+            top: -4px;
+            width: 4px;
+            height: 34px;
+            background: #fff;
+            box-shadow: 0 0 6px rgba(255,255,255,0.8);
+        }
+        #meter-center {
+            position: absolute;
+            top: 0; bottom: 0;
+            left: 50%;
+            width: 6px;
+            transform: translateX(-50%);
+            background: rgba(255,255,255,0.35);
+        }
+
+        .result-panel {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 22px 28px;
+            text-align: center;
+            display: none;
+            min-width: 260px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        .result-panel.show { display: block; }
+        .result-panel h2 { margin: 0 0 6px; font-size: 22px; color: var(--accent); }
+        .result-panel .distance { font-size: 34px; font-weight: 900; margin: 6px 0; }
+        .result-panel .earn { color: var(--money); font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+        .result-panel .record { color: var(--accent-2); font-weight: 800; margin-bottom: 8px; }
+        .result-panel .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
+
+        /* ---------- SHOP ---------- */
+        #screen-shop {
+            background: #171b28;
+            display: none;
+            flex-direction: column;
+        }
+        .shop-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 16px 8px;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .tabs { display: flex; gap: 8px; padding: 0 16px 10px; }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            border-radius: 10px;
+            border: 2px solid var(--panel-border);
+            background: #1f2437;
+            color: var(--text-dim);
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .tab-btn.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
+        .shop-body { flex: 1; overflow-y: auto; padding: 0 16px 20px; }
+        .upgrade-card, .skin-card {
+            background: #1f2437;
+            border: 2px solid var(--panel-border);
+            border-radius: 14px;
+            padding: 14px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+        .upgrade-card .icon, .skin-card .icon {
+            font-size: 30px;
+            width: 46px;
+            text-align: center;
+        }
+        .upgrade-card .info, .skin-card .info { flex: 1; }
+        .upgrade-card .info h3, .skin-card .info h3 { margin: 0 0 4px; font-size: 15px; }
+        .upgrade-card .info p, .skin-card .info p { margin: 0; font-size: 12px; color: var(--text-dim); }
+        .skin-card img {
+            width: 46px; height: 46px; object-fit: contain;
+        }
+        .level-badge {
+            font-size: 11px;
+            color: var(--accent);
+            font-weight: 700;
+        }
+
+        .modal-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(0,0,0,0.5);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 50;
+        }
+        .modal-overlay.show { display: flex; }
+        .toast {
+            position: absolute;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(20,24,36,0.95);
+            border: 2px solid var(--panel-border);
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 700;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+            pointer-events: none;
+            z-index: 60;
+        }
+        .toast.show { opacity: 1; }
+
+        .back-btn {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 10;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+
+    <!-- MENU SCREEN -->
+    <section id="screen-menu" class="screen active">
+        <div class="menu-wrap">
+            <div class="title-card">
+                <h1>🎒 Bully the Trousse</h1>
+                <p>Lance ta trousse le plus loin possible !</p>
+            </div>
+            <div class="money-pill">💰 <span id="menu-money">0</span> $</div>
+            <div id="trousse-preview-wrap"><img id="trousse-preview-img" src="trousse-skin-1.png" alt="trousse"></div>
+            <div class="stats-row">
+                <div class="stat-chip">Puissance <b id="menu-puissance">1</b></div>
+                <div class="stat-chip">Vitesse <b id="menu-vitesse">1</b></div>
+                <div class="stat-chip">Record <b id="menu-record">0 m</b></div>
+            </div>
+            <div class="menu-buttons">
+                <button class="btn" id="btn-play">🚀 Jouer</button>
+                <button class="btn secondary" id="btn-shop">🛒 Boutique</button>
+            </div>
+            <div class="worlds-row" id="worlds-row"></div>
+        </div>
+    </section>
+
+    <!-- GAME SCREEN -->
+    <section id="screen-game" class="screen">
+        <canvas id="game-canvas"></canvas>
+        <button class="btn secondary small back-btn" id="btn-game-back">← Menu</button>
+        <div class="hud-top">
+            <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
+            <div class="money-pill" style="font-size:14px; padding:6px 14px; color:#fff;">📏 <span id="game-distance">0</span> m</div>
+        </div>
+        <div class="hint-text" id="hint-text">Clique / appuie pour charger la puissance !</div>
+        <div id="meter-wrap">
+            <div id="meter-fill"></div>
+            <div id="meter-center"></div>
+            <div id="meter-marker"></div>
+        </div>
+        <div class="result-panel" id="result-panel">
+            <div id="result-record" class="record" style="display:none;">🏆 NOUVEAU RECORD !</div>
+            <div id="result-perfect" class="record" style="display:none; color:#6bffb0;">✨ LANCER PARFAIT !</div>
+            <h2>Distance parcourue</h2>
+            <div class="distance"><span id="result-distance">0</span> m</div>
+            <div class="earn">+<span id="result-earn">0</span> $</div>
+            <div class="buttons">
+                <button class="btn" id="btn-throw-again">🔁 Relancer</button>
+                <button class="btn secondary" id="btn-result-shop">🛒 Boutique</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- SHOP SCREEN -->
+    <section id="screen-shop" class="screen">
+        <button class="btn secondary small back-btn" id="btn-shop-back">← Menu</button>
+        <div class="shop-header" style="justify-content:center; padding-top:16px;">
+            <div class="money-pill">💰 <span id="shop-money">0</span> $</div>
+        </div>
+        <div class="tabs">
+            <button class="tab-btn active" id="tab-upgrades">⚙️ Améliorations</button>
+            <button class="tab-btn" id="tab-skins">🎨 Skins</button>
+        </div>
+        <div class="shop-body" id="shop-body"></div>
+    </section>
+
+    <div class="toast" id="toast"></div>
+</div>
+
+<script>
+(function () {
+    "use strict";
+
+    /* ============ CONSTANTS ============ */
+    const SAVE_KEY = "bullyTrousseSave_v1";
+    const SCALE = 12; // px per meter
+    const BASE_G = 950; // px/s^2 at vitesse level 0
+    const BASE_V0 = 480; // px/s at puissance level 0, full power
+
+    const WORLDS = [
+        { id: "cour", name: "Cour d'école", emoji: "🏫", unlocked: true },
+        { id: "plage", name: "Plage", emoji: "🏖️", unlocked: false },
+        { id: "ville", name: "Ville", emoji: "🏙️", unlocked: false },
+    ];
+
+    const SKINS = [
+        {
+            id: "classique", name: "Trousse Classique", cost: 0,
+            desc: "La trousse de base, fidèle au poste.",
+            bonusPuissance: 0, bonusVitesse: 0, filter: "none"
+        },
+        {
+            id: "doree", name: "Trousse Dorée", cost: 400,
+            desc: "+2 Puissance. Brille de mille feux.",
+            bonusPuissance: 2, bonusVitesse: 0, filter: "sepia(0.6) saturate(4) hue-rotate(-10deg) brightness(1.15)"
+        },
+        {
+            id: "glacee", name: "Trousse Glacée", cost: 1200,
+            desc: "+3 Vitesse. Fraîche comme un glaçon.",
+            bonusPuissance: 0, bonusVitesse: 3, filter: "hue-rotate(150deg) saturate(2) brightness(1.1)"
+        },
+        {
+            id: "feu", name: "Trousse de Feu", cost: 3200,
+            desc: "+3 Puissance, +2 Vitesse. Ça chauffe !",
+            bonusPuissance: 3, bonusVitesse: 2, filter: "hue-rotate(-60deg) saturate(3) brightness(1.05)"
+        },
+        {
+            id: "arcenciel", name: "Trousse Arc-en-ciel", cost: 9000,
+            desc: "+5 Puissance, +5 Vitesse. La légende ultime.",
+            bonusPuissance: 5, bonusVitesse: 5, filter: "rainbow"
+        },
+    ];
+
+    /* ============ SAVE / STATE ============ */
+    function defaultSave() {
+        return {
+            money: 0,
+            puissanceLevel: 0,
+            vitesseLevel: 0,
+            bestDistance: 0,
+            ownedSkins: ["classique"],
+            equippedSkin: "classique",
+        };
+    }
+
+    let save = loadSave();
+
+    function loadSave() {
+        try {
+            const raw = localStorage.getItem(SAVE_KEY);
+            if (!raw) return defaultSave();
+            const parsed = JSON.parse(raw);
+            return Object.assign(defaultSave(), parsed);
+        } catch (e) {
+            return defaultSave();
+        }
+    }
+
+    function persist() {
+        localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+    }
+
+    function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
+
+    function totalPuissance() {
+        return save.puissanceLevel + getSkin(save.equippedSkin).bonusPuissance;
+    }
+    function totalVitesse() {
+        return save.vitesseLevel + getSkin(save.equippedSkin).bonusVitesse;
+    }
+
+    function upgradeCost(level) {
+        return Math.round(50 * Math.pow(1.55, level));
+    }
+
+    /* ============ TOAST ============ */
+    const toastEl = document.getElementById("toast");
+    let toastTimer = null;
+    function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add("show");
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1600);
+    }
+
+    /* ============ SOUND (WebAudio, no assets) ============ */
+    let audioCtx = null;
+    function ensureAudio() {
+        if (!audioCtx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) audioCtx = new AC();
+        }
+        return audioCtx;
+    }
+    function beep(freq, dur, type, vol) {
+        const ctx = ensureAudio();
+        if (!ctx) return;
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type || "sine";
+        osc.frequency.value = freq;
+        gain.gain.value = vol || 0.15;
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        const now = ctx.currentTime;
+        gain.gain.setValueAtTime(gain.gain.value, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        osc.start(now);
+        osc.stop(now + dur);
+    }
+    function sfxCharge() { beep(300, 0.08, "square", 0.05); }
+    function sfxLaunch() { beep(180, 0.25, "sawtooth", 0.12); beep(500, 0.15, "sine", 0.08); }
+    function sfxLand() { beep(90, 0.3, "triangle", 0.18); }
+    function sfxBuy() { beep(700, 0.12, "sine", 0.1); beep(900, 0.15, "sine", 0.1); }
+    function sfxError() { beep(140, 0.15, "square", 0.1); }
+    function sfxRecord() { beep(600, 0.1, "sine", 0.12); beep(800, 0.1, "sine", 0.12); beep(1000, 0.2, "sine", 0.12); }
+
+    /* ============ SCREEN NAVIGATION ============ */
+    const screens = {
+        menu: document.getElementById("screen-menu"),
+        game: document.getElementById("screen-game"),
+        shop: document.getElementById("screen-shop"),
+    };
+    function showScreen(name) {
+        Object.values(screens).forEach(s => s.classList.remove("active"));
+        screens[name].classList.add("active");
+        if (name === "menu") refreshMenu();
+        if (name === "shop") refreshShop();
+        if (name === "game") resetThrow();
+    }
+
+    /* ============ MENU ============ */
+    function refreshMenu() {
+        document.getElementById("menu-money").textContent = save.money;
+        document.getElementById("menu-puissance").textContent = totalPuissance();
+        document.getElementById("menu-vitesse").textContent = totalVitesse();
+        document.getElementById("menu-record").textContent = save.bestDistance.toFixed(1) + " m";
+        document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
+    }
+
+    function rainbowOrFilter(filter, t) {
+        if (filter === "rainbow") {
+            const hue = Math.floor((t / 15) % 360);
+            return "hue-rotate(" + hue + "deg) saturate(2.2) brightness(1.1)";
+        }
+        return filter;
+    }
+
+    function buildWorldsRow() {
+        const row = document.getElementById("worlds-row");
+        row.innerHTML = "";
+        WORLDS.forEach((w, idx) => {
+            const card = document.createElement("div");
+            card.className = "world-card" + (w.unlocked ? "" : " locked") + (idx === 0 ? " selected" : "");
+            card.innerHTML = '<div class="emoji">' + w.emoji + '</div><div class="name">' + w.name + '</div>';
+            card.addEventListener("click", () => {
+                if (!w.unlocked) {
+                    showToast("🔒 " + w.name + " arrive bientôt !");
+                    sfxError();
+                }
+            });
+            row.appendChild(card);
+        });
+    }
+
+    let menuPreviewRAF = null;
+    function animateMenuPreview() {
+        if (!screens.menu.classList.contains("active")) return;
+        const img = document.getElementById("trousse-preview-img");
+        img.style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
+        menuPreviewRAF = requestAnimationFrame(animateMenuPreview);
+    }
+
+    /* ============ SHOP ============ */
+    let currentTab = "upgrades";
+
+    function refreshShop() {
+        document.getElementById("shop-money").textContent = save.money;
+        renderShopTab();
+    }
+
+    function renderShopTab() {
+        const body = document.getElementById("shop-body");
+        body.innerHTML = "";
+        if (currentTab === "upgrades") {
+            body.appendChild(buildUpgradeCard(
+                "💪", "Puissance", save.puissanceLevel,
+                "Augmente la force maximale de ton lancer.",
+                () => {
+                    const cost = upgradeCost(save.puissanceLevel);
+                    if (save.money >= cost) {
+                        save.money -= cost;
+                        save.puissanceLevel++;
+                        persist();
+                        sfxBuy();
+                        refreshShop();
+                    } else {
+                        sfxError();
+                        showToast("Pas assez d'argent !");
+                    }
+                }
+            ));
+            body.appendChild(buildUpgradeCard(
+                "⚡", "Vitesse", save.vitesseLevel,
+                "Réduit la résistance : la trousse vole plus loin.",
+                () => {
+                    const cost = upgradeCost(save.vitesseLevel);
+                    if (save.money >= cost) {
+                        save.money -= cost;
+                        save.vitesseLevel++;
+                        persist();
+                        sfxBuy();
+                        refreshShop();
+                    } else {
+                        sfxError();
+                        showToast("Pas assez d'argent !");
+                    }
+                }
+            ));
+        } else {
+            SKINS.forEach(skin => body.appendChild(buildSkinCard(skin)));
+        }
+    }
+
+    function buildUpgradeCard(icon, name, level, desc, onBuy) {
+        const cost = upgradeCost(level);
+        const card = document.createElement("div");
+        card.className = "upgrade-card";
+        card.innerHTML =
+            '<div class="icon">' + icon + '</div>' +
+            '<div class="info"><h3>' + name + ' <span class="level-badge">Niv. ' + level + '</span></h3>' +
+            '<p>' + desc + '</p></div>';
+        const btn = document.createElement("button");
+        btn.className = "btn small";
+        btn.textContent = cost + " $";
+        btn.addEventListener("click", onBuy);
+        card.appendChild(btn);
+        return card;
+    }
+
+    function buildSkinCard(skin) {
+        const owned = save.ownedSkins.includes(skin.id);
+        const equipped = save.equippedSkin === skin.id;
+        const card = document.createElement("div");
+        card.className = "skin-card";
+        const img = document.createElement("img");
+        img.src = "trousse-skin-1.png";
+        img.style.filter = skin.filter === "rainbow" ? "hue-rotate(0deg) saturate(2.2)" : skin.filter;
+        card.appendChild(img);
+
+        const info = document.createElement("div");
+        info.className = "info";
+        let bonusText = [];
+        if (skin.bonusPuissance) bonusText.push("+" + skin.bonusPuissance + " Puissance");
+        if (skin.bonusVitesse) bonusText.push("+" + skin.bonusVitesse + " Vitesse");
+        info.innerHTML = "<h3>" + skin.name + (equipped ? ' <span class="level-badge">ÉQUIPÉE</span>' : '') + "</h3><p>" + skin.desc + (bonusText.length ? " (" + bonusText.join(", ") + ")" : "") + "</p>";
+        card.appendChild(info);
+
+        const btn = document.createElement("button");
+        btn.className = "btn small" + (equipped ? " secondary" : "");
+        if (equipped) {
+            btn.textContent = "Équipée";
+            btn.disabled = true;
+        } else if (owned) {
+            btn.textContent = "Équiper";
+            btn.addEventListener("click", () => {
+                save.equippedSkin = skin.id;
+                persist();
+                sfxBuy();
+                refreshShop();
+            });
+        } else {
+            btn.textContent = skin.cost + " $";
+            btn.addEventListener("click", () => {
+                if (save.money >= skin.cost) {
+                    save.money -= skin.cost;
+                    save.ownedSkins.push(skin.id);
+                    save.equippedSkin = skin.id;
+                    persist();
+                    sfxBuy();
+                    refreshShop();
+                } else {
+                    sfxError();
+                    showToast("Pas assez d'argent !");
+                }
+            });
+        }
+        card.appendChild(btn);
+        return card;
+    }
+
+    document.getElementById("tab-upgrades").addEventListener("click", () => {
+        currentTab = "upgrades";
+        document.getElementById("tab-upgrades").classList.add("active");
+        document.getElementById("tab-skins").classList.remove("active");
+        renderShopTab();
+    });
+    document.getElementById("tab-skins").addEventListener("click", () => {
+        currentTab = "skins";
+        document.getElementById("tab-skins").classList.add("active");
+        document.getElementById("tab-upgrades").classList.remove("active");
+        renderShopTab();
+    });
+
+    /* ============ GAME (CANVAS) ============ */
+    const canvas = document.getElementById("game-canvas");
+    const ctx = canvas.getContext("2d");
+    const meterWrap = document.getElementById("meter-wrap");
+    const meterFill = document.getElementById("meter-fill");
+    const meterMarker = document.getElementById("meter-marker");
+    const hintText = document.getElementById("hint-text");
+    const resultPanel = document.getElementById("result-panel");
+
+    let trousseImg = new Image();
+    trousseImg.src = "trousse-skin-1.png";
+
+    function resizeCanvas() {
+        canvas.width = canvas.clientWidth * devicePixelRatio;
+        canvas.height = canvas.clientHeight * devicePixelRatio;
+    }
+    window.addEventListener("resize", resizeCanvas);
+
+    // Game state machine: idle -> charging_power -> charging_angle -> flying -> landed
+    let state = "idle";
+    let worldX = 0;       // horizontal distance travelled (px, world space)
+    let worldY = 0;       // height above ground (px), 0 = ground
+    let vx = 0, vy = 0;
+    let rotation = 0;
+    let rotSpeed = 0;
+    let cameraX = 0;
+    let t0 = 0;           // phase start time
+    let lastFrameTime = 0;
+    let lockedPower = 0;
+    let lockedAccuracy = 0;
+    let isPerfect = false;
+    let groundScreenY = 0;
+
+    function resetThrow() {
+        state = "idle";
+        worldX = 0;
+        worldY = 0;
+        vx = 0; vy = 0;
+        rotation = 0;
+        cameraX = 0;
+        resultPanel.classList.remove("show");
+        meterWrap.style.display = "none";
+        hintText.style.display = "block";
+        hintText.textContent = "Clique / appuie pour charger la puissance !";
+        resizeCanvas();
+        requestAnimationFrame(gameLoop);
+    }
+
+    function startChargingPower() {
+        if (state !== "idle") return;
+        state = "charging_power";
+        t0 = performance.now();
+        meterWrap.style.display = "block";
+        hintText.textContent = "Clique pour verrouiller la PUISSANCE !";
+    }
+
+    function lockPower() {
+        const t = (performance.now() - t0) / 1000;
+        const frac = 0.4 + 0.6 * Math.abs(Math.sin(t * 2.6));
+        lockedPower = frac;
+        state = "charging_angle";
+        t0 = performance.now();
+        hintText.textContent = "Reclique pour verrouiller la PRÉCISION !";
+        sfxCharge();
+    }
+
+    function lockAccuracyAndLaunch() {
+        const t = (performance.now() - t0) / 1000;
+        const value = Math.sin(t * 3.4); // -1..1
+        lockedAccuracy = value;
+        isPerfect = Math.abs(value) < 0.08;
+
+        const puissance = totalPuissance();
+        const vitesse = totalVitesse();
+
+        const v0 = BASE_V0 * (1 + puissance * 0.12) * lockedPower;
+        const angleDeg = 45 - value * 16;
+        const angleRad = angleDeg * Math.PI / 180;
+        const g = BASE_G / (1 + vitesse * 0.09);
+
+        vx = v0 * Math.cos(angleRad);
+        vy = -v0 * Math.sin(angleRad);
+        window.__g = g;
+
+        rotSpeed = 6 + v0 / 55;
+        state = "flying";
+        meterWrap.style.display = "none";
+        hintText.style.display = "none";
+        sfxLaunch();
+    }
+
+    canvas.addEventListener("pointerdown", (e) => {
+        e.preventDefault();
+        handleTap();
+    });
+    window.addEventListener("keydown", (e) => {
+        if (e.code === "Space" && screens.game.classList.contains("active")) {
+            e.preventDefault();
+            handleTap();
+        }
+    });
+
+    function handleTap() {
+        if (state === "idle") startChargingPower();
+        else if (state === "charging_power") lockPower();
+        else if (state === "charging_angle") lockAccuracyAndLaunch();
+        else if (state === "landed") { /* result buttons handle this */ }
+    }
+
+    function updateMeterUI() {
+        if (state === "charging_power") {
+            const t = (performance.now() - t0) / 1000;
+            const frac = 0.4 + 0.6 * Math.abs(Math.sin(t * 2.6));
+            meterFill.style.width = (frac * 100) + "%";
+            meterMarker.style.left = (frac * 100) + "%";
+        } else if (state === "charging_angle") {
+            const t = (performance.now() - t0) / 1000;
+            const value = Math.sin(t * 3.4); // -1..1
+            const pct = (value + 1) / 2 * 100;
+            meterFill.style.width = "100%";
+            meterMarker.style.left = pct + "%";
+        }
+    }
+
+    function onLanded() {
+        state = "landed";
+        const distanceMeters = worldX / SCALE;
+        if (distanceMeters > save.bestDistance) {
+            save.bestDistance = distanceMeters;
+            document.getElementById("result-record").style.display = "block";
+            sfxRecord();
+        } else {
+            document.getElementById("result-record").style.display = "none";
+        }
+        document.getElementById("result-perfect").style.display = isPerfect ? "block" : "none";
+
+        let earn = Math.max(1, Math.round(distanceMeters * 2));
+        if (isPerfect) earn = Math.round(earn * 1.3);
+        save.money += earn;
+        persist();
+
+        document.getElementById("result-distance").textContent = distanceMeters.toFixed(1);
+        document.getElementById("result-earn").textContent = earn;
+        document.getElementById("game-money").textContent = save.money;
+
+        resultPanel.classList.add("show");
+        sfxLand();
+    }
+
+    document.getElementById("btn-throw-again").addEventListener("click", () => resetThrow());
+    document.getElementById("btn-result-shop").addEventListener("click", () => showScreen("shop"));
+    document.getElementById("btn-game-back").addEventListener("click", () => showScreen("menu"));
+    document.getElementById("btn-shop-back").addEventListener("click", () => showScreen("menu"));
+    document.getElementById("btn-play").addEventListener("click", () => showScreen("game"));
+    document.getElementById("btn-shop").addEventListener("click", () => showScreen("shop"));
+
+    /* ---- Rendering ---- */
+    function drawBackground(w, h) {
+        groundScreenY = h * 0.68;
+        // sky
+        const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
+        sky.addColorStop(0, "#7ec8e3");
+        sky.addColorStop(1, "#d8f3ff");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, groundScreenY);
+
+        // distant school building silhouette (parallax, slow scroll)
+        const parX = -cameraX * 0.25;
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        for (let i = -2; i < 8; i++) {
+            const bx = (i * 260) + (parX % 260);
+            ctx.fillRect(bx, groundScreenY - 140, 180, 140);
+            ctx.fillStyle = "rgba(120,150,180,0.35)";
+            for (let wcol = 0; wcol < 4; wcol++) {
+                for (let wrow = 0; wrow < 3; wrow++) {
+                    ctx.fillRect(bx + 15 + wcol * 40, groundScreenY - 120 + wrow * 35, 22, 22);
+                }
+            }
+            ctx.fillStyle = "rgba(255,255,255,0.55)";
+        }
+
+        // ground
+        const groundGrad = ctx.createLinearGradient(0, groundScreenY, 0, h);
+        groundGrad.addColorStop(0, "#9aa0ab");
+        groundGrad.addColorStop(1, "#6f7480");
+        ctx.fillStyle = groundGrad;
+        ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+
+        // ground distance markers every 10 meters
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "12px sans-serif";
+        ctx.lineWidth = 2;
+        const startMeter = Math.floor((cameraX / SCALE) / 10) * 10;
+        for (let m = startMeter; m < startMeter + 200; m += 10) {
+            const sx = m * SCALE - cameraX;
+            if (sx < -20 || sx > w + 20) continue;
+            ctx.beginPath();
+            ctx.moveTo(sx, groundScreenY);
+            ctx.lineTo(sx, groundScreenY + 14);
+            ctx.stroke();
+            ctx.fillText(m + "m", sx + 4, groundScreenY + 26);
+        }
+    }
+
+    function worldToScreen(x, y) {
+        return { sx: x - cameraX, sy: groundScreenY - y };
+    }
+
+    function drawTrousse() {
+        const { sx, sy } = worldToScreen(worldX, worldY);
+        const size = 60;
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(rotation);
+        ctx.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
+        if (trousseImg.complete && trousseImg.naturalWidth > 0) {
+            ctx.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+        } else {
+            ctx.fillStyle = "#e67e22";
+            ctx.fillRect(-size / 2, -size / 2, size, size);
+        }
+        ctx.filter = "none";
+        ctx.restore();
+    }
+
+    function gameLoop(now) {
+        if (!screens.game.classList.contains("active")) return;
+        if (!lastFrameTime) lastFrameTime = now;
+        const dt = Math.min((now - lastFrameTime) / 1000, 0.032);
+        lastFrameTime = now;
+
+        const w = canvas.width / devicePixelRatio;
+        const h = canvas.height / devicePixelRatio;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        if (state === "flying") {
+            const g = window.__g || BASE_G;
+            worldX += vx * dt;
+            worldY += vy * dt;
+            vy += g * dt;
+            rotation += rotSpeed * dt;
+
+            if (worldY <= 0 && vy > 0) {
+                worldY = 0;
+                onLanded();
+            }
+
+            // camera follows trousse, keeping it roughly at 30% of screen width
+            const targetCamera = worldX - w * 0.3;
+            cameraX = Math.max(0, targetCamera);
+
+            document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
+        }
+
+        updateMeterUI();
+        drawBackground(w, h);
+        drawTrousse();
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    /* ============ INIT ============ */
+    buildWorldsRow();
+    refreshMenu();
+    if (!menuPreviewRAF) animateMenuPreview();
+    showScreen("menu");
+})();
+</script>
+</body>
+</html>
