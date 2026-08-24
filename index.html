@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bully the Trousse</title>
     <style>
+        /* Variables de couleur réutilisées partout dans l'interface */
         :root {
             --sky-top: #7ec8e3;
             --sky-bottom: #cdeffd;
@@ -42,6 +43,8 @@
             overflow: hidden;
         }
 
+        /* Les 3 écrans (menu / jeu / boutique) sont superposés et on affiche
+           seulement celui qui a la classe "active" (voir showScreen en JS) */
         .screen {
             position: absolute;
             inset: 0;
@@ -49,7 +52,7 @@
         }
         .screen.active { display: block; }
 
-        /* ---------- MENU ---------- */
+        /* ---------- ÉCRAN MENU ---------- */
         #screen-menu {
             background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 60%, var(--ground) 60%, var(--ground-dark) 100%);
         }
@@ -102,6 +105,7 @@
             animation: floaty 2.6s ease-in-out infinite;
         }
         #trousse-preview-wrap img { width: 100%; height: 100%; object-fit: contain; }
+        /* Petite animation de flottement pour la trousse affichée dans le menu */
         @keyframes floaty {
             0%, 100% { transform: translateY(0) rotate(-3deg); }
             50% { transform: translateY(-10px) rotate(3deg); }
@@ -145,6 +149,7 @@
         .btn.small { padding: 8px 16px; font-size: 14px; border-radius: 10px; }
         .menu-buttons { display: flex; gap: 14px; margin-top: 4px; }
 
+        /* Rangée des "mondes" (niveaux) en bas du menu */
         .worlds-row {
             display: flex;
             gap: 10px;
@@ -167,7 +172,8 @@
         .world-card .name { font-size: 12px; font-weight: 700; margin-top: 4px; }
         .world-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
 
-        /* ---------- GAME ---------- */
+        /* ---------- ÉCRAN DE JEU ---------- */
+        /* Tout le décor + la trousse sont dessinés dans ce <canvas> en JS */
         #screen-game canvas {
             display: block;
             width: 100%;
@@ -196,6 +202,7 @@
             text-shadow: 0 2px 6px rgba(0,0,0,0.6);
             pointer-events: none;
         }
+        /* Barre de charge affichée pendant les phases "puissance" et "précision" */
         #meter-wrap {
             position: absolute;
             left: 50%;
@@ -232,6 +239,7 @@
             background: rgba(255,255,255,0.35);
         }
 
+        /* Panneau affiché après l'atterrissage (distance + argent gagné) */
         .result-panel {
             position: absolute;
             left: 50%;
@@ -253,11 +261,16 @@
         .result-panel .record { color: var(--accent-2); font-weight: 800; margin-bottom: 8px; }
         .result-panel .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; }
 
-        /* ---------- SHOP ---------- */
+        /* ---------- ÉCRAN BOUTIQUE ---------- */
         #screen-shop {
             background: #171b28;
             flex-direction: column;
         }
+        /* Important : on utilise "#screen-shop.active" (un ID + une classe) plutôt
+           que de remettre "display: none" ici, car un sélecteur avec ID est plus
+           spécifique que ".screen.active" et gagnerait toujours, même une fois la
+           classe "active" ajoutée en JS. Résultat sans ça : la boutique ne s'affiche
+           jamais, sans la moindre erreur dans la console. */
         #screen-shop.active { display: flex; }
         .shop-header {
             display: flex;
@@ -317,6 +330,7 @@
             z-index: 50;
         }
         .modal-overlay.show { display: flex; }
+        /* Petit message temporaire en bas de l'écran (ex: "Pas assez d'argent !") */
         .toast {
             position: absolute;
             bottom: 24px;
@@ -346,7 +360,7 @@
 <body>
 <div id="app">
 
-    <!-- MENU SCREEN -->
+    <!-- ÉCRAN MENU -->
     <section id="screen-menu" class="screen active">
         <div class="menu-wrap">
             <div class="title-card">
@@ -364,11 +378,12 @@
                 <button class="btn" id="btn-play">🚀 Jouer</button>
                 <button class="btn secondary" id="btn-shop">🛒 Boutique</button>
             </div>
+            <!-- Rempli dynamiquement par buildWorldsRow() -->
             <div class="worlds-row" id="worlds-row"></div>
         </div>
     </section>
 
-    <!-- GAME SCREEN -->
+    <!-- ÉCRAN DE JEU -->
     <section id="screen-game" class="screen">
         <canvas id="game-canvas"></canvas>
         <button class="btn secondary small back-btn" id="btn-game-back">← Menu</button>
@@ -395,7 +410,7 @@
         </div>
     </section>
 
-    <!-- SHOP SCREEN -->
+    <!-- ÉCRAN BOUTIQUE -->
     <section id="screen-shop" class="screen">
         <button class="btn secondary small back-btn" id="btn-shop-back">← Menu</button>
         <div class="shop-header" style="justify-content:center; padding-top:16px;">
@@ -405,6 +420,7 @@
             <button class="tab-btn active" id="tab-upgrades">⚙️ Améliorations</button>
             <button class="tab-btn" id="tab-skins">🎨 Skins</button>
         </div>
+        <!-- Rempli dynamiquement par renderShopTab() -->
         <div class="shop-body" id="shop-body"></div>
     </section>
 
@@ -415,18 +431,40 @@
 (function () {
     "use strict";
 
-    /* ============ CONSTANTS ============ */
-    const SAVE_KEY = "bullyTrousseSave_v1";
-    const SCALE = 12; // px per meter
-    const BASE_G = 950; // px/s^2 at vitesse level 0
-    const BASE_V0 = 480; // px/s at puissance level 0, full power
+    /* =========================================================
+       SOMMAIRE DU FICHIER
+       1. Constantes de jeu (physique, échelle, sauvegarde)
+       2. Données statiques (mondes, skins)
+       3. Sauvegarde (localStorage)
+       4. Notification "toast"
+       5. Sons (WebAudio, sans fichiers audio)
+       6. Navigation entre les 3 écrans
+       7. Écran menu
+       8. Écran boutique
+       9. Écran de jeu : état + mécanique de lancer
+       10. Rendu du décor (canvas) : bâtiments, arbres, craie
+       11. Rendu de la trousse + boucle principale du jeu
+       12. Initialisation
+       ========================================================= */
 
+    /* ============ 1. CONSTANTES DE JEU ============ */
+    const SAVE_KEY = "bullyTrousseSave_v1";
+    const SCALE = 12;   // nombre de pixels représentant 1 mètre à l'écran
+    const BASE_G = 950; // gravité (px/s²) avec un niveau de Vitesse à 0
+    const BASE_V0 = 480; // vitesse initiale (px/s) avec Puissance à 0 et charge à 100%
+
+    /* ============ 2. DONNÉES STATIQUES ============ */
+    // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
+    // "unlocked" à true et d'ajouter un décor pour en activer un nouveau.
     const WORLDS = [
         { id: "cour", name: "Cour d'école", emoji: "🏫", unlocked: true },
         { id: "plage", name: "Plage", emoji: "🏖️", unlocked: false },
         { id: "ville", name: "Ville", emoji: "🏙️", unlocked: false },
     ];
 
+    // Chaque skin réutilise la même image (trousse-skin-1.png) mais applique
+    // un filtre CSS/canvas différent pour changer les couleurs, plus un bonus
+    // de statistiques ajouté par-dessus les niveaux achetés en boutique.
     const SKINS = [
         {
             id: "classique", name: "Trousse Classique", cost: 0,
@@ -451,11 +489,11 @@
         {
             id: "arcenciel", name: "Trousse Arc-en-ciel", cost: 9000,
             desc: "+5 Puissance, +5 Vitesse. La légende ultime.",
-            bonusPuissance: 5, bonusVitesse: 5, filter: "rainbow"
+            bonusPuissance: 5, bonusVitesse: 5, filter: "rainbow" // cas spécial : géré par rainbowOrFilter()
         },
     ];
 
-    /* ============ SAVE / STATE ============ */
+    /* ============ 3. SAUVEGARDE (localStorage) ============ */
     function defaultSave() {
         return {
             money: 0,
@@ -474,6 +512,8 @@
             const raw = localStorage.getItem(SAVE_KEY);
             if (!raw) return defaultSave();
             const parsed = JSON.parse(raw);
+            // Object.assign avec defaultSave() en base : si on ajoute un nouveau
+            // champ de sauvegarde plus tard, les anciennes parties ne cassent pas.
             return Object.assign(defaultSave(), parsed);
         } catch (e) {
             return defaultSave();
@@ -486,6 +526,7 @@
 
     function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
 
+    // Stat totale = niveau acheté en boutique + bonus du skin équipé
     function totalPuissance() {
         return save.puissanceLevel + getSkin(save.equippedSkin).bonusPuissance;
     }
@@ -493,11 +534,13 @@
         return save.vitesseLevel + getSkin(save.equippedSkin).bonusVitesse;
     }
 
+    // Coût d'amélioration : croissance exponentielle pour garder une
+    // progression satisfaisante sans que ça devienne gratuit trop vite
     function upgradeCost(level) {
         return Math.round(50 * Math.pow(1.55, level));
     }
 
-    /* ============ TOAST ============ */
+    /* ============ 4. NOTIFICATION "TOAST" ============ */
     const toastEl = document.getElementById("toast");
     let toastTimer = null;
     function showToast(msg) {
@@ -507,7 +550,9 @@
         toastTimer = setTimeout(() => toastEl.classList.remove("show"), 1600);
     }
 
-    /* ============ SOUND (WebAudio, no assets) ============ */
+    /* ============ 5. SONS (WebAudio, aucun fichier audio requis) ============ */
+    // On génère des petits bips synthétiques à la volée avec l'API WebAudio,
+    // pas besoin d'assets .mp3/.wav supplémentaires.
     let audioCtx = null;
     function ensureAudio() {
         if (!audioCtx) {
@@ -528,7 +573,7 @@
         gain.connect(ctx.destination);
         const now = ctx.currentTime;
         gain.gain.setValueAtTime(gain.gain.value, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + dur);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + dur); // fondu de sortie
         osc.start(now);
         osc.stop(now + dur);
     }
@@ -539,12 +584,14 @@
     function sfxError() { beep(140, 0.15, "square", 0.1); }
     function sfxRecord() { beep(600, 0.1, "sine", 0.12); beep(800, 0.1, "sine", 0.12); beep(1000, 0.2, "sine", 0.12); }
 
-    /* ============ SCREEN NAVIGATION ============ */
+    /* ============ 6. NAVIGATION ENTRE LES 3 ÉCRANS ============ */
     const screens = {
         menu: document.getElementById("screen-menu"),
         game: document.getElementById("screen-game"),
         shop: document.getElementById("screen-shop"),
     };
+    // Ajoute/retire simplement la classe "active" (voir le CSS plus haut) et
+    // rafraîchit le contenu de l'écran qu'on vient d'afficher.
     function showScreen(name) {
         Object.values(screens).forEach(s => s.classList.remove("active"));
         screens[name].classList.add("active");
@@ -553,7 +600,7 @@
         if (name === "game") resetThrow();
     }
 
-    /* ============ MENU ============ */
+    /* ============ 7. ÉCRAN MENU ============ */
     function refreshMenu() {
         document.getElementById("menu-money").textContent = save.money;
         document.getElementById("menu-puissance").textContent = totalPuissance();
@@ -562,6 +609,8 @@
         document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
     }
 
+    // Le skin "rainbow" n'a pas un filtre fixe : la teinte tourne en fonction
+    // du temps écoulé pour un effet arc-en-ciel animé.
     function rainbowOrFilter(filter, t) {
         if (filter === "rainbow") {
             const hue = Math.floor((t / 15) % 360);
@@ -570,6 +619,7 @@
         return filter;
     }
 
+    // Construit les cartes de mondes en bas du menu (un seul déblocable pour l'instant)
     function buildWorldsRow() {
         const row = document.getElementById("worlds-row");
         row.innerHTML = "";
@@ -587,6 +637,9 @@
         });
     }
 
+    // Boucle légère (juste pour l'image de prévisualisation) qui met à jour
+    // le filtre rainbow tant qu'on est sur le menu ; s'arrête toute seule
+    // dès qu'on quitte l'écran (voir la condition au tout début).
     let menuPreviewRAF = null;
     function animateMenuPreview() {
         if (!screens.menu.classList.contains("active")) return;
@@ -595,14 +648,15 @@
         menuPreviewRAF = requestAnimationFrame(animateMenuPreview);
     }
 
-    /* ============ SHOP ============ */
-    let currentTab = "upgrades";
+    /* ============ 8. ÉCRAN BOUTIQUE ============ */
+    let currentTab = "upgrades"; // "upgrades" ou "skins"
 
     function refreshShop() {
         document.getElementById("shop-money").textContent = save.money;
         renderShopTab();
     }
 
+    // Reconstruit entièrement la liste de cartes selon l'onglet actif
     function renderShopTab() {
         const body = document.getElementById("shop-body");
         body.innerHTML = "";
@@ -646,6 +700,7 @@
         }
     }
 
+    // Crée une carte d'amélioration (Puissance ou Vitesse) avec son bouton d'achat
     function buildUpgradeCard(icon, name, level, desc, onBuy) {
         const cost = upgradeCost(level);
         const card = document.createElement("div");
@@ -662,6 +717,8 @@
         return card;
     }
 
+    // Crée une carte de skin : bouton "Prix" si pas acheté, "Équiper" si possédé
+    // mais pas équipé, ou juste "Équipée" (désactivé) si c'est le skin actuel
     function buildSkinCard(skin) {
         const owned = save.ownedSkins.includes(skin.id);
         const equipped = save.equippedSkin === skin.id;
@@ -713,6 +770,7 @@
         return card;
     }
 
+    // Bascule entre l'onglet "Améliorations" et l'onglet "Skins"
     document.getElementById("tab-upgrades").addEventListener("click", () => {
         currentTab = "upgrades";
         document.getElementById("tab-upgrades").classList.add("active");
@@ -726,7 +784,7 @@
         renderShopTab();
     });
 
-    /* ============ GAME (CANVAS) ============ */
+    /* ============ 9. ÉCRAN DE JEU : ÉTAT + MÉCANIQUE DE LANCER ============ */
     const canvas = document.getElementById("game-canvas");
     const ctx = canvas.getContext("2d");
     const meterWrap = document.getElementById("meter-wrap");
@@ -744,21 +802,23 @@
     }
     window.addEventListener("resize", resizeCanvas);
 
-    // Game state machine: idle -> charging_power -> charging_angle -> flying -> landed
+    // Machine à états du lancer : idle -> charging_power -> charging_angle -> flying -> landed
     let state = "idle";
-    let worldX = 0;       // horizontal distance travelled (px, world space)
-    let worldY = 0;       // height above ground (px), 0 = ground
-    let vx = 0, vy = 0;
-    let rotation = 0;
-    let rotSpeed = 0;
-    let cameraX = 0;
-    let t0 = 0;           // phase start time
+    let worldX = 0;       // distance horizontale parcourue (px, espace "monde")
+    let worldY = 0;       // hauteur au-dessus du sol (px), 0 = au sol
+    let vx = 0, vy = 0;   // vitesse horizontale / verticale (px/s). vy positif = vers le haut
+    let currentG = BASE_G; // gravité du lancer en cours (dépend du niveau de Vitesse)
+    let rotation = 0;     // angle de rotation actuel de la trousse (radians)
+    let rotSpeed = 0;     // vitesse de rotation du lancer en cours (radians/s)
+    let cameraX = 0;      // décalage de caméra pour suivre la trousse pendant le vol
+    let t0 = 0;           // horodatage du début de la phase en cours (charge / précision)
     let lastFrameTime = 0;
-    let lockedPower = 0;
-    let lockedAccuracy = 0;
-    let isPerfect = false;
-    let groundScreenY = 0;
+    let lockedPower = 0;    // puissance verrouillée (0.4 à 1.0) lors du 1er clic
+    let lockedAccuracy = 0; // précision verrouillée (-1 à 1) lors du 2e clic
+    let isPerfect = false;  // vrai si le lancer était quasi-parfait (bonus d'argent)
+    let groundScreenY = 0;  // position Y du sol à l'écran (recalculée à chaque frame)
 
+    // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
         state = "idle";
         worldX = 0;
@@ -774,6 +834,7 @@
         requestAnimationFrame(gameLoop);
     }
 
+    // 1er clic : démarre la barre de charge de puissance (oscille automatiquement)
     function startChargingPower() {
         if (state !== "idle") return;
         state = "charging_power";
@@ -782,9 +843,10 @@
         hintText.textContent = "Clique pour verrouiller la PUISSANCE !";
     }
 
+    // 2e clic : verrouille la puissance à l'instant présent, démarre la barre de précision
     function lockPower() {
         const t = (performance.now() - t0) / 1000;
-        const frac = 0.4 + 0.6 * Math.abs(Math.sin(t * 2.6));
+        const frac = 0.4 + 0.6 * Math.abs(Math.sin(t * 2.6)); // oscille entre 0.4 et 1.0
         lockedPower = frac;
         state = "charging_angle";
         t0 = performance.now();
@@ -792,23 +854,28 @@
         sfxCharge();
     }
 
+    // 3e clic : verrouille la précision et calcule la vitesse initiale du lancer
     function lockAccuracyAndLaunch() {
         const t = (performance.now() - t0) / 1000;
-        const value = Math.sin(t * 3.4); // -1..1
+        const value = Math.sin(t * 3.4); // -1..1, 0 = visée parfaite (angle optimal)
         lockedAccuracy = value;
         isPerfect = Math.abs(value) < 0.08;
 
         const puissance = totalPuissance();
         const vitesse = totalVitesse();
 
+        // Formule de tir : plus la Puissance est haute, plus v0 est grand ;
+        // plus la Vitesse est haute, plus la gravité effective est faible
+        // (la trousse "flotte" plus longtemps et va donc plus loin).
         const v0 = BASE_V0 * (1 + puissance * 0.12) * lockedPower;
-        const angleDeg = 45 - value * 16;
+        const angleDeg = 45 - value * 16; // 45° = angle optimal, la précision l'écarte de ±16°
         const angleRad = angleDeg * Math.PI / 180;
-        const g = BASE_G / (1 + vitesse * 0.09);
+        currentG = BASE_G / (1 + vitesse * 0.09);
 
+        // vy positif car worldY augmente vers le haut (voir worldToScreen plus bas) ;
+        // c'est la gravité (currentG, soustraite chaque frame) qui la ramènera au sol.
         vx = v0 * Math.cos(angleRad);
         vy = v0 * Math.sin(angleRad);
-        window.__g = g;
 
         rotSpeed = 6 + v0 / 55;
         state = "flying";
@@ -817,6 +884,7 @@
         sfxLaunch();
     }
 
+    // Un clic/tap ou la touche Espace fait avancer la machine à états d'une étape
     canvas.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         handleTap();
@@ -832,9 +900,10 @@
         if (state === "idle") startChargingPower();
         else if (state === "charging_power") lockPower();
         else if (state === "charging_angle") lockAccuracyAndLaunch();
-        else if (state === "landed") { /* result buttons handle this */ }
+        else if (state === "landed") { /* rien à faire, les boutons du panneau de résultat gèrent la suite */ }
     }
 
+    // Met à jour la position visuelle du curseur sur la barre de charge à chaque frame
     function updateMeterUI() {
         if (state === "charging_power") {
             const t = (performance.now() - t0) / 1000;
@@ -850,6 +919,8 @@
         }
     }
 
+    // Appelé dès que la trousse touche le sol : calcule la distance, l'argent
+    // gagné, met à jour le record éventuel et affiche le panneau de résultat
     function onLanded() {
         state = "landed";
         const distanceMeters = worldX / SCALE;
@@ -863,7 +934,7 @@
         document.getElementById("result-perfect").style.display = isPerfect ? "block" : "none";
 
         let earn = Math.max(1, Math.round(distanceMeters * 2));
-        if (isPerfect) earn = Math.round(earn * 1.3);
+        if (isPerfect) earn = Math.round(earn * 1.3); // bonus de 30% sur un lancer parfait
         save.money += earn;
         persist();
 
@@ -875,6 +946,7 @@
         sfxLand();
     }
 
+    // Boutons de navigation de l'écran de jeu et du panneau de résultat
     document.getElementById("btn-throw-again").addEventListener("click", () => resetThrow());
     document.getElementById("btn-result-shop").addEventListener("click", () => showScreen("shop"));
     document.getElementById("btn-game-back").addEventListener("click", () => showScreen("menu"));
@@ -882,14 +954,20 @@
     document.getElementById("btn-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-shop").addEventListener("click", () => showScreen("shop"));
 
-    /* ---- Rendering ---- */
+    /* ============ 10. RENDU DU DÉCOR (canvas) ============ */
+
+    // Petit générateur pseudo-aléatoire déterministe : pour une même "seed"
+    // (ici l'indice de position dans le monde), on obtient toujours la même
+    // valeur entre 0 et 1. Ça évite que les bâtiments/arbres/craies changent
+    // ou clignotent d'une frame à l'autre pendant que la caméra défile.
     function seededRand(seed) {
         const x = Math.sin(seed * 12.9898) * 43758.5453;
         return x - Math.floor(x);
     }
 
+    // Dessine un bâtiment d'école en arrière-plan (façade + toit + fenêtres + porte)
     function drawBuilding(bx, groundY, seed) {
-        const brick = seededRand(seed) > 0.5;
+        const brick = seededRand(seed) > 0.5; // alterne entre 2 styles de façade
         const height = 130 + seededRand(seed + 1) * 50;
         const bw = 170;
         const wallColor = brick ? "rgba(196,120,110,0.5)" : "rgba(230,230,235,0.6)";
@@ -898,11 +976,11 @@
         ctx.fillStyle = wallColor;
         ctx.fillRect(bx, groundY - height, bw, height);
 
-        // roof strip
+        // bande de toit
         ctx.fillStyle = roofColor;
         ctx.fillRect(bx - 6, groundY - height - 12, bw + 12, 16);
 
-        // windows grid, some "lit"
+        // grille de fenêtres, certaines "allumées"
         const cols = 4, rows = Math.max(2, Math.floor((height - 30) / 38));
         for (let c = 0; c < cols; c++) {
             for (let r = 0; r < rows; r++) {
@@ -912,13 +990,14 @@
             }
         }
 
-        // door
+        // porte d'entrée
         ctx.fillStyle = "rgba(90,60,45,0.6)";
         ctx.fillRect(bx + bw / 2 - 14, groundY - 34, 28, 34);
     }
 
+    // Dessine un arbre simple : tronc + 3 boules de feuillage superposées
     function drawTree(sx, groundY, seed) {
-        const scale = 0.85 + seededRand(seed) * 0.4;
+        const scale = 0.85 + seededRand(seed) * 0.4; // légère variation de taille
         const trunkH = 34 * scale, trunkW = 10 * scale;
         ctx.fillStyle = "#7a5230";
         ctx.fillRect(sx - trunkW / 2, groundY - trunkH, trunkW, trunkH);
@@ -928,10 +1007,12 @@
         ctx.beginPath(); ctx.arc(sx, groundY - trunkH - 22 * scale, 24 * scale, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(sx - 16 * scale, groundY - trunkH - 12 * scale, 17 * scale, 0, Math.PI * 2); ctx.fill();
         ctx.beginPath(); ctx.arc(sx + 16 * scale, groundY - trunkH - 12 * scale, 17 * scale, 0, Math.PI * 2); ctx.fill();
+        // petite ombre pour donner du volume au feuillage
         ctx.fillStyle = "rgba(0,0,0,0.08)";
         ctx.beginPath(); ctx.arc(sx + 8 * scale, groundY - trunkH - 18 * scale, 14 * scale, 0, Math.PI * 2); ctx.fill();
     }
 
+    // Dessine un dessin à la craie sur le sol (marelle, étoile, morpion ou gribouillis)
     function drawChalk(sx, groundY, seed) {
         const kind = Math.floor(seededRand(seed) * 4);
         ctx.save();
@@ -939,10 +1020,10 @@
         ctx.fillStyle = "rgba(255,255,255,0.55)";
         ctx.lineWidth = 2.5;
         ctx.translate(sx, groundY - 4);
-        ctx.rotate((seededRand(seed + 5) - 0.5) * 0.3);
+        ctx.rotate((seededRand(seed + 5) - 0.5) * 0.3); // légère rotation aléatoire, effet "dessiné à la main"
 
         if (kind === 0) {
-            // hopscotch
+            // marelle
             const cellW = 26, cellH = 24;
             const layout = [[0], [-1, 1], [0], [-1, 1], [0]];
             layout.forEach((row, r) => {
@@ -953,7 +1034,7 @@
                 });
             });
         } else if (kind === 1) {
-            // star doodle
+            // étoile
             ctx.beginPath();
             for (let i = 0; i < 5; i++) {
                 const a = (i * 4 * Math.PI) / 5 - Math.PI / 2;
@@ -963,7 +1044,7 @@
             ctx.closePath();
             ctx.stroke();
         } else if (kind === 2) {
-            // tic-tac-toe
+            // morpion (tic-tac-toe)
             for (let i = -1; i <= 1; i += 2) {
                 ctx.beginPath(); ctx.moveTo(i * 12, -20); ctx.lineTo(i * 12, 20); ctx.stroke();
                 ctx.beginPath(); ctx.moveTo(-20, i * 12); ctx.lineTo(20, i * 12); ctx.stroke();
@@ -971,7 +1052,7 @@
             ctx.beginPath(); ctx.arc(-12, -12, 6, 0, Math.PI * 2); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(6, 6); ctx.lineTo(18, 18); ctx.moveTo(18, 6); ctx.lineTo(6, 18); ctx.stroke();
         } else {
-            // wavy scribble
+            // gribouillis ondulé
             ctx.beginPath();
             ctx.moveTo(-22, 0);
             for (let i = -22; i <= 22; i += 4) {
@@ -982,16 +1063,19 @@
         ctx.restore();
     }
 
+    // Dessine tout le fond du niveau "Cour d'école" : ciel, bâtiments, sol,
+    // craies au sol, arbres et repères de distance. Appelée à chaque frame.
     function drawBackground(w, h) {
         groundScreenY = h * 0.68;
-        // sky
+
+        // ciel (dégradé bleu clair)
         const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
         sky.addColorStop(0, "#7ec8e3");
         sky.addColorStop(1, "#d8f3ff");
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, groundScreenY);
 
-        // distant school buildings (parallax, slow scroll)
+        // bâtiments d'école au loin (défilent 4x plus lentement que le sol = effet de parallaxe)
         const buildingSpacing = 260;
         const parX = -cameraX * 0.25;
         const buildingStartIdx = Math.floor((-parX) / buildingSpacing) - 1;
@@ -1001,14 +1085,14 @@
             drawBuilding(bx, groundScreenY, i);
         }
 
-        // ground
+        // sol (dégradé gris)
         const groundGrad = ctx.createLinearGradient(0, groundScreenY, 0, h);
         groundGrad.addColorStop(0, "#9aa0ab");
         groundGrad.addColorStop(1, "#6f7480");
         ctx.fillStyle = groundGrad;
         ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
 
-        // chalk drawings on the ground (full scroll speed, behind the trousse)
+        // dessins à la craie sur le sol (défilent à la même vitesse que le sol, sous la trousse)
         const chalkSpacing = 210;
         const chalkStartIdx = Math.floor(cameraX / chalkSpacing) - 1;
         for (let i = chalkStartIdx; i < chalkStartIdx + Math.ceil(w / chalkSpacing) + 2; i++) {
@@ -1018,7 +1102,7 @@
             drawChalk(sx, h - 14, i);
         }
 
-        // trees along the horizon (full scroll speed, standing on the ground line)
+        // arbres plantés sur la ligne d'horizon (défilent à la même vitesse que le sol)
         const treeSpacing = 300;
         const treeStartIdx = Math.floor(cameraX / treeSpacing) - 1;
         for (let i = treeStartIdx; i < treeStartIdx + Math.ceil(w / treeSpacing) + 2; i++) {
@@ -1028,7 +1112,7 @@
             drawTree(sx, groundScreenY + 6, i);
         }
 
-        // ground distance markers every 10 meters
+        // repères de distance tous les 10 mètres, par-dessus le reste
         ctx.strokeStyle = "rgba(255,255,255,0.35)";
         ctx.fillStyle = "rgba(255,255,255,0.7)";
         ctx.font = "12px sans-serif";
@@ -1045,6 +1129,11 @@
         }
     }
 
+    /* ============ 11. RENDU DE LA TROUSSE + BOUCLE PRINCIPALE ============ */
+
+    // Convertit une position "monde" (worldX/worldY) en position à l'écran,
+    // en tenant compte du décalage de caméra et du fait que worldY augmente
+    // vers le haut alors que l'écran augmente vers le bas.
     function worldToScreen(x, y) {
         return { sx: x - cameraX, sy: groundScreenY - y };
     }
@@ -1054,11 +1143,12 @@
         const size = 60;
         ctx.save();
         ctx.translate(sx, sy);
-        ctx.rotate(rotation);
+        ctx.rotate(rotation); // rotation continue pendant le vol
         ctx.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
         if (trousseImg.complete && trousseImg.naturalWidth > 0) {
             ctx.drawImage(trousseImg, -size / 2, -size / 2, size, size);
         } else {
+            // filet de sécurité si l'image n'a pas fini de charger
             ctx.fillStyle = "#e67e22";
             ctx.fillRect(-size / 2, -size / 2, size, size);
         }
@@ -1066,10 +1156,11 @@
         ctx.restore();
     }
 
+    // Boucle principale : appelée à chaque frame tant que l'écran de jeu est actif
     function gameLoop(now) {
         if (!screens.game.classList.contains("active")) return;
         if (!lastFrameTime) lastFrameTime = now;
-        const dt = Math.min((now - lastFrameTime) / 1000, 0.032);
+        const dt = Math.min((now - lastFrameTime) / 1000, 0.032); // dt plafonné pour éviter les gros sauts
         lastFrameTime = now;
 
         const w = canvas.width / devicePixelRatio;
@@ -1078,18 +1169,20 @@
         ctx.clearRect(0, 0, w, h);
 
         if (state === "flying") {
-            const g = window.__g || BASE_G;
+            // intégration physique simple (méthode d'Euler) :
+            // la trousse monte tant que vy > 0, la gravité la ralentit puis la fait redescendre
             worldX += vx * dt;
             worldY += vy * dt;
-            vy -= g * dt;
+            vy -= currentG * dt;
             rotation += rotSpeed * dt;
 
+            // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
             if (worldY <= 0 && vy < 0) {
                 worldY = 0;
                 onLanded();
             }
 
-            // camera follows trousse, keeping it roughly at 30% of screen width
+            // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
             const targetCamera = worldX - w * 0.3;
             cameraX = Math.max(0, targetCamera);
 
@@ -1103,7 +1196,7 @@
         requestAnimationFrame(gameLoop);
     }
 
-    /* ============ INIT ============ */
+    /* ============ 12. INITIALISATION ============ */
     buildWorldsRow();
     refreshMenu();
     if (!menuPreviewRAF) animateMenuPreview();
