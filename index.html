@@ -409,6 +409,30 @@
             z-index: 50;
         }
         .modal-overlay.show { display: flex; }
+
+        /* ---------- TUTORIEL (affiché une seule fois pour les nouveaux joueurs) ---------- */
+        .tutorial-box {
+            position: relative;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 30px 24px 22px;
+            text-align: center;
+            width: 88vw;
+            max-width: 360px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        #btn-tutorial-skip {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+        .tutorial-icon { font-size: 48px; margin-bottom: 6px; }
+        #tutorial-title { margin: 4px 0 10px; font-size: 20px; color: var(--accent); }
+        #tutorial-text { margin: 0 0 18px; font-size: 14px; line-height: 1.5; color: var(--text); }
+        .tutorial-dots { display: flex; gap: 8px; justify-content: center; margin-bottom: 16px; }
+        .tutorial-dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.25); }
+        .tutorial-dot.active { background: var(--accent); }
         /* Petit message temporaire en bas de l'écran (ex: "Pas assez d'argent !") */
         .toast {
             position: absolute;
@@ -550,6 +574,18 @@
         <div class="shop-body" id="leaderboard-body"></div>
     </section>
 
+    <!-- Tutoriel affiché une seule fois, au tout premier lancement (voir showTutorialIfNeeded) -->
+    <div class="modal-overlay" id="tutorial-overlay">
+        <div class="tutorial-box">
+            <button class="btn secondary small" id="btn-tutorial-skip">Passer ✕</button>
+            <div class="tutorial-icon" id="tutorial-icon">🎒</div>
+            <h2 id="tutorial-title"></h2>
+            <p id="tutorial-text"></p>
+            <div class="tutorial-dots" id="tutorial-dots"></div>
+            <button class="btn" id="btn-tutorial-next">Suivant</button>
+        </div>
+    </div>
+
     <div class="toast" id="toast"></div>
 
     <!-- Musique de fond, démarrée au premier clic de l'utilisateur (voir plus bas) -->
@@ -582,7 +618,8 @@
        10. Rendu du décor (canvas) : bâtiments, arbres, craie
        11. Rendu de la trousse + boucle principale du jeu
        12. Firebase : auth anonyme, sauvegarde cloud, classement en ligne
-       13. Initialisation
+       13. Tutoriel (une seule fois pour les nouveaux joueurs)
+       14. Initialisation
        ========================================================= */
 
     /* ============ 1. CONSTANTES DE JEU ============ */
@@ -657,6 +694,7 @@
             equippedSkin: "classique",
             musicMuted: false,
             pseudo: "", // généré automatiquement à la première connexion Firebase
+            tutorialSeen: false, // passe à true dès que le tutoriel a été vu ou passé
         };
     }
 
@@ -1762,12 +1800,79 @@
         }
     });
 
-    /* ============ 13. INITIALISATION ============ */
+    /* ============ 13. TUTORIEL (une seule fois pour les nouveaux joueurs) ============ */
+    const TUTORIAL_SLIDES = [
+        {
+            icon: "🎒",
+            title: "Bienvenue dans Bully the Trousse !",
+            text: "Le but du jeu : lancer ta trousse le plus loin possible dans la cour d'école.",
+        },
+        {
+            icon: "👆",
+            title: "Comment lancer",
+            text: "Clique 3 fois : une fois pour charger la PUISSANCE, une fois pour verrouiller la PRÉCISION, et une dernière fois pour lancer !",
+        },
+        {
+            icon: "💰",
+            title: "Gagne de l'argent",
+            text: "Plus tu lances loin, plus tu gagnes d'argent. Dépense-le dans la Boutique pour améliorer ta Puissance, ta Vitesse, ou débloquer des skins.",
+        },
+        {
+            icon: "🏆",
+            title: "Défie le monde entier",
+            text: "Bats ton record pour apparaître dans le Classement mondial, visible depuis le menu !",
+        },
+    ];
+    let tutorialStep = 0;
+
+    function renderTutorialSlide() {
+        const slide = TUTORIAL_SLIDES[tutorialStep];
+        document.getElementById("tutorial-icon").textContent = slide.icon;
+        document.getElementById("tutorial-title").textContent = slide.title;
+        document.getElementById("tutorial-text").textContent = slide.text;
+
+        const dots = document.getElementById("tutorial-dots");
+        dots.innerHTML = "";
+        TUTORIAL_SLIDES.forEach((s, i) => {
+            const dot = document.createElement("div");
+            dot.className = "tutorial-dot" + (i === tutorialStep ? " active" : "");
+            dots.appendChild(dot);
+        });
+
+        const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
+        document.getElementById("btn-tutorial-next").textContent = isLast ? "C'est parti !" : "Suivant";
+    }
+
+    function closeTutorial() {
+        document.getElementById("tutorial-overlay").classList.remove("show");
+        save.tutorialSeen = true;
+        persist();
+    }
+
+    function showTutorialIfNeeded() {
+        if (save.tutorialSeen) return;
+        tutorialStep = 0;
+        renderTutorialSlide();
+        document.getElementById("tutorial-overlay").classList.add("show");
+    }
+
+    document.getElementById("btn-tutorial-next").addEventListener("click", () => {
+        if (tutorialStep < TUTORIAL_SLIDES.length - 1) {
+            tutorialStep++;
+            renderTutorialSlide();
+        } else {
+            closeTutorial();
+        }
+    });
+    document.getElementById("btn-tutorial-skip").addEventListener("click", closeTutorial);
+
+    /* ============ 14. INITIALISATION ============ */
     buildWorldsRow();
     refreshMenu();
     if (!menuPreviewRAF) animateMenuPreview();
     showScreen("menu");
     initFirebase();
+    showTutorialIfNeeded();
 })();
 </script>
 </body>
