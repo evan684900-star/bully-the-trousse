@@ -1522,6 +1522,13 @@
         return x - Math.floor(x);
     }
 
+    // Modulo qui reste toujours positif (contrairement à l'opérateur % de JS,
+    // qui garde le signe du dividende) : utile pour les motifs qui bouclent en
+    // boucle infinie (ex: le champ d'étoiles) sans jamais sauter.
+    function mod(n, m) {
+        return ((n % m) + m) % m;
+    }
+
     // Dessine un bâtiment d'école en arrière-plan (façade + toit + fenêtres + porte)
     function drawBuilding(bx, groundY, seed) {
         const brick = seededRand(seed) > 0.5; // alterne entre 2 styles de façade
@@ -1632,12 +1639,17 @@
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, groundScreenY);
 
-        // bâtiments d'école au loin (défilent 4x plus lentement que le sol = effet de parallaxe)
+        // Bâtiments d'école au loin (défilent 4x plus lentement que le sol = effet
+        // de parallaxe). bx est une fonction continue de i et parX, SANS modulo
+        // dans le calcul de position : un modulo là-dedans faisait "sauter" les
+        // bâtiments de tout un cran (~260px) dès que parX franchissait un multiple
+        // de buildingSpacing, ce qui donnait cet effet de fond qui se recharge.
         const buildingSpacing = 260;
-        const parX = -cameraX * 0.25;
-        const buildingStartIdx = Math.floor((-parX) / buildingSpacing) - 1;
-        for (let i = buildingStartIdx; i < buildingStartIdx + 10; i++) {
-            const bx = i * buildingSpacing + (parX % buildingSpacing);
+        const parX = cameraX * 0.25;
+        const buildingStartIdx = Math.floor((parX - 220) / buildingSpacing);
+        const buildingEndIdx = Math.ceil((parX + w + 40) / buildingSpacing);
+        for (let i = buildingStartIdx; i <= buildingEndIdx; i++) {
+            const bx = i * buildingSpacing - parX;
             if (bx < -220 || bx > w + 40) continue;
             drawBuilding(bx, groundScreenY, i);
         }
@@ -1711,10 +1723,13 @@
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, groundScreenY);
 
-        // étoiles scintillantes (légère parallaxe)
+        // étoiles scintillantes (légère parallaxe). Le modulo JS renvoie un
+        // reste négatif pour un dividende négatif ; on le force à rester
+        // positif (voir mod() plus bas) pour éviter le même genre de saut
+        // que celui corrigé sur les bâtiments de la cour.
         const starParX = -cameraX * 0.05;
         for (let i = 0; i < 90; i++) {
-            const sx = ((i * 137 + starParX) % (w + 100)) - 50;
+            const sx = mod(i * 137 + starParX, w + 100) - 50;
             const sy = seededRand(i * 3.1) * groundScreenY * 0.9;
             const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(performance.now() / 500 + i));
             ctx.fillStyle = "rgba(255,255,255," + (0.3 + 0.5 * twinkle) + ")";
