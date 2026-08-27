@@ -218,19 +218,17 @@
             text-shadow: 0 2px 6px rgba(0,0,0,0.6);
             pointer-events: none;
         }
-        /* Prompt du QTE de l'easter egg spatial */
+        /* Prompt du QTE de l'easter egg spatial (l'anneau lui-même est dessiné
+           sur le canvas, voir drawQteRing) */
         #qte-wrap {
             position: absolute;
             left: 50%;
-            top: 40%;
+            top: 20%;
             transform: translate(-50%, -50%);
             display: none;
-            flex-direction: column;
-            align-items: center;
-            gap: 10px;
             z-index: 15;
         }
-        #qte-wrap.show { display: flex; }
+        #qte-wrap.show { display: block; }
         #qte-prompt {
             font-size: clamp(20px, 5vw, 32px);
             font-weight: 900;
@@ -241,19 +239,6 @@
         @keyframes qtePulse {
             from { transform: scale(1); }
             to { transform: scale(1.12); }
-        }
-        #qte-timer-bar {
-            width: min(70vw, 320px);
-            height: 14px;
-            background: rgba(10,12,20,0.55);
-            border: 2px solid #222633;
-            border-radius: 999px;
-            overflow: hidden;
-        }
-        #qte-timer-fill {
-            height: 100%;
-            width: 100%;
-            background: linear-gradient(90deg, var(--money), var(--accent), var(--accent-2));
         }
 
         /* Barre de charge affichée pendant les phases "puissance" et "précision" */
@@ -498,8 +483,7 @@
         </div>
         <div class="hint-text" id="hint-text">Clique / appuie pour charger la puissance !</div>
         <div id="qte-wrap">
-            <div id="qte-prompt">🚀 APPUIE VITE !</div>
-            <div id="qte-timer-bar"><div id="qte-timer-fill"></div></div>
+            <div id="qte-prompt">🚀 CLIQUE QUAND ÇA S'ALIGNE !</div>
         </div>
         <div id="meter-wrap">
             <div id="meter-fill"></div>
@@ -597,7 +581,10 @@
     const SPACE_EGG_ACCURACY_MAX = -0.6;  // value doit être très à gauche (zone verte du début)
     const CLOUD_TRANSITION_DURATION = 0.8; // secondes, nuages qui cachent le changement de décor
     const SPACE_FLOAT_DURATION = 1.3;      // secondes, flottement avant le QTE
-    const QTE_DURATION = 1.1;              // secondes pour réagir au QTE
+    const QTE_DURATION = 1.3;              // secondes pendant lesquelles l'anneau rétrécit
+    const QTE_RING_START = 110;            // rayon de départ de l'anneau qui rétrécit (px)
+    const QTE_RING_TARGET = 46;            // rayon de l'anneau-cible fixe (px)
+    const QTE_RING_TOLERANCE = 15;         // marge acceptée autour de la cible pour réussir
     const SPACE_BOOST_VX = 2600;           // vitesse folle horizontale si le QTE est réussi
     const SPACE_BOOST_VY = 150;
 
@@ -1103,7 +1090,11 @@
         if (state === "idle") startChargingPower();
         else if (state === "charging_power") lockPower();
         else if (state === "charging_angle") lockAccuracyAndLaunch();
-        else if (state === "qte") resolveQte(true);
+        else if (state === "qte") {
+            // réussi seulement si l'anneau qui rétrécit est proche de la cible fixe
+            const hit = Math.abs(currentQteRingRadius() - QTE_RING_TARGET) <= QTE_RING_TOLERANCE;
+            resolveQte(hit);
+        }
         else if (state === "landed") { /* rien à faire, les boutons du panneau de résultat gèrent la suite */ }
     }
 
@@ -1458,6 +1449,33 @@
         ctx.restore();
     }
 
+    // Rayon actuel de l'anneau du QTE : décroît linéairement de QTE_RING_START
+    // à 0 sur toute la durée QTE_DURATION.
+    function currentQteRingRadius() {
+        const t = Math.min(phaseTimer / QTE_DURATION, 1);
+        return QTE_RING_START * (1 - t);
+    }
+
+    // Dessine l'anneau-cible fixe (vert) et l'anneau qui rétrécit (blanc) :
+    // il faut cliquer quand les deux tailles coïncident à peu près.
+    function drawQteRing(w, h) {
+        const cx = w / 2, cy = h * 0.4;
+        const radius = currentQteRingRadius();
+        ctx.save();
+        ctx.strokeStyle = "rgba(107,255,176,0.9)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.arc(cx, cy, QTE_RING_TARGET, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(255,255,255,0.95)";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(radius, 2), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
     /* ============ 11. RENDU DE LA TROUSSE + BOUCLE PRINCIPALE ============ */
 
     // Convertit une position "monde" (worldX/worldY) en position à l'écran,
@@ -1549,14 +1567,11 @@
                 phaseTimer = 0;
                 qteSuccess = null;
                 document.getElementById("qte-wrap").classList.add("show");
-                document.getElementById("qte-timer-fill").style.width = "100%";
             }
         } else if (state === "qte") {
             phaseTimer += dt;
-            const remaining = Math.max(0, 1 - phaseTimer / QTE_DURATION);
-            document.getElementById("qte-timer-fill").style.width = (remaining * 100) + "%";
             if (phaseTimer >= QTE_DURATION && qteSuccess === null) {
-                resolveQte(false); // temps écoulé sans réaction = échec
+                resolveQte(false); // l'anneau a fini de rétrécir sans qu'on ait cliqué = échec
             }
         }
 
@@ -1569,6 +1584,8 @@
         drawTrousse();
         if (state === "space_transition") {
             drawCloudSweep(w, h, phaseTimer / CLOUD_TRANSITION_DURATION);
+        } else if (state === "qte") {
+            drawQteRing(w, h);
         }
 
         requestAnimationFrame(gameLoop);
