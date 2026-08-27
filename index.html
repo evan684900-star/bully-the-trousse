@@ -8,7 +8,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Bully the Trousse</title>
     <style>
-        /* Variables de couleur réutilisées partout dans l'interface */
+        /* Variables de couleur réutilisées partout dans l'interface.
+           Le mode clair (voir applyTheme() et [data-theme="light"] plus bas)
+           ne change QUE ce thème d'interface : le décor du jeu lui-même
+           (cour d'école, espace...) est dessiné en dur sur le canvas et garde
+           toujours ses propres couleurs. */
         :root {
             --sky-top: #7ec8e3;
             --sky-bottom: #cdeffd;
@@ -21,6 +25,18 @@
             --money: #6bffb0;
             --text: #f4f6ff;
             --text-dim: #aab0c8;
+            --app-bg: #10131c;
+            --shop-bg: #171b28;
+            --card-bg: #1f2437;
+        }
+        [data-theme="light"] {
+            --panel-bg: rgba(255, 255, 255, 0.92);
+            --panel-border: #d8dce6;
+            --text: #1a1f2e;
+            --text-dim: #5c6478;
+            --app-bg: #eef1f7;
+            --shop-bg: #f4f6fb;
+            --card-bg: #ffffff;
         }
 
         /* touch-action: manipulation coupe le double-tap-zoom sur mobile tout en
@@ -37,7 +53,7 @@
             height: 100dvh;
             overflow: hidden;
             font-family: "Segoe UI", "Trebuchet MS", Verdana, sans-serif;
-            background: #10131c;
+            background: var(--app-bg);
             color: var(--text);
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none; /* empêche le menu "enregistrer l'image" au appui long sur iOS */
@@ -319,7 +335,7 @@
 
         /* ---------- ÉCRAN BOUTIQUE ---------- */
         #screen-shop {
-            background: #171b28;
+            background: var(--shop-bg);
             flex-direction: column;
         }
         /* Important : on utilise "#screen-shop.active" (un ID + une classe) plutôt
@@ -342,7 +358,7 @@
             padding: 10px;
             border-radius: 10px;
             border: 2px solid var(--panel-border);
-            background: #1f2437;
+            background: var(--card-bg);
             color: var(--text-dim);
             font-weight: 700;
             cursor: pointer;
@@ -350,7 +366,7 @@
         .tab-btn.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
         .shop-body { flex: 1; overflow-y: auto; padding: 0 16px 20px; }
         .upgrade-card, .skin-card {
-            background: #1f2437;
+            background: var(--card-bg);
             border: 2px solid var(--panel-border);
             border-radius: 14px;
             padding: 14px;
@@ -358,6 +374,13 @@
             display: flex;
             align-items: center;
             gap: 14px;
+        }
+        /* Petit "pop" joué sur la carte juste achetée/équipée (voir playPurchasePop) */
+        .just-bought { animation: purchasePop 0.35s ease-out; }
+        @keyframes purchasePop {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(107,255,176,0); }
+            40% { transform: scale(1.045); box-shadow: 0 0 0 6px rgba(107,255,176,0.35); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(107,255,176,0); }
         }
         .upgrade-card .icon, .skin-card .icon {
             font-size: 30px;
@@ -378,7 +401,7 @@
 
         /* ---------- ÉCRAN CLASSEMENT ---------- */
         #screen-leaderboard {
-            background: #171b28;
+            background: var(--shop-bg);
             flex-direction: column;
         }
         /* Même astuce de spécificité que pour #screen-shop.active, voir plus haut */
@@ -387,7 +410,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            background: #1f2437;
+            background: var(--card-bg);
             border: 2px solid var(--panel-border);
             border-radius: 10px;
             padding: 10px 14px;
@@ -484,6 +507,43 @@
             align-items: center;
             justify-content: center;
         }
+        /* Même style que .mute-btn, juste à côté (bascule thème clair/sombre) */
+        .theme-btn {
+            position: fixed;
+            bottom: calc(10px + env(safe-area-inset-bottom));
+            right: calc(60px + env(safe-area-inset-right));
+            z-index: 20;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            border: 2px solid var(--panel-border);
+            background: var(--panel-bg);
+            color: var(--text);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        /* Encore à côté (bascule de langue FR/EN) */
+        .lang-btn {
+            position: fixed;
+            bottom: calc(10px + env(safe-area-inset-bottom));
+            right: calc(110px + env(safe-area-inset-right));
+            z-index: 20;
+            height: 42px;
+            padding: 0 12px;
+            border-radius: 999px;
+            border: 2px solid var(--panel-border);
+            background: var(--panel-bg);
+            color: var(--text);
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
     </style>
 </head>
 <body>
@@ -494,19 +554,19 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <h1>🎒 Bully the Trousse</h1>
-                <p>Lance ta trousse le plus loin possible !</p>
+                <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
             <div class="money-pill">💰 <span id="menu-money">0</span> $</div>
             <div id="trousse-preview-wrap"><img id="trousse-preview-img" src="trousse-skin-1.png" alt="trousse"></div>
             <div class="stats-row">
-                <div class="stat-chip">Puissance <b id="menu-puissance">1</b></div>
-                <div class="stat-chip">Vitesse <b id="menu-vitesse">1</b></div>
-                <div class="stat-chip">Record <b id="menu-record">0 m</b></div>
+                <div class="stat-chip"><span data-i18n="statPuissance">Puissance</span> <b id="menu-puissance">1</b></div>
+                <div class="stat-chip"><span data-i18n="statVitesse">Vitesse</span> <b id="menu-vitesse">1</b></div>
+                <div class="stat-chip"><span data-i18n="statRecord">Record</span> <b id="menu-record">0 m</b></div>
             </div>
             <div class="menu-buttons">
-                <button class="btn" id="btn-play">🚀 Jouer</button>
-                <button class="btn secondary" id="btn-shop">🛒 Boutique</button>
-                <button class="btn secondary" id="btn-leaderboard">🏆 Classement</button>
+                <button class="btn" id="btn-play" data-i18n="btnPlay">🚀 Jouer</button>
+                <button class="btn secondary" id="btn-shop" data-i18n="btnShop">🛒 Boutique</button>
+                <button class="btn secondary" id="btn-leaderboard" data-i18n="btnLeaderboard">🏆 Classement</button>
             </div>
             <!-- Rempli dynamiquement par buildWorldsRow() -->
             <div class="worlds-row" id="worlds-row"></div>
@@ -516,14 +576,14 @@
     <!-- ÉCRAN DE JEU -->
     <section id="screen-game" class="screen">
         <canvas id="game-canvas"></canvas>
-        <button class="btn secondary small back-btn" id="btn-game-back">← Menu</button>
+        <button class="btn secondary small back-btn" id="btn-game-back" data-i18n="btnBackMenu">← Menu</button>
         <div class="hud-top">
             <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
             <div class="money-pill" style="font-size:14px; padding:6px 14px; color:#fff;">📏 <span id="game-distance">0</span> m</div>
         </div>
-        <div class="hint-text" id="hint-text">Clique / appuie pour charger la puissance !</div>
+        <div class="hint-text" id="hint-text" data-i18n="hintCharge">Clique / appuie pour charger la puissance !</div>
         <div id="qte-wrap">
-            <div id="qte-prompt">🚀 CLIQUE QUAND ÇA S'ALIGNE !</div>
+            <div id="qte-prompt" data-i18n="qtePrompt">🚀 CLIQUE QUAND ÇA S'ALIGNE !</div>
             <div id="qte-dots"></div>
         </div>
         <div id="meter-wrap">
@@ -532,29 +592,30 @@
             <div id="meter-marker"></div>
         </div>
         <div class="result-panel" id="result-panel">
-            <div id="result-record" class="record" style="display:none;">🏆 NOUVEAU RECORD !</div>
-            <div id="result-perfect" class="record" style="display:none; color:#6bffb0;">✨ LANCER PARFAIT !</div>
-            <h2>Distance parcourue</h2>
+            <div id="result-record" class="record" style="display:none;" data-i18n="resultRecord">🏆 NOUVEAU RECORD !</div>
+            <div id="result-perfect" class="record" style="display:none; color:#6bffb0;" data-i18n="resultPerfect">✨ LANCER PARFAIT !</div>
+            <h2 data-i18n="resultDistanceTitle">Distance parcourue</h2>
             <div class="distance"><span id="result-distance">0</span> m</div>
             <div class="earn">+<span id="result-earn">0</span> $</div>
             <div class="buttons">
-                <button class="btn" id="btn-throw-again">🔁 Relancer</button>
-                <button class="btn secondary" id="btn-result-shop">🛒 Boutique</button>
+                <button class="btn" id="btn-throw-again" data-i18n="btnThrowAgain">🔁 Relancer</button>
+                <button class="btn secondary" id="btn-result-shop" data-i18n="btnShop">🛒 Boutique</button>
             </div>
         </div>
     </section>
 
     <!-- ÉCRAN BOUTIQUE -->
     <section id="screen-shop" class="screen">
-        <button class="btn secondary small back-btn" id="btn-shop-back">← Menu</button>
+        <button class="btn secondary small back-btn" id="btn-shop-back" data-i18n="btnBackMenu">← Menu</button>
         <!-- Permet de reprendre directement le jeu sans repasser par le menu -->
-        <button class="btn small forward-btn" id="btn-shop-play">🎮 Retour au jeu</button>
+        <button class="btn small forward-btn" id="btn-shop-play" data-i18n="btnBackGame">🎮 Retour au jeu</button>
         <div class="shop-header" style="justify-content:center; padding-top:16px;">
             <div class="money-pill">💰 <span id="shop-money">0</span> $</div>
         </div>
         <div class="tabs">
-            <button class="tab-btn active" id="tab-upgrades">⚙️ Améliorations</button>
-            <button class="tab-btn" id="tab-skins">🎨 Skins</button>
+            <button class="tab-btn active" id="tab-upgrades" data-i18n="shopTabUpgrades">⚙️ Améliorations</button>
+            <button class="tab-btn" id="tab-skins" data-i18n="shopTabSkins">🎨 Skins</button>
+            <button class="tab-btn" id="tab-trails" data-i18n="shopTabTrails">🌈 Traînées</button>
         </div>
         <!-- Rempli dynamiquement par renderShopTab() -->
         <div class="shop-body" id="shop-body"></div>
@@ -562,13 +623,13 @@
 
     <!-- ÉCRAN CLASSEMENT (en ligne, via Firebase) -->
     <section id="screen-leaderboard" class="screen">
-        <button class="btn secondary small back-btn" id="btn-leaderboard-back">← Menu</button>
+        <button class="btn secondary small back-btn" id="btn-leaderboard-back" data-i18n="btnBackMenu">← Menu</button>
         <div class="shop-header" style="justify-content:center; padding-top:16px; flex-direction: column; gap: 4px;">
-            <div class="money-pill">🏆 Classement mondial</div>
+            <div class="money-pill" data-i18n="leaderboardTitle">🏆 Classement mondial</div>
             <div id="online-status" style="font-size:12px; color: var(--text-dim);">Connexion...</div>
         </div>
         <div style="display:flex; justify-content:center; padding: 0 16px 10px;">
-            <button class="btn small secondary" id="btn-edit-pseudo">✏️ Pseudo : <span id="leaderboard-pseudo">-</span></button>
+            <button class="btn small secondary" id="btn-edit-pseudo"><span data-i18n="pseudoLabel">✏️ Pseudo : </span><span id="leaderboard-pseudo">-</span></button>
         </div>
         <!-- Rempli dynamiquement par loadLeaderboard() -->
         <div class="shop-body" id="leaderboard-body"></div>
@@ -577,7 +638,7 @@
     <!-- Tutoriel affiché une seule fois, au tout premier lancement (voir showTutorialIfNeeded) -->
     <div class="modal-overlay" id="tutorial-overlay">
         <div class="tutorial-box">
-            <button class="btn secondary small" id="btn-tutorial-skip">Passer ✕</button>
+            <button class="btn secondary small" id="btn-tutorial-skip" data-i18n="tutorialSkip">Passer ✕</button>
             <div class="tutorial-icon" id="tutorial-icon">🎒</div>
             <h2 id="tutorial-title"></h2>
             <p id="tutorial-text"></p>
@@ -591,6 +652,8 @@
     <!-- Musique de fond, démarrée au premier clic de l'utilisateur (voir plus bas) -->
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
     <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
+    <button id="btn-theme" class="theme-btn" title="Thème clair / sombre">🌙</button>
+    <button id="btn-lang" class="lang-btn" title="Changer de langue">FR</button>
 </div>
 
 <!-- SDK Firebase (compat, sans étape de build) : auth anonyme + Firestore.
@@ -603,6 +666,77 @@
 <script>
 (function () {
     "use strict";
+
+    /* ============ I18N (FR/EN) ============ */
+    // Dictionnaire des textes de l'interface. tr(clé) renvoie la version dans
+    // la langue active (save.lang). Le contenu généré dynamiquement en JS
+    // (cartes boutique, tutoriel, hints...) l'utilise directement ; le texte
+    // statique du HTML porte un attribut data-i18n mis à jour par applyLanguage().
+    const STRINGS = {
+        menuSubtitle: { fr: "Lance ta trousse le plus loin possible !", en: "Throw your pencil case as far as you can!" },
+        statPuissance: { fr: "Puissance", en: "Power" },
+        statVitesse: { fr: "Vitesse", en: "Speed" },
+        statRecord: { fr: "Record", en: "Record" },
+        btnPlay: { fr: "🚀 Jouer", en: "🚀 Play" },
+        btnShop: { fr: "🛒 Boutique", en: "🛒 Shop" },
+        btnLeaderboard: { fr: "🏆 Classement", en: "🏆 Leaderboard" },
+        btnBackMenu: { fr: "← Menu", en: "← Menu" },
+        btnBackGame: { fr: "🎮 Retour au jeu", en: "🎮 Back to game" },
+        worldLocked: { fr: " arrive bientôt !", en: " is coming soon!" },
+        hintCharge: { fr: "Clique / appuie pour charger la puissance !", en: "Click / tap to charge power!" },
+        hintLockPower: { fr: "Clique pour verrouiller la PUISSANCE !", en: "Click to lock in POWER!" },
+        hintLockAccuracy: { fr: "Reclique pour verrouiller la PRÉCISION !", en: "Click again to lock in ACCURACY!" },
+        hintZeroG: { fr: "🛸 En apesanteur...", en: "🛸 Weightless..." },
+        qtePrompt: { fr: "🚀 CLIQUE QUAND ÇA S'ALIGNE !", en: "🚀 CLICK WHEN IT LINES UP!" },
+        resultDistanceTitle: { fr: "Distance parcourue", en: "Distance travelled" },
+        resultRecord: { fr: "🏆 NOUVEAU RECORD !", en: "🏆 NEW RECORD!" },
+        resultPerfect: { fr: "✨ LANCER PARFAIT !", en: "✨ PERFECT THROW!" },
+        btnThrowAgain: { fr: "🔁 Relancer", en: "🔁 Throw again" },
+        notEnoughMoney: { fr: "Pas assez d'argent !", en: "Not enough money!" },
+        shopTabUpgrades: { fr: "⚙️ Améliorations", en: "⚙️ Upgrades" },
+        shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
+        shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
+        upgradePuissanceName: { fr: "Puissance", en: "Power" },
+        upgradePuissanceDesc: { fr: "Augmente la force maximale de ton lancer.", en: "Increases the maximum force of your throw." },
+        upgradeVitesseName: { fr: "Vitesse", en: "Speed" },
+        upgradeVitesseDesc: { fr: "Réduit la résistance : la trousse vole plus loin.", en: "Reduces drag: the pencil case flies further." },
+        levelShort: { fr: "Niv. ", en: "Lvl " },
+        equip: { fr: "Équiper", en: "Equip" },
+        equipped: { fr: "Équipée", en: "Equipped" },
+        leaderboardTitle: { fr: "🏆 Classement mondial", en: "🏆 Global leaderboard" },
+        onlineConnecting: { fr: "Connexion...", en: "Connecting..." },
+        onlineConnected: { fr: "En ligne ✅", en: "Online ✅" },
+        onlineOfflineNoConfig: { fr: "Hors ligne (Firebase non configuré)", en: "Offline (Firebase not configured)" },
+        onlineOfflineFailed: { fr: "Hors ligne (connexion échouée)", en: "Offline (connection failed)" },
+        leaderboardUnavailable: { fr: "Classement indisponible hors ligne.", en: "Leaderboard unavailable offline." },
+        leaderboardLoading: { fr: "Chargement...", en: "Loading..." },
+        leaderboardEmpty: { fr: "Aucun score pour l'instant, sois le premier !", en: "No scores yet, be the first!" },
+        leaderboardError: { fr: "Impossible de charger le classement.", en: "Couldn't load the leaderboard." },
+        pseudoLabel: { fr: "✏️ Pseudo : ", en: "✏️ Nickname: " },
+        pseudoPrompt: { fr: "Ton pseudo pour le classement :", en: "Your nickname for the leaderboard:" },
+        tutorialSkip: { fr: "Passer ✕", en: "Skip ✕" },
+        tutorialNext: { fr: "Suivant", en: "Next" },
+        tutorialDone: { fr: "C'est parti !", en: "Let's go!" },
+    };
+
+    // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
+    // Nommée "tr" (pas "t") pour ne pas entrer en collision avec les variables
+    // locales "t" utilisées un peu partout pour le temps écoulé (lockPower,
+    // lockAccuracyAndLaunch, updateMeterUI...).
+    function tr(key) {
+        const entry = STRINGS[key];
+        return entry ? (entry[save.lang] || entry.fr) : key;
+    }
+
+    // Met à jour tout le texte statique du HTML (attribut data-i18n) ainsi que
+    // le bouton de langue. Les textes générés en JS se retraduisent tout
+    // seuls la prochaine fois qu'ils sont (re)dessinés (hints, cartes boutique...).
+    function applyLanguage() {
+        document.querySelectorAll("[data-i18n]").forEach((el) => {
+            el.textContent = tr(el.getAttribute("data-i18n"));
+        });
+        document.getElementById("btn-lang").textContent = save.lang === "en" ? "EN" : "FR";
+    }
 
     /* =========================================================
        SOMMAIRE DU FICHIER
@@ -683,6 +817,18 @@
         },
     ];
 
+    // Traînée dessinée derrière la trousse pendant le vol (voir drawTrail).
+    // "rgb" est une chaîne "r,g,b" réutilisée dans une rgba() ; le cas "rainbow"
+    // est géré à part (teinte qui tourne avec le temps, comme le skin arc-en-ciel).
+    const TRAILS = [
+        { id: "blanche", name: "Traînée Blanche", cost: 0, desc: "La traînée de base, offerte.", rgb: "255,255,255" },
+        { id: "doree", name: "Traînée Dorée", cost: 300, desc: "Un sillage doré et scintillant.", rgb: "255,210,63" },
+        { id: "glacee", name: "Traînée Glacée", cost: 800, desc: "Un sillage bleu glacial.", rgb: "120,200,255" },
+        { id: "feu", name: "Traînée de Feu", cost: 2000, desc: "Un sillage rouge ardent.", rgb: "255,110,60" },
+        { id: "arcenciel", name: "Traînée Arc-en-ciel", cost: 6000, desc: "Un sillage qui change de couleur en continu.", rgb: "rainbow" },
+    ];
+    function getTrail(id) { return TRAILS.find(t => t.id === id) || TRAILS[0]; }
+
     /* ============ 3. SAUVEGARDE (localStorage) ============ */
     function defaultSave() {
         return {
@@ -695,6 +841,11 @@
             musicMuted: false,
             pseudo: "", // généré automatiquement à la première connexion Firebase
             tutorialSeen: false, // passe à true dès que le tutoriel a été vu ou passé
+            milestoneReached: 0, // nombre de paliers de 100m déjà récompensés (0 = aucun)
+            ownedTrails: ["blanche"],
+            equippedTrail: "blanche",
+            theme: "dark", // "dark" ou "light", voir applyTheme()
+            lang: "", // "fr" ou "en" ; vide = pas encore choisi, détecté au premier lancement
         };
     }
 
@@ -807,6 +958,21 @@
         applyMuteState();
     });
 
+    // Thème clair/sombre : ne change que l'interface (menus, boutique...), le
+    // décor du jeu lui-même garde toujours ses propres couleurs (voir la note
+    // au-dessus de :root dans le CSS).
+    const themeBtn = document.getElementById("btn-theme");
+    function applyTheme() {
+        document.documentElement.setAttribute("data-theme", save.theme);
+        themeBtn.textContent = save.theme === "light" ? "☀️" : "🌙";
+    }
+    applyTheme();
+    themeBtn.addEventListener("click", () => {
+        save.theme = save.theme === "light" ? "dark" : "light";
+        persist();
+        applyTheme();
+    });
+
     /* ============ 6. NAVIGATION ENTRE LES 3 ÉCRANS ============ */
     const screens = {
         menu: document.getElementById("screen-menu"),
@@ -854,7 +1020,7 @@
             card.innerHTML = '<div class="emoji">' + w.emoji + '</div><div class="name">' + w.name + '</div>';
             card.addEventListener("click", () => {
                 if (!w.unlocked) {
-                    showToast("🔒 " + w.name + " arrive bientôt !");
+                    showToast("🔒 " + w.name + tr("worldLocked"));
                     sfxError();
                 }
             });
@@ -881,14 +1047,23 @@
         renderShopTab();
     }
 
+    // Petit "pop" visuel joué sur toute la liste juste après un achat/équipement,
+    // pour donner un retour clair en plus du son et du toast de confirmation.
+    function playPurchasePop() {
+        const body = document.getElementById("shop-body");
+        body.classList.remove("just-bought");
+        void body.offsetWidth; // force le navigateur à relancer l'animation même si la classe était déjà présente
+        body.classList.add("just-bought");
+    }
+
     // Reconstruit entièrement la liste de cartes selon l'onglet actif
     function renderShopTab() {
         const body = document.getElementById("shop-body");
         body.innerHTML = "";
         if (currentTab === "upgrades") {
             body.appendChild(buildUpgradeCard(
-                "💪", "Puissance", save.puissanceLevel,
-                "Augmente la force maximale de ton lancer.",
+                "💪", tr("upgradePuissanceName"), save.puissanceLevel,
+                tr("upgradePuissanceDesc"),
                 () => {
                     const cost = upgradeCost(save.puissanceLevel);
                     if (save.money >= cost) {
@@ -896,16 +1071,18 @@
                         save.puissanceLevel++;
                         persist();
                         sfxBuy();
+                        showToast("✅ " + tr("upgradePuissanceName") + " (" + tr("levelShort") + save.puissanceLevel + ")");
                         refreshShop();
+                        playPurchasePop();
                     } else {
                         sfxError();
-                        showToast("Pas assez d'argent !");
+                        showToast(tr("notEnoughMoney"));
                     }
                 }
             ));
             body.appendChild(buildUpgradeCard(
-                "⚡", "Vitesse", save.vitesseLevel,
-                "Réduit la résistance : la trousse vole plus loin.",
+                "⚡", tr("upgradeVitesseName"), save.vitesseLevel,
+                tr("upgradeVitesseDesc"),
                 () => {
                     const cost = upgradeCost(save.vitesseLevel);
                     if (save.money >= cost) {
@@ -913,15 +1090,19 @@
                         save.vitesseLevel++;
                         persist();
                         sfxBuy();
+                        showToast("✅ " + tr("upgradeVitesseName") + " (" + tr("levelShort") + save.vitesseLevel + ")");
                         refreshShop();
+                        playPurchasePop();
                     } else {
                         sfxError();
-                        showToast("Pas assez d'argent !");
+                        showToast(tr("notEnoughMoney"));
                     }
                 }
             ));
-        } else {
+        } else if (currentTab === "skins") {
             SKINS.forEach(skin => body.appendChild(buildSkinCard(skin)));
+        } else {
+            TRAILS.forEach(trail => body.appendChild(buildTrailCard(trail)));
         }
     }
 
@@ -932,7 +1113,7 @@
         card.className = "upgrade-card";
         card.innerHTML =
             '<div class="icon">' + icon + '</div>' +
-            '<div class="info"><h3>' + name + ' <span class="level-badge">Niv. ' + level + '</span></h3>' +
+            '<div class="info"><h3>' + name + ' <span class="level-badge">' + tr("levelShort") + level + '</span></h3>' +
             '<p>' + desc + '</p></div>';
         const btn = document.createElement("button");
         btn.className = "btn small";
@@ -959,21 +1140,23 @@
         let bonusText = [];
         if (skin.bonusPuissance) bonusText.push("+" + skin.bonusPuissance + " Puissance");
         if (skin.bonusVitesse) bonusText.push("+" + skin.bonusVitesse + " Vitesse");
-        info.innerHTML = "<h3>" + skin.name + (equipped ? ' <span class="level-badge">ÉQUIPÉE</span>' : '') + "</h3><p>" + skin.desc + (bonusText.length ? " (" + bonusText.join(", ") + ")" : "") + "</p>";
+        info.innerHTML = "<h3>" + skin.name + (equipped ? ' <span class="level-badge">' + tr("equipped").toUpperCase() + '</span>' : '') + "</h3><p>" + skin.desc + (bonusText.length ? " (" + bonusText.join(", ") + ")" : "") + "</p>";
         card.appendChild(info);
 
         const btn = document.createElement("button");
         btn.className = "btn small" + (equipped ? " secondary" : "");
         if (equipped) {
-            btn.textContent = "Équipée";
+            btn.textContent = tr("equipped");
             btn.disabled = true;
         } else if (owned) {
-            btn.textContent = "Équiper";
+            btn.textContent = tr("equip");
             btn.addEventListener("click", () => {
                 save.equippedSkin = skin.id;
                 persist();
                 sfxBuy();
+                showToast("✅ " + skin.name + " équipée !");
                 refreshShop();
+                playPurchasePop();
             });
         } else {
             btn.textContent = skin.cost + " $";
@@ -984,10 +1167,12 @@
                     save.equippedSkin = skin.id;
                     persist();
                     sfxBuy();
+                    showToast("✅ " + skin.name + " achetée !");
                     refreshShop();
+                    playPurchasePop();
                 } else {
                     sfxError();
-                    showToast("Pas assez d'argent !");
+                    showToast(tr("notEnoughMoney"));
                 }
             });
         }
@@ -995,19 +1180,73 @@
         return card;
     }
 
-    // Bascule entre l'onglet "Améliorations" et l'onglet "Skins"
-    document.getElementById("tab-upgrades").addEventListener("click", () => {
-        currentTab = "upgrades";
-        document.getElementById("tab-upgrades").classList.add("active");
-        document.getElementById("tab-skins").classList.remove("active");
+    // Crée une carte de traînée : même logique que buildSkinCard (Prix / Équiper / Équipée)
+    function buildTrailCard(trail) {
+        const owned = save.ownedTrails.includes(trail.id);
+        const equipped = save.equippedTrail === trail.id;
+        const card = document.createElement("div");
+        card.className = "skin-card";
+
+        const swatch = document.createElement("div");
+        swatch.className = "icon";
+        swatch.textContent = "🌈";
+        swatch.style.color = trail.rgb === "rainbow" ? "" : "rgb(" + trail.rgb + ")";
+        card.appendChild(swatch);
+
+        const info = document.createElement("div");
+        info.className = "info";
+        info.innerHTML = "<h3>" + trail.name + (equipped ? ' <span class="level-badge">' + tr("equipped").toUpperCase() + '</span>' : '') + "</h3><p>" + trail.desc + "</p>";
+        card.appendChild(info);
+
+        const btn = document.createElement("button");
+        btn.className = "btn small" + (equipped ? " secondary" : "");
+        if (equipped) {
+            btn.textContent = tr("equipped");
+            btn.disabled = true;
+        } else if (owned) {
+            btn.textContent = tr("equip");
+            btn.addEventListener("click", () => {
+                save.equippedTrail = trail.id;
+                persist();
+                sfxBuy();
+                showToast("✅ " + trail.name + " équipée !");
+                refreshShop();
+                playPurchasePop();
+            });
+        } else {
+            btn.textContent = trail.cost + " $";
+            btn.addEventListener("click", () => {
+                if (save.money >= trail.cost) {
+                    save.money -= trail.cost;
+                    save.ownedTrails.push(trail.id);
+                    save.equippedTrail = trail.id;
+                    persist();
+                    sfxBuy();
+                    showToast("✅ " + trail.name + " achetée !");
+                    refreshShop();
+                    playPurchasePop();
+                } else {
+                    sfxError();
+                    showToast(tr("notEnoughMoney"));
+                }
+            });
+        }
+        card.appendChild(btn);
+        return card;
+    }
+
+    // Bascule entre les onglets "Améliorations", "Skins" et "Traînées"
+    const shopTabs = { upgrades: "tab-upgrades", skins: "tab-skins", trails: "tab-trails" };
+    function switchShopTab(name) {
+        currentTab = name;
+        Object.entries(shopTabs).forEach(([key, id]) => {
+            document.getElementById(id).classList.toggle("active", key === name);
+        });
         renderShopTab();
-    });
-    document.getElementById("tab-skins").addEventListener("click", () => {
-        currentTab = "skins";
-        document.getElementById("tab-skins").classList.add("active");
-        document.getElementById("tab-upgrades").classList.remove("active");
-        renderShopTab();
-    });
+    }
+    document.getElementById("tab-upgrades").addEventListener("click", () => switchShopTab("upgrades"));
+    document.getElementById("tab-skins").addEventListener("click", () => switchShopTab("skins"));
+    document.getElementById("tab-trails").addEventListener("click", () => switchShopTab("trails"));
 
     /* ============ 9. ÉCRAN DE JEU : ÉTAT + MÉCANIQUE DE LANCER ============ */
     const canvas = document.getElementById("game-canvas");
@@ -1053,6 +1292,7 @@
     let phaseTimer = 0;            // chronomètre des phases spéciales (transition/flottaison/QTE)
     let qteResults = [];           // un booléen par anneau déjà résolu (true = réussi), longueur <= QTE_RING_COUNT
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
+    let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
 
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
@@ -1067,11 +1307,12 @@
         phaseTimer = 0;
         qteResults = [];
         craterWorldX = null;
+        trailPoints = [];
         document.getElementById("qte-wrap").classList.remove("show");
         resultPanel.classList.remove("show");
         meterWrap.style.display = "none";
         hintText.style.display = "block";
-        hintText.textContent = "Clique / appuie pour charger la puissance !";
+        hintText.textContent = tr("hintCharge");
         resizeCanvas();
         requestAnimationFrame(gameLoop);
     }
@@ -1082,7 +1323,7 @@
         state = "charging_power";
         t0 = performance.now();
         meterWrap.style.display = "block";
-        hintText.textContent = "Clique pour verrouiller la PUISSANCE !";
+        hintText.textContent = tr("hintLockPower");
     }
 
     // 2e clic : verrouille la puissance à l'instant présent, démarre la barre de précision
@@ -1092,7 +1333,7 @@
         lockedPower = frac;
         state = "charging_angle";
         t0 = performance.now();
-        hintText.textContent = "Reclique pour verrouiller la PRÉCISION !";
+        hintText.textContent = tr("hintLockAccuracy");
         sfxCharge();
     }
 
@@ -1230,6 +1471,19 @@
         let earn = Math.max(1, Math.round(distanceMeters * 2));
         if (isPerfect) earn = Math.round(earn * 1.3); // bonus de 30% sur un lancer parfait
         save.money += earn;
+
+        // Récompense de palier (100m, 200m, ...) : ne se déclenche qu'une seule
+        // fois par palier, même si un lancer (ex: boost spatial) en franchit
+        // plusieurs d'un coup.
+        const milestone = Math.floor(distanceMeters / 100);
+        if (milestone > save.milestoneReached) {
+            const newMilestones = milestone - save.milestoneReached;
+            const milestoneBonus = 50 * newMilestones;
+            save.milestoneReached = milestone;
+            save.money += milestoneBonus;
+            showToast("🎉 Palier des " + (milestone * 100) + "m atteint ! +" + milestoneBonus + "$");
+        }
+
         persist();
 
         document.getElementById("result-distance").textContent = distanceMeters.toFixed(1);
@@ -1564,6 +1818,43 @@
         return { sx: x - cameraX, sy: groundScreenY - y };
     }
 
+    // Dessine la traînée derrière la trousse à partir des positions récentes
+    // (trailPoints), en cercles qui rétrécissent et s'estompent avec l'âge.
+    function drawTrail() {
+        if (trailPoints.length < 2) return;
+        const trail = getTrail(save.equippedTrail);
+        const now = performance.now();
+        for (let i = 0; i < trailPoints.length; i++) {
+            const p = trailPoints[i];
+            const age = (now - p.t) / 260; // 0 = tout juste posé, 1 = complètement estompé
+            if (age >= 1) continue;
+            const { sx, sy } = worldToScreen(p.x, p.y);
+            const rgb = trail.rgb === "rainbow" ? rainbowRgb(p.t) : trail.rgb;
+            ctx.fillStyle = "rgba(" + rgb + "," + (0.5 * (1 - age)) + ")";
+            ctx.beginPath();
+            ctx.arc(sx, sy, 10 * (1 - age), 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Petite variante "r,g,b" de rainbowOrFilter, pour la traînée arc-en-ciel
+    // (conversion HSL -> RGB à la main, teinte saturée et assez claire fixe)
+    function rainbowRgb(t) {
+        const h = Math.floor((t / 15) % 360);
+        const s = 1, l = 0.65;
+        const c = (1 - Math.abs(2 * l - 1)) * s;
+        const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+        const m = l - c / 2;
+        let r, g, b;
+        if (h < 60) { r = c; g = x; b = 0; }
+        else if (h < 120) { r = x; g = c; b = 0; }
+        else if (h < 180) { r = 0; g = c; b = x; }
+        else if (h < 240) { r = 0; g = x; b = c; }
+        else if (h < 300) { r = x; g = 0; b = c; }
+        else { r = c; g = 0; b = x; }
+        return Math.round((r + m) * 255) + "," + Math.round((g + m) * 255) + "," + Math.round((b + m) * 255);
+    }
+
     function drawTrousse() {
         // petit flottement vertical purement visuel pendant la séquence spatiale
         let floatBob = 0;
@@ -1607,6 +1898,11 @@
             vy -= currentG * dt;
             rotation += rotSpeed * dt;
 
+            // échantillonne la position pour la traînée (voir drawTrail), en
+            // gardant seulement les points assez récents pour rester visibles
+            trailPoints.push({ x: worldX, y: worldY, t: now });
+            trailPoints = trailPoints.filter(p => now - p.t < 260);
+
             if (spaceEggTriggered && vy <= 0) {
                 // on vient d'atteindre l'apogée avec la combinaison easter egg :
                 // on gèle la position et on bascule vers la séquence spatiale
@@ -1633,7 +1929,7 @@
             if (phaseTimer >= CLOUD_TRANSITION_DURATION) {
                 state = "space_floating";
                 phaseTimer = 0;
-                hintText.textContent = "🛸 En apesanteur...";
+                hintText.textContent = tr("hintZeroG");
                 hintText.style.display = "block";
                 sfxSpace();
             }
@@ -1661,6 +1957,7 @@
         } else {
             drawBackground(w, h);
         }
+        drawTrail();
         drawTrousse();
         if (state === "space_transition") {
             drawCloudSweep(w, h, phaseTimer / CLOUD_TRANSITION_DURATION);
@@ -1695,21 +1992,21 @@
 
     function initFirebase() {
         if (!FIREBASE_ENABLED) {
-            updateOnlineStatus("Hors ligne (Firebase non configuré)");
+            updateOnlineStatus(tr("onlineOfflineNoConfig"));
             return;
         }
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        updateOnlineStatus("Connexion...");
+        updateOnlineStatus(tr("onlineConnecting"));
         firebase.auth().onAuthStateChanged((user) => {
             if (!user) return;
             currentUser = user;
-            updateOnlineStatus("En ligne ✅");
+            updateOnlineStatus(tr("onlineConnected"));
             syncCloudSaveOnLogin();
         });
         firebase.auth().signInAnonymously().catch((err) => {
             console.error("Connexion Firebase échouée :", err);
-            updateOnlineStatus("Hors ligne (connexion échouée)");
+            updateOnlineStatus(tr("onlineOfflineFailed"));
         });
     }
 
@@ -1762,10 +2059,10 @@
     function loadLeaderboard() {
         const body = document.getElementById("leaderboard-body");
         if (!FIREBASE_ENABLED || !db) {
-            body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Classement indisponible hors ligne.</p>';
+            body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardUnavailable") + '</p>';
             return;
         }
-        body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Chargement...</p>';
+        body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardLoading") + '</p>';
         db.collection("scores").orderBy("bestDistance", "desc").limit(15).get().then((snapshot) => {
             body.innerHTML = "";
             let rank = 0;
@@ -1781,18 +2078,18 @@
                 body.appendChild(row);
             });
             if (rank === 0) {
-                body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Aucun score pour l\'instant, sois le premier !</p>';
+                body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardEmpty") + '</p>';
             }
         }).catch((err) => {
             console.error("Chargement du classement impossible :", err);
-            body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Impossible de charger le classement.</p>';
+            body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardError") + '</p>';
         });
     }
 
     // Change le pseudo utilisé sur le classement (prompt natif : action rare,
     // pas besoin d'une fenêtre stylée pour ça)
     document.getElementById("btn-edit-pseudo").addEventListener("click", () => {
-        const next = prompt("Ton pseudo pour le classement :", save.pseudo || "");
+        const next = prompt(tr("pseudoPrompt"), save.pseudo || "");
         if (next && next.trim()) {
             save.pseudo = next.trim().slice(0, 24);
             persist();
@@ -1804,42 +2101,43 @@
     const TUTORIAL_SLIDES = [
         {
             icon: "🎒",
-            title: "Bienvenue dans Bully the Trousse !",
-            text: "Le but du jeu : lancer ta trousse le plus loin possible !",
+            fr: { title: "Bienvenue dans Bully the Trousse !", text: "Le but du jeu : lancer ta trousse le plus loin possible !" },
+            en: { title: "Welcome to Bully the Trousse!", text: "The goal: throw your pencil case as far as you can!" },
         },
         {
             icon: "🤓👆",
-            title: "Comment lancer",
-            text: "Clique 3 fois : une fois pour charger la PUISSANCE, une fois pour verrouiller la PRÉCISION, et une dernière fois pour lancer !",
+            fr: { title: "Comment lancer", text: "Clique 3 fois : une fois pour charger la PUISSANCE, une fois pour verrouiller la PRÉCISION, et une dernière fois pour lancer !" },
+            en: { title: "How to throw", text: "Click 3 times: once to charge POWER, once to lock in ACCURACY, and once more to launch!" },
         },
         {
             icon: "💰",
-            title: "Gagne de l'argent",
-            text: "Plus tu lances loin, plus tu gagnes d'argent. Dépense-le dans la Boutique pour améliorer ta Puissance, ta Vitesse, ou débloquer des skins (d'autres skins arriveront plus tard).",
+            fr: { title: "Gagne de l'argent", text: "Plus tu lances loin, plus tu gagnes d'argent. Dépense-le dans la Boutique pour améliorer ta Puissance, ta Vitesse, ou débloquer des skins (d'autres skins arriveront plus tard)." },
+            en: { title: "Earn money", text: "The further you throw, the more you earn. Spend it in the Shop on Power, Speed, or new skins (more skins are coming later)." },
         },
         {
             icon: "🏆",
-            title: "Défie le monde entier (enfin, ceux qui jouent au jeu...)",
-            text: "Bats ton record pour apparaître dans le Classement mondial, visible depuis le menu !",
+            fr: { title: "Défie le monde entier (enfin, ceux qui jouent au jeu...)", text: "Bats ton record pour apparaître dans le Classement mondial, visible depuis le menu !" },
+            en: { title: "Challenge the whole world (well, whoever plays this)", text: "Beat your record to show up on the global Leaderboard, right from the menu!" },
         },
         {
             icon: "🔁",
-            title: "Alors partage un max !",
-            text: "Partage le jeu à tes amis pour qu'ils puissent eux aussi battre ton record !",
+            fr: { title: "Alors partage un max !", text: "Partage le jeu à tes amis pour qu'ils puissent eux aussi battre ton record !" },
+            en: { title: "So go share it!", text: "Share the game with your friends so they can try to beat your record too!" },
         },
         {
             icon: "🤗",
-            title: "Visite mes autres sites !",
-            text: "Va sur evyverse.vercel.app pour découvrir mes autres sites !",
+            fr: { title: "Visite mes autres sites !", text: "Va sur evyverse.vercel.app pour découvrir mes autres sites !" },
+            en: { title: "Check out my other sites!", text: "Go to evyverse.vercel.app to discover my other projects!" },
         },
     ];
     let tutorialStep = 0;
 
     function renderTutorialSlide() {
         const slide = TUTORIAL_SLIDES[tutorialStep];
+        const localized = slide[save.lang] || slide.fr;
         document.getElementById("tutorial-icon").textContent = slide.icon;
-        document.getElementById("tutorial-title").textContent = slide.title;
-        document.getElementById("tutorial-text").textContent = slide.text;
+        document.getElementById("tutorial-title").textContent = localized.title;
+        document.getElementById("tutorial-text").textContent = localized.text;
 
         const dots = document.getElementById("tutorial-dots");
         dots.innerHTML = "";
@@ -1850,7 +2148,7 @@
         });
 
         const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
-        document.getElementById("btn-tutorial-next").textContent = isLast ? "C'est parti !" : "Suivant";
+        document.getElementById("btn-tutorial-next").textContent = isLast ? tr("tutorialDone") : tr("tutorialNext");
     }
 
     function closeTutorial() {
@@ -1876,7 +2174,22 @@
     });
     document.getElementById("btn-tutorial-skip").addEventListener("click", closeTutorial);
 
+    // Bouton de langue : bascule FR <-> EN et retraduit toute l'interface visible
+    document.getElementById("btn-lang").addEventListener("click", () => {
+        save.lang = save.lang === "en" ? "fr" : "en";
+        persist();
+        applyLanguage();
+        renderTutorialSlide(); // au cas où le tutoriel serait affiché
+    });
+
     /* ============ 14. INITIALISATION ============ */
+    // Si le joueur n'a jamais choisi de langue, on devine à partir de celle du
+    // navigateur (anglais par défaut sauf si le navigateur est en français).
+    if (!save.lang) {
+        save.lang = navigator.language && navigator.language.toLowerCase().startsWith("fr") ? "fr" : "en";
+        persist();
+    }
+    applyLanguage();
     buildWorldsRow();
     refreshMenu();
     if (!menuPreviewRAF) animateMenuPreview();
