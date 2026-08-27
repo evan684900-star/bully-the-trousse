@@ -1,0 +1,32 @@
+rules_version = '2';
+
+// Règles de sécurité Firestore pour "Bully the Trousse".
+// À coller dans la console Firebase : Firestore Database > onglet "Règles".
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Sauvegarde de progression : chaque compte anonyme ne peut lire/écrire
+    // que son propre document, identifié par son uid Firebase Auth.
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Classement : tout le monde peut lire (pour afficher le classement),
+    // mais chacun ne peut écrire QUE sa propre entrée, avec des valeurs
+    // plausibles (pseudo court, distance positive et raisonnable).
+    // Limite : ça bloque les écritures grossières, mais un joueur qui ouvre
+    // la console de son navigateur peut techniquement encore envoyer une
+    // fausse distance dans les bornes autorisées — une validation complète
+    // demanderait une Cloud Function côté serveur, hors scope ici.
+    match /scores/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.data.pseudo is string
+                   && request.resource.data.pseudo.size() <= 24
+                   && request.resource.data.bestDistance is number
+                   && request.resource.data.bestDistance >= 0
+                   && request.resource.data.bestDistance <= 100000;
+    }
+  }
+}

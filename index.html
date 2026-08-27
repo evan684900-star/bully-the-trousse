@@ -337,6 +337,29 @@
             font-weight: 700;
         }
 
+        /* ---------- ÉCRAN CLASSEMENT ---------- */
+        #screen-leaderboard {
+            background: #171b28;
+            flex-direction: column;
+        }
+        /* Même astuce de spécificité que pour #screen-shop.active, voir plus haut */
+        #screen-leaderboard.active { display: flex; }
+        .leaderboard-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #1f2437;
+            border: 2px solid var(--panel-border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .leaderboard-row .rank { width: 30px; color: var(--text-dim); font-weight: 700; }
+        .leaderboard-row .pseudo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .leaderboard-row .dist { color: var(--money); font-weight: 800; }
+        .leaderboard-row.you { border-color: var(--accent); }
+
         .modal-overlay {
             position: absolute;
             inset: 0;
@@ -420,6 +443,7 @@
             <div class="menu-buttons">
                 <button class="btn" id="btn-play">🚀 Jouer</button>
                 <button class="btn secondary" id="btn-shop">🛒 Boutique</button>
+                <button class="btn secondary" id="btn-leaderboard">🏆 Classement</button>
             </div>
             <!-- Rempli dynamiquement par buildWorldsRow() -->
             <div class="worlds-row" id="worlds-row"></div>
@@ -469,12 +493,33 @@
         <div class="shop-body" id="shop-body"></div>
     </section>
 
+    <!-- ÉCRAN CLASSEMENT (en ligne, via Firebase) -->
+    <section id="screen-leaderboard" class="screen">
+        <button class="btn secondary small back-btn" id="btn-leaderboard-back">← Menu</button>
+        <div class="shop-header" style="justify-content:center; padding-top:16px; flex-direction: column; gap: 4px;">
+            <div class="money-pill">🏆 Classement mondial</div>
+            <div id="online-status" style="font-size:12px; color: var(--text-dim);">Connexion...</div>
+        </div>
+        <div style="display:flex; justify-content:center; padding: 0 16px 10px;">
+            <button class="btn small secondary" id="btn-edit-pseudo">✏️ Pseudo : <span id="leaderboard-pseudo">-</span></button>
+        </div>
+        <!-- Rempli dynamiquement par loadLeaderboard() -->
+        <div class="shop-body" id="leaderboard-body"></div>
+    </section>
+
     <div class="toast" id="toast"></div>
 
     <!-- Musique de fond, démarrée au premier clic de l'utilisateur (voir plus bas) -->
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
     <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
 </div>
+
+<!-- SDK Firebase (compat, sans étape de build) : auth anonyme + Firestore.
+     Si le réseau est coupé ou que ces scripts ne chargent pas, le jeu continue
+     de fonctionner normalement en local — voir FIREBASE_ENABLED dans le script. -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 
 <script>
 (function () {
@@ -493,7 +538,8 @@
        9. Écran de jeu : état + mécanique de lancer
        10. Rendu du décor (canvas) : bâtiments, arbres, craie
        11. Rendu de la trousse + boucle principale du jeu
-       12. Initialisation
+       12. Firebase : auth anonyme, sauvegarde cloud, classement en ligne
+       13. Initialisation
        ========================================================= */
 
     /* ============ 1. CONSTANTES DE JEU ============ */
@@ -552,6 +598,7 @@
             ownedSkins: ["classique"],
             equippedSkin: "classique",
             musicMuted: false,
+            pseudo: "", // généré automatiquement à la première connexion Firebase
         };
     }
 
@@ -572,6 +619,7 @@
 
     function persist() {
         localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+        pushCloudSave(); // best-effort, ne fait rien si Firebase n'est pas connecté
     }
 
     function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
@@ -666,6 +714,7 @@
         menu: document.getElementById("screen-menu"),
         game: document.getElementById("screen-game"),
         shop: document.getElementById("screen-shop"),
+        leaderboard: document.getElementById("screen-leaderboard"),
     };
     // Ajoute/retire simplement la classe "active" (voir le CSS plus haut) et
     // rafraîchit le contenu de l'écran qu'on vient d'afficher.
@@ -675,6 +724,7 @@
         if (name === "menu") refreshMenu();
         if (name === "shop") refreshShop();
         if (name === "game") resetThrow();
+        if (name === "leaderboard") refreshLeaderboardScreen();
     }
 
     /* ============ 7. ÉCRAN MENU ============ */
@@ -1009,6 +1059,7 @@
             save.bestDistance = distanceMeters;
             document.getElementById("result-record").style.display = "block";
             sfxRecord();
+            pushScoreIfRecord(distanceMeters);
         } else {
             document.getElementById("result-record").style.display = "none";
         }
@@ -1035,6 +1086,8 @@
     document.getElementById("btn-shop-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-shop").addEventListener("click", () => showScreen("shop"));
+    document.getElementById("btn-leaderboard").addEventListener("click", () => showScreen("leaderboard"));
+    document.getElementById("btn-leaderboard-back").addEventListener("click", () => showScreen("menu"));
 
     /* ============ 10. RENDU DU DÉCOR (canvas) ============ */
 
@@ -1278,11 +1331,148 @@
         requestAnimationFrame(gameLoop);
     }
 
-    /* ============ 12. INITIALISATION ============ */
+    /* ============ 12. FIREBASE : AUTH ANONYME, SAUVEGARDE CLOUD, CLASSEMENT ============ */
+    // Pour activer ces fonctionnalités en ligne :
+    // 1. Crée un projet sur https://console.firebase.google.com (gratuit).
+    // 2. Dans "Authentication" > "Sign-in method", active le fournisseur "Anonyme".
+    // 3. Dans "Firestore Database", crée une base, puis colle les règles du
+    //    fichier firestore.rules (fourni à côté de ce fichier) dans l'onglet "Règles".
+    // 4. Dans "Paramètres du projet" > "Vos applications", ajoute une application
+    //    Web (</>) et copie sa configuration ci-dessous, à la place des "VOTRE_...".
+    const firebaseConfig = {
+        apiKey: "VOTRE_CLE_API",
+        authDomain: "VOTRE_PROJET.firebaseapp.com",
+        projectId: "VOTRE_PROJET",
+        storageBucket: "VOTRE_PROJET.appspot.com",
+        messagingSenderId: "000000000000",
+        appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxx",
+    };
+    // Tant que la config ci-dessus n'est pas remplie (ou si les scripts Firebase
+    // n'ont pas pu charger, ex : pas de connexion internet), le jeu reste 100%
+    // jouable hors-ligne : seuls le classement et la sauvegarde cloud sont coupés.
+    const FIREBASE_ENABLED = typeof firebase !== "undefined" && firebaseConfig.apiKey !== "VOTRE_CLE_API";
+
+    let db = null;
+    let currentUser = null;
+
+    function updateOnlineStatus(text) {
+        const el = document.getElementById("online-status");
+        if (el) el.textContent = text;
+    }
+
+    function initFirebase() {
+        if (!FIREBASE_ENABLED) {
+            updateOnlineStatus("Hors ligne (Firebase non configuré)");
+            return;
+        }
+        firebase.initializeApp(firebaseConfig);
+        db = firebase.firestore();
+        updateOnlineStatus("Connexion...");
+        firebase.auth().onAuthStateChanged((user) => {
+            if (!user) return;
+            currentUser = user;
+            updateOnlineStatus("En ligne ✅");
+            syncCloudSaveOnLogin();
+        });
+        firebase.auth().signInAnonymously().catch((err) => {
+            console.error("Connexion Firebase échouée :", err);
+            updateOnlineStatus("Hors ligne (connexion échouée)");
+        });
+    }
+
+    // Au premier lien avec le cloud : si une sauvegarde existe déjà pour ce
+    // compte anonyme, elle prend le dessus (utile si l'utilisateur revient sur
+    // le même appareil/navigateur). Sinon, on envoie la sauvegarde locale
+    // actuelle pour créer le document et on génère un pseudo par défaut.
+    function syncCloudSaveOnLogin() {
+        if (!db || !currentUser) return;
+        db.collection("users").doc(currentUser.uid).get().then((doc) => {
+            if (doc.exists) {
+                save = Object.assign(defaultSave(), doc.data());
+                localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+                refreshMenu();
+            } else {
+                if (!save.pseudo) save.pseudo = "Trousse-" + Math.floor(1000 + Math.random() * 9000);
+                pushCloudSave();
+            }
+            document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
+        }).catch((err) => console.error("Lecture de la sauvegarde cloud impossible :", err));
+    }
+
+    // Envoie la sauvegarde actuelle vers Firestore. Best-effort : si Firebase
+    // n'est pas connecté ou que la requête échoue (hors ligne...), on ignore
+    // simplement l'erreur, ça ne doit jamais bloquer le jeu.
+    function pushCloudSave() {
+        if (!db || !currentUser) return;
+        db.collection("users").doc(currentUser.uid).set(save, { merge: true })
+            .catch((err) => console.error("Sauvegarde cloud impossible :", err));
+    }
+
+    // Met à jour l'entrée du classement (un seul document par joueur, écrasé
+    // à chaque nouveau record, jamais à chaque lancer pour limiter les écritures)
+    function pushScoreIfRecord(distanceMeters) {
+        if (!db || !currentUser) return;
+        db.collection("scores").doc(currentUser.uid).set({
+            pseudo: save.pseudo || "Anonyme",
+            bestDistance: distanceMeters,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }).catch((err) => console.error("Envoi du score impossible :", err));
+    }
+
+    // Affiche le pseudo actuel et (re)charge le classement à l'ouverture de l'écran
+    function refreshLeaderboardScreen() {
+        document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
+        loadLeaderboard();
+    }
+
+    // Charge et affiche le top 15 des meilleures distances, tous joueurs confondus
+    function loadLeaderboard() {
+        const body = document.getElementById("leaderboard-body");
+        if (!FIREBASE_ENABLED || !db) {
+            body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Classement indisponible hors ligne.</p>';
+            return;
+        }
+        body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Chargement...</p>';
+        db.collection("scores").orderBy("bestDistance", "desc").limit(15).get().then((snapshot) => {
+            body.innerHTML = "";
+            let rank = 0;
+            snapshot.forEach((doc) => {
+                rank++;
+                const data = doc.data();
+                const row = document.createElement("div");
+                row.className = "leaderboard-row" + (currentUser && doc.id === currentUser.uid ? " you" : "");
+                row.innerHTML =
+                    '<span class="rank">#' + rank + '</span>' +
+                    '<span class="pseudo">' + (data.pseudo || "???") + '</span>' +
+                    '<span class="dist">' + (data.bestDistance || 0).toFixed(1) + ' m</span>';
+                body.appendChild(row);
+            });
+            if (rank === 0) {
+                body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Aucun score pour l\'instant, sois le premier !</p>';
+            }
+        }).catch((err) => {
+            console.error("Chargement du classement impossible :", err);
+            body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">Impossible de charger le classement.</p>';
+        });
+    }
+
+    // Change le pseudo utilisé sur le classement (prompt natif : action rare,
+    // pas besoin d'une fenêtre stylée pour ça)
+    document.getElementById("btn-edit-pseudo").addEventListener("click", () => {
+        const next = prompt("Ton pseudo pour le classement :", save.pseudo || "");
+        if (next && next.trim()) {
+            save.pseudo = next.trim().slice(0, 24);
+            persist();
+            document.getElementById("leaderboard-pseudo").textContent = save.pseudo;
+        }
+    });
+
+    /* ============ 13. INITIALISATION ============ */
     buildWorldsRow();
     refreshMenu();
     if (!menuPreviewRAF) animateMenuPreview();
     showScreen("menu");
+    initFirebase();
 })();
 </script>
 </body>
