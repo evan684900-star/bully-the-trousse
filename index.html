@@ -1331,26 +1331,19 @@
         requestAnimationFrame(gameLoop);
     }
 
-    /* ============ 12. FIREBASE : AUTH ANONYME, SAUVEGARDE CLOUD, CLASSEMENT ============ */
-    // Pour activer ces fonctionnalités en ligne :
-    // 1. Crée un projet sur https://console.firebase.google.com (gratuit).
-    // 2. Dans "Authentication" > "Sign-in method", active le fournisseur "Anonyme".
-    // 3. Dans "Firestore Database", crée une base, puis colle les règles du
-    //    fichier firestore.rules (fourni à côté de ce fichier) dans l'onglet "Règles".
-    // 4. Dans "Paramètres du projet" > "Vos applications", ajoute une application
-    //    Web (</>) et copie sa configuration ci-dessous, à la place des "VOTRE_...".
+    /* ============ 12. FIREBASE (SAUVEGARDE CLOUD + CLASSEMENT) ============ */
     const firebaseConfig = {
-        apiKey: "VOTRE_CLE_API",
-        authDomain: "VOTRE_PROJET.firebaseapp.com",
-        projectId: "VOTRE_PROJET",
-        storageBucket: "VOTRE_PROJET.appspot.com",
-        messagingSenderId: "000000000000",
-        appId: "1:000000000000:web:xxxxxxxxxxxxxxxxxxxxxx",
+        apiKey: "AIzaSyADulCVz8u8yVb9MGR2N9EYXs4DDtFydbs",
+        authDomain: "bully-the-trousse.firebaseapp.com",
+        projectId: "bully-the-trousse",
+        storageBucket: "bully-the-trousse.firebasestorage.app",
+        messagingSenderId: "1038347853846",
+        appId: "1:1038347853846:web:6a2054ddc7bd63fb4f5537",
     };
     // Tant que la config ci-dessus n'est pas remplie (ou si les scripts Firebase
     // n'ont pas pu charger, ex : pas de connexion internet), le jeu reste 100%
     // jouable hors-ligne : seuls le classement et la sauvegarde cloud sont coupés.
-    const FIREBASE_ENABLED = typeof firebase !== "undefined" && firebaseConfig.apiKey !== "VOTRE_CLE_API";
+    const FIREBASE_ENABLED = typeof firebase !== "undefined" && !firebaseConfig.apiKey.startsWith("VOTRE_");
 
     let db = null;
     let currentUser = null;
@@ -1393,7 +1386,7 @@
                 refreshMenu();
             } else {
                 if (!save.pseudo) save.pseudo = "Trousse-" + Math.floor(1000 + Math.random() * 9000);
-                pushCloudSave();
+                persist(); // écrit en local ET envoie au cloud (pushCloudSave seul aurait sauté le localStorage)
             }
             document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
         }).catch((err) => console.error("Lecture de la sauvegarde cloud impossible :", err));
