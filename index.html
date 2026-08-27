@@ -218,6 +218,44 @@
             text-shadow: 0 2px 6px rgba(0,0,0,0.6);
             pointer-events: none;
         }
+        /* Prompt du QTE de l'easter egg spatial */
+        #qte-wrap {
+            position: absolute;
+            left: 50%;
+            top: 40%;
+            transform: translate(-50%, -50%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            z-index: 15;
+        }
+        #qte-wrap.show { display: flex; }
+        #qte-prompt {
+            font-size: clamp(20px, 5vw, 32px);
+            font-weight: 900;
+            color: #fff;
+            text-shadow: 0 3px 10px rgba(0,0,0,0.6);
+            animation: qtePulse 0.35s ease-in-out infinite alternate;
+        }
+        @keyframes qtePulse {
+            from { transform: scale(1); }
+            to { transform: scale(1.12); }
+        }
+        #qte-timer-bar {
+            width: min(70vw, 320px);
+            height: 14px;
+            background: rgba(10,12,20,0.55);
+            border: 2px solid #222633;
+            border-radius: 999px;
+            overflow: hidden;
+        }
+        #qte-timer-fill {
+            height: 100%;
+            width: 100%;
+            background: linear-gradient(90deg, var(--money), var(--accent), var(--accent-2));
+        }
+
         /* Barre de charge affichée pendant les phases "puissance" et "précision" */
         #meter-wrap {
             position: absolute;
@@ -459,6 +497,10 @@
             <div class="money-pill" style="font-size:14px; padding:6px 14px; color:#fff;">📏 <span id="game-distance">0</span> m</div>
         </div>
         <div class="hint-text" id="hint-text">Clique / appuie pour charger la puissance !</div>
+        <div id="qte-wrap">
+            <div id="qte-prompt">🚀 APPUIE VITE !</div>
+            <div id="qte-timer-bar"><div id="qte-timer-fill"></div></div>
+        </div>
         <div id="meter-wrap">
             <div id="meter-fill"></div>
             <div id="meter-center"></div>
@@ -547,6 +589,17 @@
     const SCALE = 12;   // nombre de pixels représentant 1 mètre à l'écran
     const BASE_G = 950; // gravité (px/s²) avec un niveau de Vitesse à 0
     const BASE_V0 = 480; // vitesse initiale (px/s) avec Puissance à 0 et charge à 100%
+
+    // Easter egg "vers l'espace" : lancer avec une puissance quasi max ET une
+    // précision verrouillée tout au début de la barre (zone verte). Voir
+    // lockAccuracyAndLaunch() pour la détection et gameLoop() pour la séquence.
+    const SPACE_EGG_POWER_MIN = 0.9;      // lockedPower doit être proche du maximum (1.0)
+    const SPACE_EGG_ACCURACY_MAX = -0.6;  // value doit être très à gauche (zone verte du début)
+    const CLOUD_TRANSITION_DURATION = 0.8; // secondes, nuages qui cachent le changement de décor
+    const SPACE_FLOAT_DURATION = 1.3;      // secondes, flottement avant le QTE
+    const QTE_DURATION = 1.1;              // secondes pour réagir au QTE
+    const SPACE_BOOST_VX = 2600;           // vitesse folle horizontale si le QTE est réussi
+    const SPACE_BOOST_VY = 150;
 
     /* ============ 2. DONNÉES STATIQUES ============ */
     // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
@@ -681,6 +734,8 @@
     function sfxBuy() { beep(700, 0.12, "sine", 0.1); beep(900, 0.15, "sine", 0.1); }
     function sfxError() { beep(140, 0.15, "square", 0.1); }
     function sfxRecord() { beep(600, 0.1, "sine", 0.12); beep(800, 0.1, "sine", 0.12); beep(1000, 0.2, "sine", 0.12); }
+    function sfxSpace() { beep(200, 0.5, "sine", 0.1); beep(900, 0.4, "sine", 0.06); }
+    function sfxCrash() { beep(60, 0.4, "sawtooth", 0.2); beep(40, 0.5, "square", 0.15); }
 
     // Musique de fond en boucle. Les navigateurs bloquent la lecture audio tant
     // qu'il n'y a pas eu d'interaction de l'utilisateur : on démarre donc la
@@ -949,6 +1004,13 @@
     let isPerfect = false;  // vrai si le lancer était quasi-parfait (bonus d'argent)
     let groundScreenY = 0;  // position Y du sol à l'écran (recalculée à chaque frame)
 
+    // Easter egg "vers l'espace" (voir SPACE_EGG_* plus haut)
+    let spaceEggTriggered = false; // ce lancer va-t-il basculer en mode espace à l'apogée ?
+    let inSpaceMode = false;       // le décor actuellement affiché est-il celui de l'espace ?
+    let phaseTimer = 0;            // chronomètre des phases spéciales (transition/flottaison/QTE)
+    let qteSuccess = null;         // null = pas encore résolu, true/false = résultat du QTE
+    let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
+
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
         state = "idle";
@@ -957,6 +1019,12 @@
         vx = 0; vy = 0;
         rotation = 0;
         cameraX = 0;
+        spaceEggTriggered = false;
+        inSpaceMode = false;
+        phaseTimer = 0;
+        qteSuccess = null;
+        craterWorldX = null;
+        document.getElementById("qte-wrap").classList.remove("show");
         resultPanel.classList.remove("show");
         meterWrap.style.display = "none";
         hintText.style.display = "block";
@@ -991,6 +1059,10 @@
         const value = Math.sin(t * 3.4); // -1..1, 0 = visée parfaite (angle optimal)
         lockedAccuracy = value;
         isPerfect = Math.abs(value) < 0.08;
+
+        // Easter egg : puissance quasi max + précision verrouillée tout au
+        // début de la barre (zone verte) = décollage vers l'espace à l'apogée
+        spaceEggTriggered = lockedPower >= SPACE_EGG_POWER_MIN && value <= SPACE_EGG_ACCURACY_MAX;
 
         const puissance = totalPuissance();
         const vitesse = totalVitesse();
@@ -1031,7 +1103,27 @@
         if (state === "idle") startChargingPower();
         else if (state === "charging_power") lockPower();
         else if (state === "charging_angle") lockAccuracyAndLaunch();
+        else if (state === "qte") resolveQte(true);
         else if (state === "landed") { /* rien à faire, les boutons du panneau de résultat gèrent la suite */ }
+    }
+
+    // Résout le QTE de l'easter egg spatial : succès (tap/touche à temps) envoie
+    // la trousse à vitesse folle droit devant, échec (temps écoulé) la laisse
+    // simplement retomber depuis sa position actuelle.
+    function resolveQte(success) {
+        if (state !== "qte" || qteSuccess !== null) return;
+        qteSuccess = success;
+        document.getElementById("qte-wrap").classList.remove("show");
+        if (success) {
+            sfxRecord();
+            vx = SPACE_BOOST_VX;
+            vy = SPACE_BOOST_VY;
+        } else {
+            sfxError();
+            vx = 0;
+            vy = 0;
+        }
+        state = "flying";
     }
 
     // Met à jour la position visuelle du curseur sur la barre de charge à chaque frame
@@ -1075,7 +1167,13 @@
         document.getElementById("game-money").textContent = save.money;
 
         resultPanel.classList.add("show");
-        sfxLand();
+
+        if (inSpaceMode) {
+            craterWorldX = worldX; // petit cratère dessiné à l'endroit du crash
+            sfxCrash();
+        } else {
+            sfxLand();
+        }
     }
 
     // Boutons de navigation de l'écran de jeu et du panneau de résultat
@@ -1264,6 +1362,102 @@
         }
     }
 
+    // Dessine un cratère (décoratif sur la lune, ou "isImpact" pour le cratère de crash)
+    function drawMoonCrater(sx, sy, radius, isImpact) {
+        ctx.save();
+        ctx.fillStyle = isImpact ? "rgba(40,35,45,0.55)" : "rgba(60,60,70,0.35)";
+        ctx.beginPath();
+        ctx.ellipse(sx, sy, radius, radius * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = isImpact ? "rgba(20,15,25,0.6)" : "rgba(40,40,50,0.3)";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Décor de la séquence easter egg : ciel étoilé, planète lointaine et sol
+    // lunaire cratérisé (dessiné à la place de drawBackground() une fois en
+    // mode espace). Même ligne d'horizon que la cour, pour un atterrissage cohérent.
+    function drawSpaceBackground(w, h) {
+        groundScreenY = h * 0.68;
+
+        const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
+        sky.addColorStop(0, "#05040f");
+        sky.addColorStop(1, "#1b1240");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, groundScreenY);
+
+        // étoiles scintillantes (légère parallaxe)
+        const starParX = -cameraX * 0.05;
+        for (let i = 0; i < 90; i++) {
+            const sx = ((i * 137 + starParX) % (w + 100)) - 50;
+            const sy = seededRand(i * 3.1) * groundScreenY * 0.9;
+            const twinkle = 0.4 + 0.6 * Math.abs(Math.sin(performance.now() / 500 + i));
+            ctx.fillStyle = "rgba(255,255,255," + (0.3 + 0.5 * twinkle) + ")";
+            ctx.beginPath();
+            ctx.arc(sx, sy, 1 + seededRand(i) * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // planète lointaine
+        const planetX = w * 0.75 - cameraX * 0.1;
+        ctx.fillStyle = "#c97b5f";
+        ctx.beginPath();
+        ctx.arc(planetX, groundScreenY * 0.25, 46, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(0,0,0,0.15)";
+        ctx.beginPath();
+        ctx.arc(planetX - 14, groundScreenY * 0.25 - 10, 12, 0, Math.PI * 2);
+        ctx.fill();
+
+        // sol lunaire (même dégradé gris que la cour, pour un rendu cohérent)
+        const groundGrad = ctx.createLinearGradient(0, groundScreenY, 0, h);
+        groundGrad.addColorStop(0, "#9aa0ab");
+        groundGrad.addColorStop(1, "#6f7480");
+        ctx.fillStyle = groundGrad;
+        ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+
+        // petits cratères décoratifs (remplacent la craie/les arbres de la cour)
+        const craterSpacing = 180;
+        const craterStartIdx = Math.floor(cameraX / craterSpacing) - 1;
+        for (let i = craterStartIdx; i < craterStartIdx + Math.ceil(w / craterSpacing) + 2; i++) {
+            const worldPos = i * craterSpacing + (seededRand(i + 0.4) - 0.5) * 60;
+            const sx = worldPos - cameraX;
+            if (sx < -30 || sx > w + 30) continue;
+            drawMoonCrater(sx, groundScreenY + 10 + seededRand(i) * 14, 10 + seededRand(i + 1) * 8);
+        }
+
+        // cratère d'impact du crash, s'il y en a déjà un pour ce lancer
+        if (craterWorldX !== null) {
+            drawMoonCrater(craterWorldX - cameraX, groundScreenY + 6, 26, true);
+        }
+    }
+
+    // Nuages qui balaient tout l'écran pendant la transition, pour cacher le
+    // changement de décor cour <-> espace. La couverture (opacité en cloche,
+    // 0 -> 1 -> 0) garantit qu'on ne voit jamais le bascule se produire.
+    function drawCloudSweep(w, h, progress) {
+        const coverage = Math.sin(Math.min(Math.max(progress, 0), 1) * Math.PI);
+        ctx.save();
+        ctx.fillStyle = "#eef3f8";
+        const drift = progress * w * 1.3 - w * 0.15;
+        for (let i = 0; i < 5; i++) {
+            const cx = drift - i * 150;
+            const cy = h * (0.15 + (i % 3) * 0.2);
+            ctx.beginPath();
+            ctx.arc(cx, cy, 95, 0, Math.PI * 2);
+            ctx.arc(cx + 75, cy + 12, 75, 0, Math.PI * 2);
+            ctx.arc(cx - 65, cy + 18, 68, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // voile plein écran par-dessus les nuages : garantit une couverture
+        // totale au milieu de la transition, quelle que soit la position des nuages
+        ctx.globalAlpha = coverage;
+        ctx.fillStyle = "#f4f8ff";
+        ctx.fillRect(0, 0, w, h);
+        ctx.restore();
+    }
+
     /* ============ 11. RENDU DE LA TROUSSE + BOUCLE PRINCIPALE ============ */
 
     // Convertit une position "monde" (worldX/worldY) en position à l'écran,
@@ -1274,7 +1468,12 @@
     }
 
     function drawTrousse() {
-        const { sx, sy } = worldToScreen(worldX, worldY);
+        // petit flottement vertical purement visuel pendant la séquence spatiale
+        let floatBob = 0;
+        if (state === "space_floating" || state === "qte") {
+            floatBob = Math.sin(performance.now() / 300) * 10;
+        }
+        const { sx, sy } = worldToScreen(worldX, worldY + floatBob);
         const size = 60;
         ctx.save();
         ctx.translate(sx, sy);
@@ -1311,22 +1510,66 @@
             vy -= currentG * dt;
             rotation += rotSpeed * dt;
 
-            // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
-            if (worldY <= 0 && vy < 0) {
+            if (spaceEggTriggered && vy <= 0) {
+                // on vient d'atteindre l'apogée avec la combinaison easter egg :
+                // on gèle la position et on bascule vers la séquence spatiale
+                spaceEggTriggered = false; // ne se déclenche qu'une fois par lancer
+                state = "space_transition";
+                phaseTimer = 0;
+            } else if (worldY <= 0 && vy < 0) {
+                // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
                 worldY = 0;
                 onLanded();
+            } else {
+                // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
+                const targetCamera = worldX - w * 0.3;
+                cameraX = Math.max(0, targetCamera);
+                document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
             }
-
-            // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
-            const targetCamera = worldX - w * 0.3;
-            cameraX = Math.max(0, targetCamera);
-
-            document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
+        } else if (state === "space_transition") {
+            phaseTimer += dt;
+            // le décor bascule à la moitié de la transition, pile quand les
+            // nuages couvrent tout l'écran (voir drawCloudSweep) : invisible pour le joueur
+            if (!inSpaceMode && phaseTimer >= CLOUD_TRANSITION_DURATION * 0.5) {
+                inSpaceMode = true;
+            }
+            if (phaseTimer >= CLOUD_TRANSITION_DURATION) {
+                state = "space_floating";
+                phaseTimer = 0;
+                hintText.textContent = "🛸 En apesanteur...";
+                hintText.style.display = "block";
+                sfxSpace();
+            }
+        } else if (state === "space_floating") {
+            phaseTimer += dt;
+            rotation += 1.2 * dt; // tumbling lent en apesanteur
+            if (phaseTimer >= SPACE_FLOAT_DURATION) {
+                hintText.style.display = "none";
+                state = "qte";
+                phaseTimer = 0;
+                qteSuccess = null;
+                document.getElementById("qte-wrap").classList.add("show");
+                document.getElementById("qte-timer-fill").style.width = "100%";
+            }
+        } else if (state === "qte") {
+            phaseTimer += dt;
+            const remaining = Math.max(0, 1 - phaseTimer / QTE_DURATION);
+            document.getElementById("qte-timer-fill").style.width = (remaining * 100) + "%";
+            if (phaseTimer >= QTE_DURATION && qteSuccess === null) {
+                resolveQte(false); // temps écoulé sans réaction = échec
+            }
         }
 
         updateMeterUI();
-        drawBackground(w, h);
+        if (inSpaceMode) {
+            drawSpaceBackground(w, h);
+        } else {
+            drawBackground(w, h);
+        }
         drawTrousse();
+        if (state === "space_transition") {
+            drawCloudSweep(w, h, phaseTimer / CLOUD_TRANSITION_DURATION);
+        }
 
         requestAnimationFrame(gameLoop);
     }
