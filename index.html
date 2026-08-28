@@ -333,30 +333,31 @@
         .result-panel .record { color: var(--accent-2); font-weight: 800; margin-bottom: 8px; }
         .result-panel .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 
-        /* Bonus du skin "Trousse Pièce" : apparaît d'un coup (aucune animation
-           d'entrée), reste opaque, puis .fading déclenche le fondu de sortie */
+        /* Bonus du skin "Trousse Pièce" : prend tout l'écran, apparaît d'un coup
+           (aucune animation d'entrée), reste opaque, puis .fading déclenche le
+           fondu de sortie sur les 0.3 dernières secondes */
         .coin-popup {
             position: absolute;
-            left: 50%;
-            top: 50%;
-            transform: translate(-50%, -230%);
+            inset: 0;
             display: none;
             flex-direction: column;
             align-items: center;
-            z-index: 70;
+            justify-content: center;
+            gap: 14px;
+            z-index: 80;
+            background: rgba(10,8,2,0.6);
             opacity: 1;
             pointer-events: none;
         }
         .coin-popup.show { display: flex; }
         .coin-popup.fading { opacity: 0; transition: opacity 0.3s ease; }
-        #coin-popup-icon { font-size: 56px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
-        #coin-popup-text { font-size: 30px; font-weight: 900; color: var(--accent); text-shadow: 0 3px 8px rgba(0,0,0,0.7); }
+        #coin-popup-canvas { filter: drop-shadow(0 10px 24px rgba(0,0,0,0.6)); }
+        #coin-popup-text { font-size: clamp(36px, 10vw, 60px); font-weight: 900; color: var(--accent); text-shadow: 0 4px 12px rgba(0,0,0,0.8); }
         #coin-popup-jackpot {
             display: none;
-            margin-top: 6px;
-            max-width: 220px;
+            max-width: 320px;
             text-align: center;
-            font-size: 13px;
+            font-size: clamp(15px, 4vw, 20px);
             font-weight: 800;
             color: var(--accent-2);
             text-shadow: 0 2px 6px rgba(0,0,0,0.7);
@@ -631,10 +632,10 @@
                 <button class="btn secondary" id="btn-result-shop" data-i18n="btnShop">🛒 Boutique</button>
             </div>
         </div>
-        <!-- Bonus du skin "Trousse Pièce" : apparaît d'un coup au-dessus du
-             panneau de résultat quand le multiplicateur se déclenche -->
+        <!-- Bonus du skin "Trousse Pièce" : prend tout l'écran, apparaît d'un
+             coup quand le multiplicateur se déclenche (voir showCoinPopup) -->
         <div class="coin-popup" id="coin-popup">
-            <div id="coin-popup-icon">🪙</div>
+            <canvas id="coin-popup-canvas" width="200" height="200"></canvas>
             <div id="coin-popup-text">x2</div>
             <div id="coin-popup-jackpot">t'as eu un fois 5 !?! prend une capture d'écran !!</div>
         </div>
@@ -1196,10 +1197,20 @@
         const equipped = save.equippedSkin === skin.id;
         const card = document.createElement("div");
         card.className = "skin-card";
-        const img = document.createElement("img");
-        img.src = "trousse-skin-1.png";
-        img.style.filter = skin.filter === "rainbow" ? "hue-rotate(0deg) saturate(2.2)" : skin.filter;
-        card.appendChild(img);
+        if (skin.isCoin) {
+            // La Trousse Pièce a son propre sprite (une pièce, pas la trousse) :
+            // on dessine sur un petit <canvas> plutôt que de reprendre l'image.
+            const iconCanvas = document.createElement("canvas");
+            iconCanvas.width = 46;
+            iconCanvas.height = 46;
+            drawPixelCoin(iconCanvas.getContext("2d"), 46);
+            card.appendChild(iconCanvas);
+        } else {
+            const img = document.createElement("img");
+            img.src = "trousse-skin-1.png";
+            img.style.filter = skin.filter === "rainbow" ? "hue-rotate(0deg) saturate(2.2)" : skin.filter;
+            card.appendChild(img);
+        }
 
         const info = document.createElement("div");
         info.className = "info";
@@ -1591,6 +1602,10 @@
         sfxCoinBonus();
         const popup = document.getElementById("coin-popup");
         const jackpot = document.getElementById("coin-popup-jackpot");
+        const popupCanvas = document.getElementById("coin-popup-canvas");
+        const popupCtx = popupCanvas.getContext("2d");
+        popupCtx.clearRect(0, 0, popupCanvas.width, popupCanvas.height);
+        drawPixelCoin(popupCtx, popupCanvas.width, "PAF");
         document.getElementById("coin-popup-text").textContent = "x" + multiplier;
         jackpot.style.display = multiplier === 5 ? "block" : "none";
         popup.classList.remove("fading");
@@ -1972,24 +1987,33 @@
     // Dessine une pièce pixelisée (skin "Trousse Pièce") : un cercle généré par
     // grille (pas une image), avec un rebord plus sombre et une petite croix
     // embossée au centre pour évoquer une pièce "pile ou face".
-    function drawPixelCoin(size) {
+    // Dessine dans le coin (0,0)-(size,size) de targetCtx. Sans "engraving",
+    // affiche une simple croix embossée (skin en vol) ; avec "engraving", écrit
+    // ce texte au centre à la place (ex: "PAF" pour le popup plein écran).
+    function drawPixelCoin(targetCtx, size, engraving) {
         const grid = 14;
         const cell = size / grid;
         const center = (grid - 1) / 2;
-        ctx.save();
-        ctx.translate(-size / 2, -size / 2);
         for (let gy = 0; gy < grid; gy++) {
             for (let gx = 0; gx < grid; gx++) {
                 const dx = gx - center, dy = gy - center;
                 const dist = Math.sqrt(dx * dx + dy * dy);
                 if (dist > grid / 2) continue; // hors du cercle
                 const rim = dist > grid / 2 - 1.6;
-                const isMark = (Math.abs(dx) <= 0.6 && Math.abs(dy) <= 3.2) || (Math.abs(dy) <= 0.6 && Math.abs(dx) <= 3.2);
-                ctx.fillStyle = rim ? "#b8860a" : (isMark ? "#e8b923" : "#ffdd55");
-                ctx.fillRect(gx * cell, gy * cell, cell + 0.5, cell + 0.5);
+                const isMark = !engraving && ((Math.abs(dx) <= 0.6 && Math.abs(dy) <= 3.2) || (Math.abs(dy) <= 0.6 && Math.abs(dx) <= 3.2));
+                targetCtx.fillStyle = rim ? "#b8860a" : (isMark ? "#e8b923" : "#ffdd55");
+                targetCtx.fillRect(gx * cell, gy * cell, cell + 0.5, cell + 0.5);
             }
         }
-        ctx.restore();
+        if (engraving) {
+            targetCtx.save();
+            targetCtx.fillStyle = "#8a5a06";
+            targetCtx.font = "900 " + Math.round(size * 0.24) + "px 'Segoe UI', Arial, sans-serif";
+            targetCtx.textAlign = "center";
+            targetCtx.textBaseline = "middle";
+            targetCtx.fillText(engraving, size / 2, size / 2 + size * 0.02);
+            targetCtx.restore();
+        }
     }
 
     function drawTrousse() {
@@ -2005,7 +2029,8 @@
         ctx.translate(sx, sy);
         ctx.rotate(rotation); // rotation continue pendant le vol
         if (skin.isCoin) {
-            drawPixelCoin(size);
+            ctx.translate(-size / 2, -size / 2); // drawPixelCoin dessine depuis (0,0)
+            drawPixelCoin(ctx, size);
         } else {
             ctx.filter = rainbowOrFilter(skin.filter, performance.now());
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
