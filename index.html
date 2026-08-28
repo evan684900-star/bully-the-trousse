@@ -608,6 +608,12 @@
             right: calc(10px + env(safe-area-inset-right));
             z-index: 10;
         }
+        /* Sur mobile, le texte fait chevaucher ce bouton avec la pastille
+           d'argent (centrée juste en dessous) : on ne garde que l'emoji */
+        @media (max-width: 480px) {
+            .forward-btn { padding: 10px 12px; }
+            .forward-btn span[data-i18n] { display: none; }
+        }
 
         /* Bouton musique : visible sur les 3 écrans, en bas à droite */
         .mute-btn {
@@ -757,7 +763,10 @@
     <section id="screen-shop" class="screen">
         <button class="btn secondary small back-btn" id="btn-shop-back" data-i18n="btnBackMenu">← Menu</button>
         <!-- Permet de reprendre directement le jeu sans repasser par le menu -->
-        <button class="btn small forward-btn" id="btn-shop-play" data-i18n="btnBackGame">🎮 Retour au jeu</button>
+        <!-- Le texte est dans un <span> séparé (voir applyLanguage) pour pouvoir
+             le masquer en CSS sur mobile et ne garder que l'emoji, sans quoi ce
+             bouton chevauche la pastille d'argent centrée juste en dessous. -->
+        <button class="btn small forward-btn" id="btn-shop-play"><span aria-hidden="true">🎮</span> <span data-i18n="btnBackGame">Retour au jeu</span></button>
         <div class="shop-header" style="justify-content:center; padding-top:16px;">
             <div class="money-pill">💰 <span id="shop-money">0</span> $</div>
         </div>
@@ -830,7 +839,7 @@
         btnShop: { fr: "🛒 Boutique", en: "🛒 Shop" },
         btnLeaderboard: { fr: "🏆 Classement", en: "🏆 Leaderboard" },
         btnBackMenu: { fr: "← Menu", en: "← Menu" },
-        btnBackGame: { fr: "🎮 Retour au jeu", en: "🎮 Back to game" },
+        btnBackGame: { fr: "Retour au jeu", en: "Back to game" },
         worldLocked: { fr: " arrive bientôt !", en: " is coming soon!" },
         hintCharge: { fr: "Clique / appuie pour charger la puissance !", en: "Click / tap to charge power!" },
         hintLockPower: { fr: "Clique pour verrouiller la PUISSANCE !", en: "Click to lock in POWER!" },
