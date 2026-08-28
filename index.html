@@ -333,6 +333,35 @@
         .result-panel .record { color: var(--accent-2); font-weight: 800; margin-bottom: 8px; }
         .result-panel .buttons { display: flex; gap: 10px; justify-content: center; margin-top: 12px; flex-wrap: wrap; }
 
+        /* Bonus du skin "Trousse Pièce" : apparaît d'un coup (aucune animation
+           d'entrée), reste opaque, puis .fading déclenche le fondu de sortie */
+        .coin-popup {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -230%);
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            z-index: 70;
+            opacity: 1;
+            pointer-events: none;
+        }
+        .coin-popup.show { display: flex; }
+        .coin-popup.fading { opacity: 0; transition: opacity 0.3s ease; }
+        #coin-popup-icon { font-size: 56px; filter: drop-shadow(0 4px 8px rgba(0,0,0,0.5)); }
+        #coin-popup-text { font-size: 30px; font-weight: 900; color: var(--accent); text-shadow: 0 3px 8px rgba(0,0,0,0.7); }
+        #coin-popup-jackpot {
+            display: none;
+            margin-top: 6px;
+            max-width: 220px;
+            text-align: center;
+            font-size: 13px;
+            font-weight: 800;
+            color: var(--accent-2);
+            text-shadow: 0 2px 6px rgba(0,0,0,0.7);
+        }
+
         /* ---------- ÉCRAN BOUTIQUE ---------- */
         #screen-shop {
             background: var(--shop-bg);
@@ -602,6 +631,13 @@
                 <button class="btn secondary" id="btn-result-shop" data-i18n="btnShop">🛒 Boutique</button>
             </div>
         </div>
+        <!-- Bonus du skin "Trousse Pièce" : apparaît d'un coup au-dessus du
+             panneau de résultat quand le multiplicateur se déclenche -->
+        <div class="coin-popup" id="coin-popup">
+            <div id="coin-popup-icon">🪙</div>
+            <div id="coin-popup-text">x2</div>
+            <div id="coin-popup-jackpot">t'as eu un fois 5 !?! prend une capture d'écran !!</div>
+        </div>
     </section>
 
     <!-- ÉCRAN BOUTIQUE -->
@@ -753,7 +789,8 @@
        11. Rendu de la trousse + boucle principale du jeu
        12. Firebase : auth anonyme, sauvegarde cloud, classement en ligne
        13. Tutoriel (une seule fois pour les nouveaux joueurs)
-       14. Initialisation
+       14. Triches (console navigateur, pratique pour tester)
+       15. Initialisation
        ========================================================= */
 
     /* ============ 1. CONSTANTES DE JEU ============ */
@@ -776,6 +813,19 @@
     const QTE_RING_TOLERANCE = 15;         // marge acceptée autour de la cible pour réussir
     const SPACE_BOOST_VX = 2600;           // vitesse folle horizontale si tous les anneaux sont réussis
     const SPACE_BOOST_VY = 150;
+
+    // Skin "Trousse Pièce" : à chaque lancer, COIN_BONUS_CHANCE de déclencher
+    // un bonus, puis le multiplicateur exact est tiré parmi COIN_MULTIPLIERS
+    // (sous-probabilités qui s'appliquent SI le bonus s'est déclenché).
+    const COIN_BONUS_CHANCE = 0.10;
+    const COIN_MULTIPLIERS = [
+        { value: 1.6, chance: 0.60 },
+        { value: 2, chance: 0.20 },
+        { value: 3, chance: 0.10 },
+        { value: 5, chance: 0.01 },
+        // les 9% restants (0.60+0.20+0.10+0.01 = 0.91) ne donnent aucun bonus,
+        // même si les COIN_BONUS_CHANCE de départ se sont déclenchées
+    ];
 
     /* ============ 2. DONNÉES STATIQUES ============ */
     // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
@@ -815,6 +865,16 @@
             id: "arcenciel", name: "Trousse Arc-en-ciel", cost: 9000,
             desc: "+5 Puissance, +5 Vitesse. La légende ultime.",
             bonusPuissance: 5, bonusVitesse: 5, filter: "rainbow" // cas spécial : géré par rainbowOrFilter()
+        },
+        {
+            // Clin d'œil "pile ou face" : pas de bonus de stats, mais 10% de
+            // chance à chaque lancer de multiplier le score du coup (voir
+            // COIN_BONUS_CHANCE et onLanded()). Dessinée comme une pièce
+            // pixelisée à part (voir drawPixelCoin) plutôt que réutiliser
+            // l'image de la trousse.
+            id: "piece", name: "Trousse Pièce", cost: 2500,
+            desc: "Aucun bonus de stats, mais 10% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3... voire x5) !",
+            bonusPuissance: 0, bonusVitesse: 0, filter: "none", isCoin: true
         },
     ];
 
@@ -931,6 +991,11 @@
     function sfxRecord() { beep(600, 0.1, "sine", 0.12); beep(800, 0.1, "sine", 0.12); beep(1000, 0.2, "sine", 0.12); }
     function sfxSpace() { beep(200, 0.5, "sine", 0.1); beep(900, 0.4, "sine", 0.06); }
     function sfxCrash() { beep(60, 0.4, "sawtooth", 0.2); beep(40, 0.5, "square", 0.15); }
+    // Petit "tintement" synthétisé pour le skin Trousse Pièce, joué à chaque
+    // lancer (pas de fichier audio externe, comme tous les autres sfx du jeu).
+    function sfxCoinFlip() { beep(900, 0.05, "square", 0.08); beep(1200, 0.05, "square", 0.07); beep(1500, 0.09, "square", 0.06); }
+    // Petit jingle plus marqué, joué quand le multiplicateur de la pièce se déclenche
+    function sfxCoinBonus() { beep(700, 0.08, "sine", 0.12); beep(1050, 0.08, "sine", 0.12); beep(1400, 0.14, "sine", 0.12); }
 
     // Musique de fond en boucle. Les navigateurs bloquent la lecture audio tant
     // qu'il n'y a pas eu d'interaction de l'utilisateur : on démarre donc la
@@ -1310,6 +1375,7 @@
         craterWorldX = null;
         trailPoints = [];
         document.getElementById("qte-wrap").classList.remove("show");
+        document.getElementById("coin-popup").classList.remove("show", "fading");
         resultPanel.classList.remove("show");
         meterWrap.style.display = "none";
         hintText.style.display = "block";
@@ -1370,6 +1436,7 @@
         meterWrap.style.display = "none";
         hintText.style.display = "none";
         sfxLaunch();
+        if (getSkin(save.equippedSkin).isCoin) sfxCoinFlip();
     }
 
     // Un clic/tap ou la touche Espace fait avancer la machine à états d'une étape
@@ -1471,6 +1538,23 @@
 
         let earn = Math.max(1, Math.round(distanceMeters * 2));
         if (isPerfect) earn = Math.round(earn * 1.3); // bonus de 30% sur un lancer parfait
+
+        // Skin "Trousse Pièce" : jet à COIN_BONUS_CHANCE de déclencher un
+        // multiplicateur sur le score de CE lancer (voir COIN_MULTIPLIERS).
+        let coinMultiplier = null;
+        if (getSkin(save.equippedSkin).isCoin && Math.random() < COIN_BONUS_CHANCE) {
+            const roll = Math.random();
+            let acc = 0;
+            for (const m of COIN_MULTIPLIERS) {
+                acc += m.chance;
+                if (roll < acc) { coinMultiplier = m.value; break; }
+            }
+        }
+        if (coinMultiplier) {
+            earn = Math.round(earn * coinMultiplier);
+            showCoinPopup(coinMultiplier);
+        }
+
         save.money += earn;
 
         // Récompense de palier (100m, 200m, ...) : ne se déclenche qu'une seule
@@ -1499,6 +1583,20 @@
         } else {
             sfxLand();
         }
+    }
+
+    // Affiche la pièce en grand avec son multiplicateur : opaque pendant 0.7s,
+    // puis fondu de sortie sur les 0.3s restantes (durée totale : 1s).
+    function showCoinPopup(multiplier) {
+        sfxCoinBonus();
+        const popup = document.getElementById("coin-popup");
+        const jackpot = document.getElementById("coin-popup-jackpot");
+        document.getElementById("coin-popup-text").textContent = "x" + multiplier;
+        jackpot.style.display = multiplier === 5 ? "block" : "none";
+        popup.classList.remove("fading");
+        popup.classList.add("show");
+        setTimeout(() => popup.classList.add("fading"), 700);
+        setTimeout(() => popup.classList.remove("show", "fading"), 1000);
     }
 
     // Boutons de navigation de l'écran de jeu et du panneau de résultat
@@ -1871,6 +1969,29 @@
         return Math.round((r + m) * 255) + "," + Math.round((g + m) * 255) + "," + Math.round((b + m) * 255);
     }
 
+    // Dessine une pièce pixelisée (skin "Trousse Pièce") : un cercle généré par
+    // grille (pas une image), avec un rebord plus sombre et une petite croix
+    // embossée au centre pour évoquer une pièce "pile ou face".
+    function drawPixelCoin(size) {
+        const grid = 14;
+        const cell = size / grid;
+        const center = (grid - 1) / 2;
+        ctx.save();
+        ctx.translate(-size / 2, -size / 2);
+        for (let gy = 0; gy < grid; gy++) {
+            for (let gx = 0; gx < grid; gx++) {
+                const dx = gx - center, dy = gy - center;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist > grid / 2) continue; // hors du cercle
+                const rim = dist > grid / 2 - 1.6;
+                const isMark = (Math.abs(dx) <= 0.6 && Math.abs(dy) <= 3.2) || (Math.abs(dy) <= 0.6 && Math.abs(dx) <= 3.2);
+                ctx.fillStyle = rim ? "#b8860a" : (isMark ? "#e8b923" : "#ffdd55");
+                ctx.fillRect(gx * cell, gy * cell, cell + 0.5, cell + 0.5);
+            }
+        }
+        ctx.restore();
+    }
+
     function drawTrousse() {
         // petit flottement vertical purement visuel pendant la séquence spatiale
         let floatBob = 0;
@@ -1879,18 +2000,23 @@
         }
         const { sx, sy } = worldToScreen(worldX, worldY + floatBob);
         const size = 60;
+        const skin = getSkin(save.equippedSkin);
         ctx.save();
         ctx.translate(sx, sy);
         ctx.rotate(rotation); // rotation continue pendant le vol
-        ctx.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
-        if (trousseImg.complete && trousseImg.naturalWidth > 0) {
-            ctx.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+        if (skin.isCoin) {
+            drawPixelCoin(size);
         } else {
-            // filet de sécurité si l'image n'a pas fini de charger
-            ctx.fillStyle = "#e67e22";
-            ctx.fillRect(-size / 2, -size / 2, size, size);
+            ctx.filter = rainbowOrFilter(skin.filter, performance.now());
+            if (trousseImg.complete && trousseImg.naturalWidth > 0) {
+                ctx.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+            } else {
+                // filet de sécurité si l'image n'a pas fini de charger
+                ctx.fillStyle = "#e67e22";
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+            ctx.filter = "none";
         }
-        ctx.filter = "none";
         ctx.restore();
     }
 
@@ -2198,7 +2324,66 @@
         renderTutorialSlide(); // au cas où le tutoriel serait affiché
     });
 
-    /* ============ 14. INITIALISATION ============ */
+    /* ============ 14. TRICHES (console navigateur) ============ */
+    // Petits raccourcis accessibles depuis la console du navigateur (F12),
+    // pratiques pour tester sans avoir à jouer des heures. Aucune interface
+    // visible : window.cheats reste invisible pour un joueur qui ne va pas
+    // fouiller la console lui-même.
+    window.cheats = {
+        addMoney(amount) {
+            save.money += amount;
+            persist();
+            refreshMenu();
+            if (screens.shop.classList.contains("active")) refreshShop();
+            console.log("💰 +" + amount + "$ (total : " + save.money + "$)");
+        },
+        unlockSkin(id) {
+            if (!getSkin(id) || (id !== "classique" && !SKINS.some(s => s.id === id))) {
+                console.warn("Skin inconnu. IDs valides :", SKINS.map(s => s.id).join(", "));
+                return;
+            }
+            if (!save.ownedSkins.includes(id)) save.ownedSkins.push(id);
+            save.equippedSkin = id;
+            persist();
+            refreshMenu();
+            console.log("🎨 Skin équipé :", id);
+        },
+        unlockAllSkins() {
+            SKINS.forEach((s) => { if (!save.ownedSkins.includes(s.id)) save.ownedSkins.push(s.id); });
+            persist();
+            console.log("🎨 Tous les skins débloqués :", SKINS.map(s => s.id).join(", "));
+        },
+        unlockTrail(id) {
+            if (!TRAILS.some(t => t.id === id)) {
+                console.warn("Traînée inconnue. IDs valides :", TRAILS.map(t => t.id).join(", "));
+                return;
+            }
+            if (!save.ownedTrails.includes(id)) save.ownedTrails.push(id);
+            save.equippedTrail = id;
+            persist();
+            console.log("🌈 Traînée équipée :", id);
+        },
+        setLevels(puissance, vitesse) {
+            if (typeof puissance === "number") save.puissanceLevel = puissance;
+            if (typeof vitesse === "number") save.vitesseLevel = vitesse;
+            persist();
+            refreshMenu();
+            console.log("💪 Puissance :", save.puissanceLevel, "  ⚡ Vitesse :", save.vitesseLevel);
+        },
+        show() {
+            console.log(JSON.parse(JSON.stringify(save)));
+        },
+        resetSave() {
+            localStorage.removeItem(SAVE_KEY);
+            location.reload();
+        },
+    };
+    console.log(
+        "%c🎮 Triches dispo dans window.cheats : addMoney(n), unlockSkin(id), unlockAllSkins(), unlockTrail(id), setLevels(p, v), show(), resetSave()",
+        "color:#ffd23f; font-weight:bold;"
+    );
+
+    /* ============ 15. INITIALISATION ============ */
     // Si le joueur n'a jamais choisi de langue, on devine à partir de celle du
     // navigateur (anglais par défaut sauf si le navigateur est en français).
     if (!save.lang) {
