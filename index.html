@@ -123,7 +123,7 @@
 
         .sky-anim .celestial {
             position: absolute;
-            left: 80%;
+            left: 68%;
             width: 48px;
             height: 48px;
             margin-left: -24px;
@@ -148,6 +148,31 @@
         [data-theme="dark"] .sky-anim .moon { top: 10%; opacity: 1; }
         /* Easter egg espace : pas de lune à faire lever, on est littéralement dessus */
         #screen-game.in-space .sky-anim .moon { opacity: 0; }
+
+        /* Sur petit écran (mobile), on réduit, on colle au coin et on allège
+           la lueur pour éviter que ça chevauche le titre (menu) ou la pastille
+           distance (jeu). Placé en dernier pour gagner sur les règles ci-dessus
+           (même spécificité, la cascade tranche à l'ordre). */
+        @media (max-width: 480px) {
+            .sky-anim .celestial {
+                left: 90%;
+                width: 30px;
+                height: 30px;
+                margin-left: -15px;
+            }
+            .sky-anim .sun { box-shadow: 0 0 18px 6px rgba(255,190,60,0.45); }
+            .sky-anim .moon {
+                box-shadow:
+                    0 0 14px 4px rgba(220,225,255,0.4),
+                    inset -6px -4px 0 -1px rgba(160,168,190,0.55),
+                    inset 6px 7px 0 -5px rgba(160,168,190,0.45);
+            }
+            [data-theme="light"] .sky-anim .sun { top: 3%; }
+            [data-theme="dark"] .sky-anim .moon { top: 3%; }
+            /* Sur l'écran de jeu, le coin est pris par les pastilles $ / distance
+               du HUD : on recentre pour rester dans l'espace libre entre les deux */
+            #screen-game .sky-anim .celestial { left: 50%; margin-left: -15px; }
+        }
         .menu-wrap {
             position: absolute;
             inset: 0;
