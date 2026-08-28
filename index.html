@@ -83,6 +83,69 @@
         #screen-menu {
             background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 60%, var(--ground) 60%, var(--ground-dark) 100%);
         }
+
+        /* ---------- ANIMATION SOLEIL / LUNE (mode nuit) ----------
+           Un même bloc de markup (voir buildSkyAnim() en JS, dupliqué dans le
+           menu et l'écran de jeu) : la position du soleil/lune et l'opacité du
+           voile nocturne changent juste avec [data-theme], donc la transition
+           CSS anime automatiquement la "levée"/"chute" à chaque bascule du
+           thème, sans boucle JS. Posé APRÈS le fond (gradient du menu, ou le
+           <canvas> du jeu) et AVANT le reste du contenu de l'écran, pour rester
+           visible derrière les boutons/HUD. */
+        .sky-anim {
+            position: absolute;
+            left: 0; right: 0; top: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        #screen-menu .sky-anim { bottom: 40%; }
+        #screen-game .sky-anim { bottom: 32%; }
+
+        .sky-anim .tint {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(6,10,34,0.75), rgba(18,26,64,0.3));
+            opacity: 0;
+            transition: opacity 2s ease;
+        }
+        [data-theme="dark"] .sky-anim .tint { opacity: 1; }
+
+        .sky-anim .star {
+            position: absolute;
+            width: 3px; height: 3px;
+            border-radius: 50%;
+            background: #fff;
+            opacity: 0;
+            transition: opacity 1.6s ease 0.3s;
+            box-shadow: 0 0 4px 1px rgba(255,255,255,0.8);
+        }
+        [data-theme="dark"] .sky-anim .star { opacity: 0.9; }
+
+        .sky-anim .celestial {
+            position: absolute;
+            left: 80%;
+            width: 48px;
+            height: 48px;
+            margin-left: -24px;
+            border-radius: 50%;
+            top: 120%;
+            opacity: 0;
+            transition: top 2.4s cubic-bezier(.65,0,.35,1), opacity 1.8s ease;
+        }
+        .sky-anim .sun {
+            background: radial-gradient(circle at 35% 35%, #fff6c8, #ffd23f 55%, #ffa620 100%);
+            box-shadow: 0 0 46px 14px rgba(255,190,60,0.55);
+        }
+        .sky-anim .moon {
+            background: radial-gradient(circle at 35% 35%, #ffffff, #e6ebf7 60%, #b9c2da 100%);
+            box-shadow:
+                0 0 32px 8px rgba(220,225,255,0.45),
+                inset -10px -6px 0 -2px rgba(160,168,190,0.55),
+                inset 9px 11px 0 -7px rgba(160,168,190,0.45),
+                inset -5px 15px 0 -9px rgba(160,168,190,0.4);
+        }
+        [data-theme="light"] .sky-anim .sun { top: 12%; opacity: 1; }
+        [data-theme="dark"] .sky-anim .moon { top: 10%; opacity: 1; }
         .menu-wrap {
             position: absolute;
             inset: 0;
@@ -581,6 +644,17 @@
 
     <!-- ÉCRAN MENU -->
     <section id="screen-menu" class="screen active">
+        <div class="sky-anim" aria-hidden="true">
+            <div class="tint"></div>
+            <div class="star" style="left:15%; top:18%;"></div>
+            <div class="star" style="left:28%; top:8%;"></div>
+            <div class="star" style="left:70%; top:14%;"></div>
+            <div class="star" style="left:82%; top:28%;"></div>
+            <div class="star" style="left:50%; top:6%;"></div>
+            <div class="star" style="left:90%; top:10%;"></div>
+            <div class="celestial sun"></div>
+            <div class="celestial moon"></div>
+        </div>
         <div class="menu-wrap">
             <div class="title-card">
                 <h1>🎒 Bully the Trousse</h1>
@@ -606,6 +680,17 @@
     <!-- ÉCRAN DE JEU -->
     <section id="screen-game" class="screen">
         <canvas id="game-canvas"></canvas>
+        <div class="sky-anim" aria-hidden="true">
+            <div class="tint"></div>
+            <div class="star" style="left:15%; top:18%;"></div>
+            <div class="star" style="left:28%; top:8%;"></div>
+            <div class="star" style="left:70%; top:14%;"></div>
+            <div class="star" style="left:82%; top:28%;"></div>
+            <div class="star" style="left:50%; top:6%;"></div>
+            <div class="star" style="left:90%; top:10%;"></div>
+            <div class="celestial sun"></div>
+            <div class="celestial moon"></div>
+        </div>
         <button class="btn secondary small back-btn" id="btn-game-back" data-i18n="btnBackMenu">← Menu</button>
         <div class="hud-top">
             <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
