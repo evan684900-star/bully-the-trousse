@@ -1780,10 +1780,10 @@
         const coverage = Math.sin(Math.min(Math.max(progress, 0), 1) * Math.PI);
         ctx.save();
         ctx.fillStyle = "#eef3f8";
-        const drift = progress * w * 1.3 - w * 0.15;
+        const drift = h * 1.15 - progress * h * 1.3; // du bas vers le haut
         for (let i = 0; i < 5; i++) {
-            const cx = drift - i * 150;
-            const cy = h * (0.15 + (i % 3) * 0.2);
+            const cy = drift - i * 150;
+            const cx = w * (0.15 + (i % 3) * 0.25);
             ctx.beginPath();
             ctx.arc(cx, cy, 95, 0, Math.PI * 2);
             ctx.arc(cx + 75, cy + 12, 75, 0, Math.PI * 2);
