@@ -146,6 +146,8 @@
         }
         [data-theme="light"] .sky-anim .sun { top: 12%; opacity: 1; }
         [data-theme="dark"] .sky-anim .moon { top: 10%; opacity: 1; }
+        /* Easter egg espace : pas de lune à faire lever, on est littéralement dessus */
+        #screen-game.in-space .sky-anim .moon { opacity: 0; }
         .menu-wrap {
             position: absolute;
             inset: 0;
@@ -2204,6 +2206,8 @@
         }
 
         updateMeterUI();
+        // Pas de lune à faire "lever" quand on est déjà dessus (easter egg espace)
+        screens.game.classList.toggle("in-space", inSpaceMode);
         if (inSpaceMode) {
             drawSpaceBackground(w, h);
         } else {
