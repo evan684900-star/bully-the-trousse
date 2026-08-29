@@ -876,7 +876,7 @@
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
     <!-- Joué une fois pile quand le sol commence à trembler dans la cinématique
          des Volcans (voir la phase "quake" de updateVolcanoCinematic) -->
-    <audio id="quake-audio" src="tremblementdeterre.m4a" preload="auto"></audio>
+    <audio id="quake-audio" src="tremblementdeterre.mp4" preload="auto"></audio>
     <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
     <button id="btn-theme" class="theme-btn" title="Thème clair / sombre">🌙</button>
     <button id="btn-lang" class="lang-btn" title="Changer de langue">FR</button>
@@ -2529,8 +2529,8 @@
        d'échec aux 3 coups. */
     const VOLCANO_ZOOM_DURATION = 7;
     const VOLCANO_QUAKE_DURATION = 9;      // précis, tel que demandé
-    const VOLCANO_LAUNCH_DURATION = 1.4;
-    const VOLCANO_ASCEND_DURATION = 2.6;
+    const VOLCANO_LAUNCH_DURATION = 0.55; // rapide et violent, pas un petit saut
+    const VOLCANO_ASCEND_DURATION = 4;    // plus long que la transition espace (0.8s), plus de nuages à traverser
     const VOLCANO_DODGE_WARN_DURATION = 0.8; // fenêtre de réaction par roche
     const VOLCANO_DODGE_GAP_DURATION = 0.5;
     const VOLCANO_ROCK_COUNT = 5;
@@ -2632,6 +2632,11 @@
         }
     }
 
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function lerpColor(c1, c2, t) {
+        return [Math.round(lerp(c1[0], c2[0], t)), Math.round(lerp(c1[1], c2[1], t)), Math.round(lerp(c1[2], c2[2], t))];
+    }
+
     function drawWarningTriangle(x, y) {
         ctx.save();
         ctx.fillStyle = "#ffcc33";
@@ -2653,8 +2658,10 @@
     }
 
     // Texte centré qui revient à la ligne pour ne jamais déborder de maxWidth
-    // (ctx.font doit être déjà réglé avant l'appel). Utilisé par le QTE de clics.
-    function drawWrappedCenteredText(text, cx, y, maxWidth, lineHeight) {
+    // (ctx.font/fillStyle doivent être déjà réglés avant l'appel). Utilisé par
+    // le QTE de clics ; "outline" ajoute un contour (ctx.strokeStyle) pour
+    // rester lisible même quand le fond devient rouge.
+    function drawWrappedCenteredText(text, cx, y, maxWidth, lineHeight, outline) {
         const words = text.split(" ");
         const lines = [];
         let current = "";
@@ -2668,7 +2675,10 @@
             }
         });
         if (current) lines.push(current);
-        lines.forEach((line, i) => ctx.fillText(line, cx, y + i * lineHeight));
+        lines.forEach((line, i) => {
+            if (outline) ctx.strokeText(line, cx, y + i * lineHeight);
+            ctx.fillText(line, cx, y + i * lineHeight);
+        });
     }
 
     function drawVolcanoRock(x, y, r) {
@@ -2684,31 +2694,41 @@
         ctx.restore();
     }
 
-    // Fond "au-dessus des nuages" utilisé pendant l'ascension et l'esquive :
-    // ciel dégagé en haut, tapis de nuages qui défile dans le bas de l'écran
-    // (on regarde vers le bas, pas vers l'espace).
-    function drawAboveClouds(w, h, drift) {
+    // Fond "au-dessus des nuages" utilisé pendant l'ascension, l'esquive et le
+    // QTE de rééquilibrage : nuages plein écran qui défilent du bas vers le
+    // haut (comme si on montait à travers), inspiré de drawCloudSweep mais en
+    // continu plutôt qu'en un seul passage. "redness" (0-1) fait virer le ciel
+    // et les nuages au rouge, utilisé pendant le QTE de clics.
+    function drawCloudsFullscreen(w, h, scroll, redness) {
+        redness = redness || 0;
+        const topC = lerpColor([47, 111, 176], [110, 20, 18], redness);
+        const botC = lerpColor([234, 246, 255], [70, 12, 10], redness);
         const sky = ctx.createLinearGradient(0, 0, 0, h);
-        sky.addColorStop(0, "#2f6fb0");
-        sky.addColorStop(0.6, "#bfe4ff");
-        sky.addColorStop(1, "#eaf6ff");
+        sky.addColorStop(0, "rgb(" + topC.join(",") + ")");
+        sky.addColorStop(1, "rgb(" + botC.join(",") + ")");
         ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, h);
 
-        ctx.fillStyle = "#ffffff";
-        const bandY = h * 0.62;
-        for (let i = -1; i < 8; i++) {
-            const cx = mod(i * 180 + drift, w + 360) - 180;
-            const cy = bandY + Math.sin(i * 1.7) * 18;
-            ctx.beginPath();
-            ctx.arc(cx, cy, 60, 0, Math.PI * 2);
-            ctx.arc(cx + 55, cy + 10, 46, 0, Math.PI * 2);
-            ctx.arc(cx - 50, cy + 14, 42, 0, Math.PI * 2);
-            ctx.arc(cx + 20, cy - 20, 38, 0, Math.PI * 2);
-            ctx.fill();
+        const cloudC = lerpColor([255, 255, 255], [255, 150, 140], redness);
+        ctx.fillStyle = "rgb(" + cloudC.join(",") + ")";
+        const rowH = 140;
+        const wrapH = rowH * 9;
+        const rows = Math.ceil(h / rowH) + 4;
+        for (let row = -2; row < rows; row++) {
+            const cy = mod(row * rowH - scroll, wrapH) - rowH * 1.5;
+            for (let col = 0; col < 3; col++) {
+                const seed = row * 13.7 + col * 3.1;
+                const cx = (col + 0.5) * (w / 3) + (seededRand(seed) - 0.5) * 90;
+                const puffY = cy + (seededRand(seed + 1) - 0.5) * 40;
+                const scale = 0.8 + seededRand(seed + 2) * 0.6;
+                ctx.beginPath();
+                ctx.arc(cx, puffY, 55 * scale, 0, Math.PI * 2);
+                ctx.arc(cx + 50 * scale, puffY + 8, 42 * scale, 0, Math.PI * 2);
+                ctx.arc(cx - 48 * scale, puffY + 10, 40 * scale, 0, Math.PI * 2);
+                ctx.arc(cx + 15 * scale, puffY - 30 * scale, 36 * scale, 0, Math.PI * 2);
+                ctx.fill();
+            }
         }
-        ctx.fillStyle = "rgba(255,255,255,0.55)";
-        ctx.fillRect(0, bandY + 40, w, h - bandY - 40);
     }
 
     function spawnVolcanoExplosion(x, y) {
@@ -2904,14 +2924,22 @@
         }
     }
 
+    // Décollage rapide et violent : la caméra reste zoomée/proche (même
+    // transform que la secousse, volcanoZoomScale n'est jamais réinitialisé)
+    // au lieu de revenir brutalement à un plan large.
     function updateVolcanoLaunch(dt, w, h) {
         const t = Math.min(volcanoTimer / VOLCANO_LAUNCH_DURATION, 1);
+        const cx = w * 0.5, cy = groundScreenY;
         cameraX = 0;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(volcanoZoomScale, volcanoZoomScale);
+        ctx.translate(-cx, -cy);
         drawBackground(w, h);
 
         const startX = w * 0.5, startY = groundScreenY;
-        const endX = w * 0.5, endY = h * 0.42;
-        const eased = 1 - Math.pow(1 - t, 3);
+        const endX = w * 0.5, endY = h * 0.15;
+        const eased = 1 - Math.pow(1 - t, 5); // très rapide dès le départ
         const sx = startX + (endX - startX) * eased;
         const sy = startY + (endY - startY) * eased;
 
@@ -2923,8 +2951,9 @@
 
         ctx.save();
         ctx.translate(sx, sy);
-        ctx.rotate(t * Math.PI * 2.4);
+        ctx.rotate(t * Math.PI * 3.2);
         drawTrousseSprite(58);
+        ctx.restore();
         ctx.restore();
 
         if (t >= 1) {
@@ -2933,44 +2962,52 @@
         }
     }
 
+    // Traversée des nuages : même principe que la transition cour <-> espace
+    // (drawCloudSweep) mais en continu, plus dense et bien plus longue - on
+    // "monte à travers" plutôt que de juste cacher un changement de décor.
     function updateVolcanoAscend(dt, w, h) {
-        volcanoCloudDrift += dt * 30;
-        drawAboveClouds(w, h, volcanoCloudDrift);
+        volcanoCloudDrift += dt * 190;
+        drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
         const t = Math.min(volcanoTimer / VOLCANO_ASCEND_DURATION, 1);
-        const cx = w * 0.5, cy = h * 0.42 + Math.sin(volcanoTimer * 4) * 6;
+        const cx = w * 0.5, cy = h * 0.5 + Math.sin(volcanoTimer * 4) * 6;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(Math.sin(volcanoTimer * 3) * 0.15);
-        drawTrousseSprite(58);
+        drawTrousseSprite(80); // plus grosse : la caméra reste proche
         ctx.restore();
 
         if (t >= 1) beginVolcanoDodgeRock();
     }
 
+    // Les roches viennent D'EN BAS (on est au-dessus des nuages, elles montent
+    // vers la trousse) et le triangle d'alerte est en bas de l'écran, dans la
+    // colonne où la roche va arriver - pas au-dessus de la trousse.
     function updateVolcanoDodgeWarn(dt, w, h) {
-        volcanoCloudDrift += dt * 30;
-        drawAboveClouds(w, h, volcanoCloudDrift);
+        volcanoCloudDrift += dt * 190;
+        drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
 
-        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.42;
+        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.5;
         const rockX = w * 0.5 + volcanoTargetLane * VOLCANO_LANE_OFFSET;
         const rockProgress = Math.min(volcanoTimer / VOLCANO_DODGE_WARN_DURATION, 1);
-        const rockY = -40 + (cy + 40) * rockProgress;
+        const rockStartY = h + 50;
+        const rockY = rockStartY + (cy - rockStartY) * rockProgress;
         drawVolcanoRock(rockX, rockY, 28);
 
-        if (Math.sin(volcanoTimer * 18) > 0) drawWarningTriangle(cx, cy - 70);
+        // h - 80 (pas h - 50) pour rester au-dessus des boutons son/thème fixes en bas de l'écran
+        if (Math.sin(volcanoTimer * 18) > 0) drawWarningTriangle(rockX, h - 80);
 
         ctx.save();
         ctx.translate(cx, cy);
-        drawTrousseSprite(56);
+        drawTrousseSprite(80);
         ctx.restore();
 
         if (volcanoTimer >= VOLCANO_DODGE_WARN_DURATION) resolveVolcanoRockHit();
     }
 
     function updateVolcanoDodgeGap(dt, w, h) {
-        volcanoCloudDrift += dt * 30;
-        drawAboveClouds(w, h, volcanoCloudDrift);
-        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.42;
+        volcanoCloudDrift += dt * 190;
+        drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
+        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.5;
         let wobbleOffset = 0;
         if (volcanoWobble > 0) {
             volcanoWobble = Math.max(0, volcanoWobble - dt);
@@ -2978,7 +3015,7 @@
         }
         ctx.save();
         ctx.translate(cx + wobbleOffset, cy);
-        drawTrousseSprite(56);
+        drawTrousseSprite(80);
         ctx.restore();
 
         if (volcanoTimer >= VOLCANO_DODGE_GAP_DURATION) {
@@ -2988,24 +3025,32 @@
     }
 
     function updateVolcanoClickQte(dt, w, h) {
-        volcanoCloudDrift += dt * 70;
-        drawAboveClouds(w, h, volcanoCloudDrift);
+        volcanoCloudDrift += dt * 260;
+        const redness = Math.min(volcanoTimer / VOLCANO_CLICK_QTE_DURATION, 1);
+        drawCloudsFullscreen(w, h, volcanoCloudDrift, redness);
 
-        const cx = w * 0.5, cy = h * 0.42;
+        const cx = w * 0.5, cy = h * 0.5;
         ctx.save();
         ctx.translate(cx, cy);
         ctx.rotate(Math.sin(volcanoTimer * 10) * 0.08 * Math.min(volcanoClickCount, VOLCANO_CLICK_QTE_TARGET) / VOLCANO_CLICK_QTE_TARGET);
-        drawTrousseSprite(56);
+        drawTrousseSprite(80);
         ctx.restore();
 
+        // Le texte tremble légèrement (petit décalage aléatoire à chaque frame)
+        // et garde un contour sombre pour rester lisible même sur fond rouge.
+        const shakeX = (Math.random() - 0.5) * 4;
+        const shakeY = (Math.random() - 0.5) * 4;
         ctx.save();
-        ctx.fillStyle = "#ff4444";
+        ctx.fillStyle = "#ffffff";
+        ctx.strokeStyle = "#7a0000";
+        ctx.lineWidth = 3;
         ctx.textAlign = "center";
         const qteFontSize = Math.max(14, Math.min(20, w / 22));
         ctx.font = "900 " + qteFontSize + "px Arial, sans-serif";
-        drawWrappedCenteredText(tr("volcanoClickQte"), w / 2, h * 0.14, w * 0.88, qteFontSize + 6);
+        drawWrappedCenteredText(tr("volcanoClickQte"), w / 2 + shakeX, h * 0.14 + shakeY, w * 0.88, qteFontSize + 6, true);
         ctx.font = "900 28px Arial, sans-serif";
-        ctx.fillText(Math.min(volcanoClickCount, VOLCANO_CLICK_QTE_TARGET) + " / " + VOLCANO_CLICK_QTE_TARGET, w / 2, h * 0.14 + 62);
+        ctx.strokeText(Math.min(volcanoClickCount, VOLCANO_CLICK_QTE_TARGET) + " / " + VOLCANO_CLICK_QTE_TARGET, w / 2 + shakeX, h * 0.14 + 62 + shakeY);
+        ctx.fillText(Math.min(volcanoClickCount, VOLCANO_CLICK_QTE_TARGET) + " / " + VOLCANO_CLICK_QTE_TARGET, w / 2 + shakeX, h * 0.14 + 62 + shakeY);
         ctx.restore();
 
         if (volcanoTimer >= VOLCANO_CLICK_QTE_DURATION) beginVolcanoLanding();
@@ -3016,7 +3061,7 @@
         cameraX = 0;
         drawVolcanoBackground(w, h);
 
-        const startY = h * 0.42;
+        const startY = h * 0.5;
         const fallT = Math.min(t / 0.6, 1);
         const eased = fallT * fallT;
         const cx = w * 0.5, cy = startY + (groundScreenY - startY) * eased;
@@ -3036,11 +3081,11 @@
     }
 
     function updateVolcanoFailFade(dt, w, h) {
-        drawAboveClouds(w, h, volcanoCloudDrift);
-        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.42;
+        drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
+        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.5;
         ctx.save();
         ctx.translate(cx, cy);
-        drawTrousseSprite(56);
+        drawTrousseSprite(80);
         ctx.restore();
 
         const t = Math.min(volcanoTimer / VOLCANO_FAIL_FADE_DURATION, 1);
