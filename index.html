@@ -774,6 +774,23 @@
         </div>
     </div>
 
+    <!-- Proposé quand on reclique sur "Volcans" une fois déjà débloqué.
+         Popup maison (pas de confirm() natif) : Chrome bloque silencieusement
+         les confirm()/alert() répétés pendant les tests ("empêcher cette page
+         de créer d'autres boîtes de dialogue"), ce qui rendait le choix
+         invisible/inopérant. -->
+    <div class="modal-overlay" id="volcano-replay-overlay">
+        <div class="tutorial-box" style="padding:24px;">
+            <div class="tutorial-icon">🌋</div>
+            <h2 style="margin:4px 0 14px; color:var(--accent);" data-i18n="volcanoReplayTitle">Refaire la cinématique ?</h2>
+            <p style="margin:0 0 18px; color:var(--text);" data-i18n="volcanoReplayText">Tu peux revivre la cinématique de déblocage, ou aller directement au monde Volcans.</p>
+            <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+                <button class="btn" id="btn-volcano-replay-yes" data-i18n="volcanoReplayYes">🔁 Refaire</button>
+                <button class="btn secondary" id="btn-volcano-replay-no" data-i18n="volcanoReplayNo">🌋 Juste y aller</button>
+            </div>
+        </div>
+    </div>
+
     <!-- ÉCRAN DE JEU -->
     <section id="screen-game" class="screen">
         <canvas id="game-canvas"></canvas>
@@ -944,7 +961,10 @@
         tutorialNext: { fr: "Suivant", en: "Next" },
         tutorialDone: { fr: "C'est parti !", en: "Let's go!" },
 
-        volcanoReplayConfirm: { fr: "Voulez-vous refaire la cinématique ?", en: "Do you want to replay the cutscene?" },
+        volcanoReplayTitle: { fr: "Refaire la cinématique ?", en: "Replay the cutscene?" },
+        volcanoReplayText: { fr: "Tu peux revivre la cinématique de déblocage, ou aller directement au monde Volcans.", en: "You can relive the unlock cutscene, or go straight to the Volcans world." },
+        volcanoReplayYes: { fr: "🔁 Refaire", en: "🔁 Replay" },
+        volcanoReplayNo: { fr: "🌋 Juste y aller", en: "🌋 Just go there" },
         volcanoOnCooldown: { fr: "Réessaie dans", en: "Try again in" },
         volcanoHelpAsk: { fr: "Tu veux de l'aide ?", en: "Want some help?" },
         volcanoHelpText: {
@@ -1347,14 +1367,7 @@
     function onWorldCardClick(w) {
         if (w.id === "volcans") {
             if (save.volcanoUnlocked) {
-                if (confirm(tr("volcanoReplayConfirm"))) {
-                    startVolcanoCinematic(true);
-                } else if (save.currentWorld !== "volcans") {
-                    save.currentWorld = "volcans";
-                    persist();
-                    applyWorldTheme();
-                    buildWorldsRow();
-                }
+                document.getElementById("volcano-replay-overlay").classList.add("show");
                 return;
             }
             const remainMs = save.volcanoFailUntil - Date.now();
@@ -1997,6 +2010,23 @@
         if (this.dataset.expanded === "true") return;
         this.textContent = tr("volcanoHelpText");
         this.dataset.expanded = "true";
+    });
+
+    // Popup "refaire la cinématique ?" (voir onWorldCardClick) : "Refaire"
+    // relance la cinématique en entier, "Juste y aller" sélectionne le monde
+    // Volcans sans la rejouer.
+    document.getElementById("btn-volcano-replay-yes").addEventListener("click", () => {
+        document.getElementById("volcano-replay-overlay").classList.remove("show");
+        startVolcanoCinematic(true);
+    });
+    document.getElementById("btn-volcano-replay-no").addEventListener("click", () => {
+        document.getElementById("volcano-replay-overlay").classList.remove("show");
+        if (save.currentWorld !== "volcans") {
+            save.currentWorld = "volcans";
+            persist();
+            applyWorldTheme();
+            buildWorldsRow();
+        }
     });
 
     /* ============ 10. RENDU DU DÉCOR (canvas) ============ */
