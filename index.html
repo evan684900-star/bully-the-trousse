@@ -574,6 +574,136 @@
             align-items: center;
             justify-content: center;
         }
+        /* ---------- CINÉMATIQUE DU MONDE VOLCAN ---------- */
+        /* La cinématique réutilise le canvas et les décors du jeu : on masque
+           simplement le HUD (body.cine-mode) et on superpose #cine-ui. */
+        .screen.cine-fading { z-index: 5; opacity: 1; transition: opacity 2.2s ease; }
+        .screen.cine-fading.cine-gone { opacity: 0; }
+        body.cine-mode .hud-top,
+        body.cine-mode .hint-text,
+        body.cine-mode #meter-wrap,
+        body.cine-mode #btn-game-back,
+        body.cine-mode .mute-btn,
+        body.cine-mode .theme-btn,
+        body.cine-mode .lang-btn { display: none !important; }
+        #game-canvas { transform-origin: 50% 50%; }
+
+        #cine-ui { position: absolute; inset: 0; display: none; z-index: 40; pointer-events: none; }
+        body.cine-mode #cine-ui { display: block; }
+
+        /* Panneau "!" du QTE des roches volcaniques */
+        #cine-warn {
+            position: absolute;
+            left: 50%;
+            top: 17%;
+            transform: translate(-50%, -50%);
+            width: 110px;
+            height: 96px;
+            display: none;
+        }
+        #cine-warn.show { display: block; animation: cineWarnBlink 0.22s steps(1) infinite alternate; }
+        @keyframes cineWarnBlink { from { opacity: 1; } to { opacity: 0.2; } }
+        #cine-warn .tri {
+            width: 0;
+            height: 0;
+            margin: 0 auto;
+            border-left: 55px solid transparent;
+            border-right: 55px solid transparent;
+            border-bottom: 96px solid #ffcf3f;
+            filter: drop-shadow(0 4px 12px rgba(0,0,0,0.65));
+        }
+        #cine-warn .bang {
+            position: absolute;
+            left: 0; right: 0;
+            top: 36px;
+            text-align: center;
+            font-size: 44px;
+            font-weight: 900;
+            color: #2a1500;
+        }
+        /* Zones de tap gauche/droite (mobile) pendant le QTE des roches */
+        #cine-sides { position: absolute; inset: 0; display: none; }
+        #cine-sides.show { display: block; }
+        #cine-sides .side {
+            position: absolute;
+            top: 32%;
+            bottom: 24%;
+            width: 24%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(28px, 7vw, 48px);
+            color: rgba(255,255,255,0.5);
+            background: rgba(255,255,255,0.05);
+            border: 2px solid rgba(255,255,255,0.14);
+            border-radius: 18px;
+            pointer-events: auto;
+        }
+        #cine-sides .side.left { left: 2%; }
+        #cine-sides .side.right { right: 2%; }
+        #cine-sides .side:active { background: rgba(255,255,255,0.18); }
+        /* Vies restantes pendant la séquence des roches */
+        #cine-lives {
+            position: absolute;
+            top: calc(14px + env(safe-area-inset-top));
+            left: 0; right: 0;
+            text-align: center;
+            font-size: 22px;
+            letter-spacing: 6px;
+            display: none;
+        }
+        #cine-lives.show { display: block; }
+        /* QTE de clics pendant la descente */
+        #cine-clickqte {
+            position: absolute;
+            left: 50%;
+            bottom: 17%;
+            transform: translateX(-50%);
+            width: min(86vw, 460px);
+            text-align: center;
+            display: none;
+        }
+        #cine-clickqte.show { display: block; }
+        #cine-clickqte .label { font-size: clamp(17px, 4.4vw, 26px); font-weight: 900; color: #ff4d4d; text-shadow: 0 2px 8px rgba(0,0,0,0.8); }
+        #cine-clickqte .bar { margin-top: 10px; height: 18px; border-radius: 999px; background: rgba(0,0,0,0.45); border: 2px solid rgba(255,255,255,0.3); overflow: hidden; }
+        #cine-clickqte .bar > div { height: 100%; width: 0%; background: linear-gradient(90deg, #ff4d4d, #ffd23f); }
+        #cine-clickqte .count { margin-top: 6px; font-weight: 800; color: #fff; text-shadow: 0 2px 6px rgba(0,0,0,0.7); }
+        /* Voile noir de l'échec (3 secondes) */
+        #cine-fade { position: absolute; inset: 0; background: #000; opacity: 0; }
+
+        /* ---------- FENÊTRES D'INFO (récap trousse / aide) ---------- */
+        .info-box {
+            position: relative;
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 24px;
+            width: 88vw;
+            max-width: 360px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.4);
+        }
+        .info-box h2 { margin: 0 0 12px; font-size: 19px; color: var(--accent); }
+        .info-box p { font-size: 14px; line-height: 1.55; margin: 0; }
+        .info-line { display: flex; justify-content: space-between; gap: 12px; font-size: 14px; padding: 8px 0; border-bottom: 1px solid rgba(128,128,128,0.18); }
+        .info-line span:last-child { font-weight: 800; }
+        .dura-bar { height: 12px; border-radius: 999px; background: rgba(0,0,0,0.3); overflow: hidden; margin: 10px 0 2px; }
+        .dura-bar > div { height: 100%; background: linear-gradient(90deg, #ff6b6b, #6bffb0); }
+        .info-box .btn { margin-top: 18px; width: 100%; }
+        #trousse-preview-wrap { cursor: pointer; }
+        /* Petit mot en bas du menu après un échec dans la cinématique */
+        #menu-help {
+            position: absolute;
+            bottom: calc(16px + env(safe-area-inset-bottom));
+            left: 0; right: 0;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--text);
+            text-decoration: underline;
+            cursor: pointer;
+            display: none;
+        }
+        #menu-help.show { display: block; }
     </style>
 </head>
 <body>
@@ -600,6 +730,8 @@
             </div>
             <!-- Rempli dynamiquement par buildWorldsRow() -->
             <div class="worlds-row" id="worlds-row"></div>
+            <!-- Proposé seulement après un échec dans la cinématique du volcan -->
+            <div id="menu-help" data-i18n="menuHelp">tu veux de l'aide ?</div>
         </div>
     </section>
 
@@ -627,6 +759,8 @@
             <h2 data-i18n="resultDistanceTitle">Distance parcourue</h2>
             <div class="distance"><span id="result-distance">0</span> m</div>
             <div class="earn">+<span id="result-earn">0</span> $</div>
+            <!-- Message rouge affiché uniquement après un dérapage (monde Volcan) -->
+            <div id="result-skid" style="display:none; color:#ff6b6b; font-size:12.5px; font-weight:700; line-height:1.45; max-width:280px; margin:8px auto 0;"></div>
             <div class="buttons">
                 <button class="btn" id="btn-throw-again" data-i18n="btnThrowAgain">🔁 Relancer</button>
                 <button class="btn secondary" id="btn-result-shop" data-i18n="btnShop">🛒 Boutique</button>
@@ -638,6 +772,21 @@
             <canvas id="coin-popup-canvas" width="200" height="200"></canvas>
             <div id="coin-popup-text">x2</div>
             <div id="coin-popup-jackpot">t'as eu un fois 5 !?! prend une capture d'écran !!</div>
+        </div>
+        <!-- Surcouche de la cinématique du monde Volcan (voir section 9bis) -->
+        <div id="cine-ui">
+            <div id="cine-lives"></div>
+            <div id="cine-warn"><div class="tri"></div><div class="bang">!</div></div>
+            <div id="cine-sides">
+                <div class="side left">◀</div>
+                <div class="side right">▶</div>
+            </div>
+            <div id="cine-clickqte">
+                <div class="label" id="cine-clickqte-label">Clique vite pour reprendre ton équilibre !</div>
+                <div class="bar"><div id="cine-clickqte-fill"></div></div>
+                <div class="count"><span id="cine-clickqte-count">0</span> / 10</div>
+            </div>
+            <div id="cine-fade"></div>
         </div>
     </section>
 
@@ -683,6 +832,30 @@
             <button class="btn" id="btn-tutorial-next">Suivant</button>
         </div>
     </div>
+
+    <!-- Récapitulatif affiché quand on clique sur la trousse du menu -->
+    <div class="modal-overlay" id="trousse-modal">
+        <div class="info-box">
+            <h2 data-i18n="trousseTitle">🎒 Ta trousse</h2>
+            <div class="info-line"><span data-i18n="labelDurability">Durabilité</span><span id="info-dura">100 / 100</span></div>
+            <div class="dura-bar"><div id="info-dura-bar"></div></div>
+            <div class="info-line"><span data-i18n="labelName">Nom</span><span id="info-name">-</span></div>
+            <div class="info-line"><span data-i18n="labelPlaytime">Temps de jeu</span><span id="info-time">0 min</span></div>
+            <div class="info-line"><span data-i18n="labelBest">Meilleur score</span><span id="info-best">0 m</span></div>
+            <button class="btn" id="btn-trousse-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+    <!-- Aide proposée après un échec dans la cinématique du volcan -->
+    <div class="modal-overlay" id="help-modal">
+        <div class="info-box">
+            <h2 data-i18n="helpTitle">🌋 Un coup de main ?</h2>
+            <p data-i18n="helpText"></p>
+            <button class="btn" id="btn-help-close" data-i18n="btnUnderstood">Compris !</button>
+        </div>
+    </div>
+
+    <!-- Son du tremblement de terre de la cinématique -->
+    <audio id="sfx-quake" src="tremblementdeterre.m4a" preload="auto"></audio>
 
     <div class="toast" id="toast"></div>
 
@@ -754,6 +927,31 @@
         tutorialSkip: { fr: "Passer ✕", en: "Skip ✕" },
         tutorialNext: { fr: "Suivant", en: "Next" },
         tutorialDone: { fr: "C'est parti !", en: "Let's go!" },
+        // --- Monde Volcan : cinématique, dérapages, durabilité ---
+        volcanoRetry: { fr: "🌋 Le volcan gronde encore... réessaie dans ", en: "🌋 The volcano is still rumbling... try again in " },
+        cineClickPrompt: { fr: "Clique vite pour reprendre ton équilibre !", en: "Click fast to regain your balance!" },
+        cineUnlocked: { fr: "MONDE VOLCANS DÉBLOQUÉ", en: "VOLCANO WORLD UNLOCKED" },
+        menuHelp: { fr: "tu veux de l'aide ?", en: "need some help?" },
+        helpTitle: { fr: "🌋 Un coup de main ?", en: "🌋 Need a hand?" },
+        helpText: {
+            fr: "Quand le symbole ! apparaît, appuie sur les flèches gauche et droite (sur PC) ou touche la gauche ou la droite de l'écran (sur mobile) pour esquiver les roches. Bonne chance !",
+            en: "When the ! symbol appears, press the left or right arrow keys (on PC) or tap the left or right side of the screen (on mobile) to dodge the rocks. Good luck!"
+        },
+        trousseTitle: { fr: "🎒 Ta trousse", en: "🎒 Your pencil case" },
+        labelDurability: { fr: "Durabilité", en: "Durability" },
+        labelName: { fr: "Nom", en: "Name" },
+        labelPlaytime: { fr: "Temps de jeu", en: "Playtime" },
+        labelBest: { fr: "Meilleur score", en: "Best score" },
+        repairName: { fr: "Réparer la trousse", en: "Repair the pencil case" },
+        repairDesc: { fr: "Remet la durabilité à 100. 500 $ par tranche de 10 de durabilité manquante.", en: "Restores durability to 100. $500 per 10 missing durability." },
+        repairFull: { fr: "Intacte", en: "Good as new" },
+        repairDone: { fr: "🔧 Trousse réparée !", en: "🔧 Pencil case repaired!" },
+        skidWarning: {
+            fr: "Dérapage incontrôlé : vous avez perdu 10 de durabilité sur la trousse (allez dans la boutique pour réparer la trousse).",
+            en: "Uncontrolled skid: your pencil case lost 10 durability (go to the shop to repair it)."
+        },
+        btnOk: { fr: "OK", en: "OK" },
+        btnUnderstood: { fr: "Compris !", en: "Got it!" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -908,6 +1106,14 @@
             equippedTrail: "blanche",
             theme: "dark", // "dark" ou "light", voir applyTheme()
             lang: "", // "fr" ou "en" ; vide = pas encore choisi, détecté au premier lancement
+            // --- Monde Volcan ---
+            currentWorld: "cour",      // monde sélectionné pour les prochains lancers
+            volcanUnlocked: false,     // devient true une fois la cinématique réussie
+            volcanFailedUntil: 0,      // timestamp : pas de nouvelle tentative avant
+            volcanHelpAvailable: false,// affiche "tu veux de l'aide ?" sur le menu
+            volcanTutorialSeen: false, // tutoriel spécifique au monde Volcan
+            durability: 100,           // 0 à 100, perdue lors des dérapages, réparable en boutique
+            playTime: 0,               // secondes de jeu cumulées
         };
     }
 
@@ -1065,6 +1271,8 @@
         document.getElementById("menu-vitesse").textContent = totalVitesse();
         document.getElementById("menu-record").textContent = save.bestDistance.toFixed(1) + " m";
         document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
+        // "tu veux de l'aide ?" n'apparaît qu'après un échec dans la cinématique
+        document.getElementById("menu-help").classList.toggle("show", !!save.volcanHelpAvailable);
     }
 
     // Le skin "rainbow" n'a pas un filtre fixe : la teinte tourne en fonction
@@ -1077,19 +1285,31 @@
         return filter;
     }
 
-    // Construit les cartes de mondes en bas du menu (un seul déblocable pour l'instant)
+    // Construit les cartes de mondes en bas du menu. Le volcan reste "verrouillé"
+    // tant qu'il n'a pas été découvert, mais rester cliquable est volontaire :
+    // c'est ce clic qui lance la cinématique (voir startVolcanoCinematic).
     function buildWorldsRow() {
         const row = document.getElementById("worlds-row");
         row.innerHTML = "";
-        WORLDS.forEach((w, idx) => {
+        WORLDS.forEach((w) => {
+            const playable = w.unlocked || (w.id === "volcans" && save.volcanUnlocked);
             const card = document.createElement("div");
-            card.className = "world-card" + (w.unlocked ? "" : " locked") + (idx === 0 ? " selected" : "");
+            card.className = "world-card" + (playable ? "" : " locked") + (save.currentWorld === w.id && playable ? " selected" : "");
             card.innerHTML = '<div class="emoji">' + w.emoji + '</div><div class="name">' + w.name + '</div>';
             card.addEventListener("click", () => {
-                if (!w.unlocked) {
+                if (w.id === "volcans" && !save.volcanUnlocked) {
+                    tryStartVolcanoCinematic();
+                    return;
+                }
+                if (!playable) {
                     showToast("🔒 " + w.name + tr("worldLocked"));
                     sfxError();
+                    return;
                 }
+                save.currentWorld = w.id;
+                persist();
+                sfxCharge();
+                buildWorldsRow();
             });
             row.appendChild(card);
         });
@@ -1166,6 +1386,9 @@
                     }
                 }
             ));
+            // Réparation : n'apparaît qu'une fois le monde Volcan découvert,
+            // puisque les dérapages y sont la seule source de dégâts.
+            if (save.volcanUnlocked) body.appendChild(buildRepairCard());
         } else if (currentTab === "skins") {
             SKINS.forEach(skin => body.appendChild(buildSkinCard(skin)));
         } else {
@@ -1186,6 +1409,46 @@
         btn.className = "btn small";
         btn.textContent = cost + " $";
         btn.addEventListener("click", onBuy);
+        card.appendChild(btn);
+        return card;
+    }
+
+    // Coût de la réparation : 500 $ par tranche de 10 de durabilité manquante
+    function repairCost() {
+        return Math.ceil((100 - save.durability) / 10) * 500;
+    }
+
+    // Carte "Réparer la trousse" (onglet Améliorations, monde Volcan débloqué)
+    function buildRepairCard() {
+        const cost = repairCost();
+        const card = document.createElement("div");
+        card.className = "upgrade-card";
+        card.innerHTML =
+            '<div class="icon">🔧</div>' +
+            '<div class="info"><h3>' + tr("repairName") + ' <span class="level-badge">' + save.durability + ' / 100</span></h3>' +
+            '<p>' + tr("repairDesc") + '</p></div>';
+        const btn = document.createElement("button");
+        btn.className = "btn small" + (cost === 0 ? " secondary" : "");
+        if (cost === 0) {
+            btn.textContent = tr("repairFull");
+            btn.disabled = true;
+        } else {
+            btn.textContent = cost + " $";
+            btn.addEventListener("click", () => {
+                if (save.money >= cost) {
+                    save.money -= cost;
+                    save.durability = 100;
+                    persist();
+                    sfxBuy();
+                    showToast(tr("repairDone"));
+                    refreshShop();
+                    playPurchasePop();
+                } else {
+                    sfxError();
+                    showToast(tr("notEnoughMoney"));
+                }
+            });
+        }
         card.appendChild(btn);
         return card;
     }
@@ -1371,6 +1634,14 @@
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
     let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
 
+    // Monde Volcan : 1 atterrissage sur 4 part en dérapage incontrôlé, qui
+    // rallonge le lancer mais abîme la trousse (voir startSkid / onLanded).
+    const SKID_CHANCE = 0.25;
+    const SKID_MIN_M = 5, SKID_MAX_M = 30;
+    const SKID_DURABILITY_COST = 10;
+    let skidTargetX = 0;   // position (world space) où la glissade s'arrête
+    let didSkid = false;   // ce lancer s'est-il terminé par un dérapage ?
+
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
         state = "idle";
@@ -1385,6 +1656,8 @@
         qteResults = [];
         craterWorldX = null;
         trailPoints = [];
+        didSkid = false;
+        document.getElementById("result-skid").style.display = "none";
         document.getElementById("qte-wrap").classList.remove("show");
         document.getElementById("coin-popup").classList.remove("show", "fading");
         resultPanel.classList.remove("show");
@@ -1453,9 +1726,11 @@
     // Un clic/tap ou la touche Espace fait avancer la machine à états d'une étape
     canvas.addEventListener("pointerdown", (e) => {
         e.preventDefault();
+        if (cineActive) return; // pendant la cinématique, c'est cineTap qui gère
         handleTap();
     });
     window.addEventListener("keydown", (e) => {
+        if (cineActive) return;
         if (e.code === "Space" && screens.game.classList.contains("active")) {
             e.preventDefault();
             handleTap();
@@ -1537,6 +1812,16 @@
     function onLanded() {
         state = "landed";
         const distanceMeters = worldX / SCALE;
+        // Un dérapage abîme la trousse : -10 de durabilité et message rouge
+        // dans le panneau de résultat (réparation en boutique).
+        const skidEl = document.getElementById("result-skid");
+        if (didSkid) {
+            save.durability = Math.max(0, save.durability - SKID_DURABILITY_COST);
+            skidEl.textContent = tr("skidWarning");
+            skidEl.style.display = "block";
+        } else {
+            skidEl.style.display = "none";
+        }
         if (distanceMeters > save.bestDistance) {
             save.bestDistance = distanceMeters;
             document.getElementById("result-record").style.display = "block";
@@ -2048,6 +2333,7 @@
     // Boucle principale : appelée à chaque frame tant que l'écran de jeu est actif
     function gameLoop(now) {
         if (!screens.game.classList.contains("active")) return;
+        if (cineActive) return; // la cinématique a sa propre boucle de rendu
         if (!lastFrameTime) lastFrameTime = now;
         const dt = Math.min((now - lastFrameTime) / 1000, 0.032); // dt plafonné pour éviter les gros sauts
         lastFrameTime = now;
@@ -2079,13 +2365,30 @@
             } else if (worldY <= 0 && vy < 0) {
                 // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
                 worldY = 0;
-                onLanded();
+                // Monde Volcan : la poussière rouge rend le sol glissant
+                if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
+                    startSkid();
+                } else {
+                    onLanded();
+                }
             } else {
                 // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
                 const targetCamera = worldX - w * 0.3;
                 cameraX = Math.max(0, targetCamera);
                 document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
             }
+        } else if (state === "skidding") {
+            // La trousse roule et râpe le sol : la vitesse décroît jusqu'à l'arrêt
+            const remaining = skidTargetX - worldX;
+            const speed = Math.max(40, remaining * 2.4);
+            worldX = Math.min(skidTargetX, worldX + speed * dt);
+            rotation += (speed / 90) * dt * 4;
+            if (Math.random() < dt * 45) {
+                spawnDust(worldX - cameraX, groundScreenY - 6, 1, { spread: 70, up: 90, size: 7, life: 0.55, color: "180,110,80" });
+            }
+            cameraX = Math.max(0, worldX - w * 0.3);
+            document.getElementById("game-distance").textContent = (worldX / SCALE).toFixed(1);
+            if (remaining <= 1) onLanded();
         } else if (state === "space_transition") {
             phaseTimer += dt;
             // le décor bascule à la moitié de la transition, pile quand les
@@ -2121,9 +2424,13 @@
         updateMeterUI();
         if (inSpaceMode) {
             drawSpaceBackground(w, h);
+        } else if (save.currentWorld === "volcans") {
+            drawVolcanoBackground(w, h);
         } else {
             drawBackground(w, h);
         }
+        updateDust(dt);
+        drawDust(ctx);
         drawTrail();
         drawTrousse();
         if (state === "space_transition") {
@@ -2134,6 +2441,835 @@
 
         requestAnimationFrame(gameLoop);
     }
+
+    /* ============ 9bis. MONDE VOLCAN : DÉCOR, DÉRAPAGES ET CINÉMATIQUE ============
+       Tout ce qui concerne le monde Volcan est regroupé ici :
+         - le système de particules (poussière/cendres/éclats) partagé avec le jeu
+         - le décor du monde (drawVolcanoBackground)
+         - le dérapage à l'atterrissage (startSkid)
+         - la cinématique de découverte, découpée en phases (voir CINE_TIMES)
+       La cinématique réutilise le canvas et les fonctions de décor du jeu :
+       on masque juste le HUD (body.cine-mode) et on superpose #cine-ui. */
+
+    /* ---- Particules (partagées : tremblement, explosion, dérapage, atterrissage) ---- */
+    let dustParticles = [];
+    function spawnDust(x, y, count, o) {
+        o = o || {};
+        for (let i = 0; i < count; i++) {
+            dustParticles.push({
+                x: x + (Math.random() - 0.5) * (o.jitter || 10),
+                y: y + (Math.random() - 0.5) * (o.jitter || 10),
+                vx: (Math.random() - 0.5) * (o.spread || 60),
+                vy: -Math.random() * (o.up || 60),
+                g: o.g === undefined ? 90 : o.g,
+                r: 2 + Math.random() * (o.size || 6),
+                life: (o.life || 0.9) * (0.6 + Math.random() * 0.7),
+                max: (o.life || 0.9),
+                color: o.color || "200,190,180",
+            });
+        }
+    }
+    function updateDust(dt) {
+        for (const p of dustParticles) {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vy += p.g * dt;
+            p.life -= dt;
+        }
+        if (dustParticles.length) dustParticles = dustParticles.filter(p => p.life > 0);
+    }
+    function drawDust(c) {
+        for (const p of dustParticles) {
+            c.fillStyle = "rgba(" + p.color + "," + Math.max(0, Math.min(1, p.life / p.max)) * 0.75 + ")";
+            c.beginPath();
+            c.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            c.fill();
+        }
+    }
+
+    /* ---- Dérapage à l'atterrissage (monde Volcan uniquement) ---- */
+    function startSkid() {
+        didSkid = true;
+        state = "skidding";
+        skidTargetX = worldX + (SKID_MIN_M + Math.random() * (SKID_MAX_M - SKID_MIN_M)) * SCALE;
+        rotSpeed = 10;
+        sfxCrash();
+    }
+
+    /* ---- Décor du monde Volcan ---- */
+    // Un volcan : cône tronqué, cratère incandescent, coulée de lave et panache.
+    function drawVolcano(sx, baseY, vw, vh, seed, body, glow) {
+        ctx.save();
+        ctx.fillStyle = body;
+        ctx.beginPath();
+        ctx.moveTo(sx - vw / 2, baseY);
+        ctx.lineTo(sx - vw * 0.13, baseY - vh);
+        ctx.lineTo(sx + vw * 0.13, baseY - vh);
+        ctx.lineTo(sx + vw / 2, baseY);
+        ctx.closePath();
+        ctx.fill();
+        // cratère
+        ctx.fillStyle = glow;
+        ctx.fillRect(sx - vw * 0.13, baseY - vh - 3, vw * 0.26, 7);
+        // coulée de lave sur un flanc
+        if (seededRand(seed + 4) > 0.4) {
+            ctx.strokeStyle = glow;
+            ctx.lineWidth = Math.max(2, vw * 0.02);
+            ctx.beginPath();
+            ctx.moveTo(sx + vw * 0.05, baseY - vh);
+            ctx.lineTo(sx + vw * 0.16, baseY - vh * 0.55);
+            ctx.lineTo(sx + vw * 0.1, baseY - vh * 0.2);
+            ctx.stroke();
+        }
+        // panache de fumée
+        ctx.fillStyle = "rgba(60,40,40,0.28)";
+        for (let i = 0; i < 3; i++) {
+            const t = performance.now() / 2600 + seed;
+            const py = baseY - vh - 18 - i * 26;
+            const px = sx + Math.sin(t + i * 0.9) * (8 + i * 7);
+            ctx.beginPath();
+            ctx.arc(px, py, 12 + i * 8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // Ciel rouge, volcans en parallaxe, sol rouge et cendres en suspension.
+    // Thème sombre = nuit : lune de sang. Thème clair = jour : le soleil est
+    // à peine visible et vire au rouge à cause de la poussière dans l'air.
+    function drawVolcanoBackground(w, h) {
+        groundScreenY = h * 0.68;
+        const night = save.theme === "dark";
+
+        const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
+        if (night) {
+            sky.addColorStop(0, "#150402");
+            sky.addColorStop(0.6, "#41100b");
+            sky.addColorStop(1, "#7a1e10");
+        } else {
+            sky.addColorStop(0, "#8d2415");
+            sky.addColorStop(0.6, "#bf4622");
+            sky.addColorStop(1, "#dd7c4c");
+        }
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, groundScreenY);
+
+        // Astre : lune de sang (nuit) ou soleil rouge étouffé (jour)
+        const ax = w * 0.74 - cameraX * 0.03;
+        const ay = groundScreenY * 0.24;
+        const halo = ctx.createRadialGradient(ax, ay, 6, ax, ay, night ? 120 : 170);
+        halo.addColorStop(0, night ? "rgba(190,40,25,0.5)" : "rgba(255,120,60,0.35)");
+        halo.addColorStop(1, "rgba(255,80,40,0)");
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(ax, ay, night ? 120 : 170, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = night ? "#a8231a" : "rgba(255,124,72,0.55)";
+        ctx.beginPath();
+        ctx.arc(ax, ay, night ? 40 : 34, 0, Math.PI * 2);
+        ctx.fill();
+        if (night) {
+            ctx.fillStyle = "rgba(70,12,8,0.55)";
+            ctx.beginPath(); ctx.arc(ax - 13, ay - 9, 10, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(ax + 11, ay + 8, 7, 0, Math.PI * 2); ctx.fill();
+        }
+
+        // Volcans : deux couches de parallaxe (loin puis proche)
+        const layers = [
+            { spacing: 340, par: 0.12, vw: 300, vh: 190, body: night ? "#2a0b08" : "#5d1c12", glow: night ? "rgba(255,110,30,0.75)" : "rgba(255,150,60,0.75)", off: 0 },
+            { spacing: 250, par: 0.3, vw: 220, vh: 130, body: night ? "#3a120d" : "#71271a", glow: night ? "rgba(255,140,50,0.85)" : "rgba(255,170,70,0.85)", off: 120 },
+        ];
+        layers.forEach((L, li) => {
+            const parX = cameraX * L.par;
+            const start = Math.floor((parX - L.vw) / L.spacing);
+            const end = Math.ceil((parX + w + L.vw) / L.spacing);
+            for (let i = start; i <= end; i++) {
+                const sx = i * L.spacing - parX + L.off;
+                const seed = i * 3.7 + li * 11;
+                drawVolcano(sx, groundScreenY + 4, L.vw * (0.75 + seededRand(seed) * 0.5), L.vh * (0.7 + seededRand(seed + 1) * 0.6), seed, L.body, L.glow);
+            }
+        });
+
+        // Sol rouge poussiéreux
+        const g = ctx.createLinearGradient(0, groundScreenY, 0, h);
+        if (night) { g.addColorStop(0, "#5d1d12"); g.addColorStop(1, "#2c0b06"); }
+        else { g.addColorStop(0, "#8b3520"); g.addColorStop(1, "#4d1a10"); }
+        ctx.fillStyle = g;
+        ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+
+        // Fissures incandescentes au sol
+        const crackSpacing = 190;
+        const cs = Math.floor(cameraX / crackSpacing) - 1;
+        for (let i = cs; i < cs + Math.ceil(w / crackSpacing) + 2; i++) {
+            const sx = i * crackSpacing + (seededRand(i + 0.6) - 0.5) * 70 - cameraX;
+            if (sx < -60 || sx > w + 60) continue;
+            const cy = groundScreenY + 16 + seededRand(i) * (h - groundScreenY - 30);
+            ctx.strokeStyle = "rgba(255,120,40," + (0.25 + seededRand(i + 2) * 0.35) + ")";
+            ctx.lineWidth = 2 + seededRand(i + 3) * 2;
+            ctx.beginPath();
+            ctx.moveTo(sx - 26, cy);
+            ctx.lineTo(sx - 6, cy + 5);
+            ctx.lineTo(sx + 12, cy - 4);
+            ctx.lineTo(sx + 32, cy + 3);
+            ctx.stroke();
+        }
+
+        // Cendres en suspension
+        const t = performance.now() / 1000;
+        for (let i = 0; i < 46; i++) {
+            const sx = mod(i * 97 + t * (12 + seededRand(i) * 22) - cameraX * 0.5, w + 60) - 30;
+            const sy = mod(seededRand(i * 2.7) * h + Math.sin(t * 0.6 + i) * 18, h);
+            ctx.fillStyle = "rgba(255," + Math.floor(150 + seededRand(i) * 60) + ",120,0.28)";
+            ctx.beginPath();
+            ctx.arc(sx, sy, 1 + seededRand(i + 5) * 1.8, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // Repères de distance (identiques à la cour, pour rester lisibles)
+        ctx.strokeStyle = "rgba(255,220,200,0.3)";
+        ctx.fillStyle = "rgba(255,230,215,0.7)";
+        ctx.font = "12px sans-serif";
+        ctx.lineWidth = 2;
+        const startMeter = Math.floor((cameraX / SCALE) / 10) * 10;
+        for (let m = startMeter; m < startMeter + 200; m += 10) {
+            const sx = m * SCALE - cameraX;
+            if (sx < -20 || sx > w + 20) continue;
+            ctx.beginPath();
+            ctx.moveTo(sx, groundScreenY);
+            ctx.lineTo(sx, groundScreenY + 14);
+            ctx.stroke();
+            ctx.fillText(m + "m", sx + 4, groundScreenY + 26);
+        }
+    }
+
+    /* ---- Cinématique : découpage temporel (~40 s au total) ---- */
+    const CINE_TIMES = {
+        fade: 2.4,       // fondu lent de l'écran d'accueil
+        approach: 5.6,   // la caméra se rapproche doucement de la trousse
+        quake: 9.0,      // tremblement de terre : exactement 9 s, avec le son
+        eruption: 2.0,   // explosion, la trousse est projetée vers le ciel
+        ascent: 5.0,     // traversée des nuages
+        stabilize: 1.0,  // la trousse se stabilise au-dessus des nuages
+        descent: 5.0,    // QTE de clics pendant la descente
+        landing: 3.2,    // atterrissage dans le cratère + découverte du monde
+        outro: 1.6,      // dernier plan avant le retour au menu
+        death: 3.0,      // fondu au noir après le 3e coup
+    };
+    const CINE_ROCKS = 5;          // roches à esquiver
+    const CINE_ROCK_WARN = 0.8;    // temps laissé pour changer de canal
+    const CINE_ROCK_TRAVEL = 0.45; // vol de la roche une fois le sort réglé
+    const CINE_ROCK_GAP = 0.4;     // respiration entre deux roches
+    const CINE_CLICK_TARGET = 10;  // clics à faire pendant la descente
+    const CINE_LANE_SPREAD = 0.2;  // écart entre deux canaux (fraction de largeur)
+    const VOLCAN_RETRY_MS = 10 * 60 * 1000;
+
+    const cineUI = {
+        warn: document.getElementById("cine-warn"),
+        sides: document.getElementById("cine-sides"),
+        lives: document.getElementById("cine-lives"),
+        click: document.getElementById("cine-clickqte"),
+        clickFill: document.getElementById("cine-clickqte-fill"),
+        clickCount: document.getElementById("cine-clickqte-count"),
+        clickLabel: document.getElementById("cine-clickqte-label"),
+        fade: document.getElementById("cine-fade"),
+    };
+    const quakeAudio = document.getElementById("sfx-quake");
+
+    let cineActive = false;
+    let cinePhase = "";
+    let cineT = 0;            // temps écoulé dans la phase en cours
+    let cineLastFrame = 0;
+    let cineLane = 0;         // canal actuel : -1 gauche, 0 centre, 1 droite
+    let cineLaneAnim = 0;     // position lissée du canal (glissement fluide)
+    let cineLives = 2;        // deux esquives automatiques avant l'échec
+    let cineWobble = 0;       // vacillement après une esquive de justesse
+    let cineRockIdx = 0;
+    let cineRockState = "wait"; // "wait" | "warn" | "incoming" | "gap" | "hit"
+    let cineRockLane = 0;
+    let cineRockT = 0;
+    let cineClicks = 0;
+    let cineShake = 0;        // amplitude de secousse de l'écran (px)
+    let cineFlash = 0;        // éclair de l'explosion
+    let cineCloudScroll = 0;
+    let cineRot = 0;
+
+    function cIn(t) { return t * t * t; }
+    function cOut(t) { return 1 - Math.pow(1 - t, 3); }
+    function cInOut(t) { return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; }
+    function c01(v) { return Math.max(0, Math.min(1, v)); }
+    function cineLaneX(lane, w) { return w / 2 + lane * w * CINE_LANE_SPREAD; }
+
+    // Le volcan gronde encore : 10 minutes d'attente après un échec
+    function tryStartVolcanoCinematic() {
+        const left = save.volcanFailedUntil - Date.now();
+        if (left > 0) {
+            const m = Math.floor(left / 60000), s = Math.floor((left % 60000) / 1000);
+            showToast(tr("volcanoRetry") + m + " min " + s + " s");
+            sfxError();
+            return;
+        }
+        startVolcanoCinematic();
+    }
+
+    function startVolcanoCinematic() {
+        cineActive = true;
+        document.body.classList.add("cine-mode");
+        // L'écran de jeu s'affiche DERRIÈRE le menu, qui se dissout doucement.
+        screens.game.classList.add("active");
+        screens.menu.classList.add("cine-fading");
+        requestAnimationFrame(() => screens.menu.classList.add("cine-gone"));
+        resizeCanvas();
+        cineLane = 0; cineLaneAnim = 0; cineLives = 2; cineWobble = 0;
+        cineRockIdx = 0; cineRockState = "wait"; cineRockT = 0;
+        cineClicks = 0; cineShake = 0; cineFlash = 0; cineCloudScroll = 0; cineRot = 0;
+        dustParticles = [];
+        cineUI.fade.style.opacity = 0;
+        cineSetPhase("fade");
+        cineLastFrame = 0;
+        requestAnimationFrame(cineLoop);
+    }
+
+    function cineSetPhase(name) {
+        cinePhase = name;
+        cineT = 0;
+        cineUI.warn.classList.remove("show");
+        cineUI.sides.classList.toggle("show", name === "rocks");
+        cineUI.lives.classList.toggle("show", name === "rocks");
+        cineUI.click.classList.toggle("show", name === "descent");
+        if (name === "quake") {
+            try { quakeAudio.currentTime = 0; quakeAudio.volume = 0.9; quakeAudio.play(); } catch (e) { /* fichier absent : la cinématique continue */ }
+        }
+        if (name === "eruption") { cineFlash = 1; cineShake = 26; sfxLaunch(); sfxCrash(); }
+        if (name === "rocks") { cineRockIdx = 0; cineRockState = "wait"; cineRockT = 0; cineUpdateLives(); }
+        if (name === "descent") {
+            cineClicks = 0;
+            cineUI.clickLabel.textContent = tr("cineClickPrompt");
+            cineUI.clickCount.textContent = "0";
+            cineUI.clickFill.style.width = "0%";
+        }
+        if (name === "landing") sfxSpace();
+    }
+
+    function cineUpdateLives() {
+        cineUI.lives.textContent = "❤️".repeat(cineLives + 1) + "🤍".repeat(2 - cineLives);
+    }
+
+    function cineStartRock() {
+        cineRockState = "warn";
+        cineRockT = 0;
+        cineRockLane = cineLane; // la roche vise le canal où se trouve la trousse
+        cineUI.warn.classList.add("show");
+        beep(520, 0.07, "square", 0.09);
+    }
+
+    // Le joueur a changé de canal à temps (dodged) ou pas du tout (échec)
+    function cineResolveRock(dodged) {
+        cineUI.warn.classList.remove("show");
+        cineRockState = "incoming";
+        cineRockT = 0;
+        if (dodged) return;
+        if (cineLives > 0) {
+            // Esquive automatique, mais au tout dernier moment : ça vacille
+            cineLives--;
+            const others = [-1, 0, 1].filter(l => l !== cineLane);
+            cineLane = others[Math.floor(Math.random() * others.length)];
+            cineWobble = 1;
+            cineShake = 14;
+            sfxError();
+            cineUpdateLives();
+        } else {
+            cineDie();
+        }
+    }
+
+    function cineMove(dir) {
+        if (cinePhase !== "rocks" || cineRockState !== "warn") return;
+        const next = Math.max(-1, Math.min(1, cineLane + dir));
+        if (next === cineLane) return; // déjà collé à ce bord
+        cineLane = next;
+        sfxCharge();
+        cineResolveRock(true);
+    }
+
+    function cineAddClick() {
+        if (cinePhase !== "descent" || cineClicks >= CINE_CLICK_TARGET) return;
+        cineClicks++;
+        beep(420 + cineClicks * 40, 0.05, "square", 0.07);
+        cineUI.clickCount.textContent = cineClicks;
+        cineUI.clickFill.style.width = (cineClicks / CINE_CLICK_TARGET * 100) + "%";
+    }
+
+    function cineDie() {
+        cineRockState = "hit";
+        cineShake = 30;
+        sfxCrash();
+        cineSetPhase("death");
+    }
+
+    function cineStopQuake() {
+        try { quakeAudio.pause(); quakeAudio.currentTime = 0; } catch (e) {}
+    }
+
+    // Sortie commune : on rend la main au menu proprement
+    function cineTeardown() {
+        cineActive = false;
+        cineStopQuake();
+        document.body.classList.remove("cine-mode");
+        screens.game.classList.remove("active");
+        screens.menu.classList.remove("cine-fading", "cine-gone");
+        canvas.style.transform = "";
+        cineUI.fade.style.opacity = 0;
+        dustParticles = [];
+    }
+
+    function cineFinish() {
+        cineTeardown();
+        save.volcanUnlocked = true;
+        save.currentWorld = "volcans";
+        save.volcanHelpAvailable = false;
+        const volcanWorld = WORLDS.find(w => w.id === "volcans");
+        if (volcanWorld) volcanWorld.unlocked = true;
+        persist();
+        showScreen("menu");
+        buildWorldsRow();
+        sfxRecord();
+        if (!save.volcanTutorialSeen) {
+            startTutorial(VOLCANO_TUTORIAL, () => { save.volcanTutorialSeen = true; persist(); });
+        }
+    }
+
+    function cineFail() {
+        cineTeardown();
+        save.volcanFailedUntil = Date.now() + VOLCAN_RETRY_MS;
+        save.volcanHelpAvailable = true;
+        persist();
+        showScreen("menu");
+    }
+
+    /* ---- Boucle et logique de phases ---- */
+    function cineLoop(now) {
+        if (!cineActive) return;
+        if (!cineLastFrame) cineLastFrame = now;
+        const dt = Math.min((now - cineLastFrame) / 1000, 0.04);
+        cineLastFrame = now;
+        cineT += dt;
+        cineUpdate(dt);
+        if (cineActive) {
+            cineRender(dt);
+            requestAnimationFrame(cineLoop);
+        }
+    }
+
+    function cineUpdate(dt) {
+        switch (cinePhase) {
+            case "fade":
+                if (cineT >= CINE_TIMES.fade) {
+                    screens.menu.classList.remove("active", "cine-fading", "cine-gone");
+                    cineSetPhase("approach");
+                }
+                break;
+            case "approach":
+                // quelques grains de poussière annoncent déjà la secousse
+                if (cineT > CINE_TIMES.approach - 1.6 && Math.random() < dt * 8) {
+                    cineShake = 1.5;
+                }
+                if (cineT >= CINE_TIMES.approach) cineSetPhase("quake");
+                break;
+            case "quake": {
+                const p = cineT / CINE_TIMES.quake;
+                cineShake = 3 + 27 * Math.pow(p, 1.6);
+                if (Math.random() < dt * 30) {
+                    spawnDust(Math.random() * 1400, 0, 1, { jitter: 40, spread: 60, up: 40, g: -50, size: 5, life: 1.4, color: "170,140,120" });
+                }
+                if (cineT >= CINE_TIMES.quake) cineSetPhase("eruption");
+                break;
+            }
+            case "eruption": {
+                const p = c01(cineT / CINE_TIMES.eruption);
+                cineShake = 26 * (1 - p);
+                quakeAudio.volume = Math.max(0, 0.9 * (1 - p));
+                if (p >= 1) { cineStopQuake(); cineSetPhase("ascent"); }
+                break;
+            }
+            case "ascent": {
+                const p = c01(cineT / CINE_TIMES.ascent);
+                cineCloudScroll += (1500 * Math.pow(1 - p, 1.6) + 50) * dt;
+                cineRot += (7 * (1 - p) + 0.5) * dt;
+                if (cineT >= CINE_TIMES.ascent) cineSetPhase("stabilize");
+                break;
+            }
+            case "stabilize":
+                cineCloudScroll += 40 * dt;
+                cineRot *= 0.9;
+                if (cineT >= CINE_TIMES.stabilize) cineSetPhase("rocks");
+                break;
+            case "rocks":
+                cineCloudScroll += 30 * dt;
+                cineRockT += dt;
+                if (cineRockState === "wait") {
+                    if (cineRockT >= 0.35) cineStartRock();
+                } else if (cineRockState === "warn") {
+                    if (cineRockT >= CINE_ROCK_WARN) cineResolveRock(false);
+                } else if (cineRockState === "incoming") {
+                    if (cineRockT >= CINE_ROCK_TRAVEL) {
+                        cineRockIdx++;
+                        cineRockState = "gap";
+                        cineRockT = 0;
+                    }
+                } else if (cineRockState === "gap") {
+                    if (cineRockT >= CINE_ROCK_GAP) {
+                        if (cineRockIdx >= CINE_ROCKS) cineSetPhase("descent");
+                        else cineStartRock();
+                    }
+                }
+                break;
+            case "descent":
+                cineCloudScroll -= 620 * dt;
+                if (cineClicks >= CINE_CLICK_TARGET || cineT >= CINE_TIMES.descent) cineSetPhase("landing");
+                break;
+            case "landing": {
+                const p = c01(cineT / CINE_TIMES.landing);
+                if (p > 0.58 && cineShake < 0.2 && dustParticles.length < 12) {
+                    cineShake = 12;
+                    sfxLand();
+                }
+                cineShake *= Math.pow(0.02, dt);
+                if (cineT >= CINE_TIMES.landing) cineSetPhase("outro");
+                break;
+            }
+            case "outro":
+                if (cineT >= CINE_TIMES.outro) { cineFinish(); return; }
+                break;
+            case "death":
+                cineShake *= Math.pow(0.05, dt);
+                cineUI.fade.style.opacity = c01(cineT / CINE_TIMES.death);
+                quakeAudio.volume = Math.max(0, quakeAudio.volume - dt);
+                if (cineT >= CINE_TIMES.death) { cineFail(); return; }
+                break;
+        }
+        updateDust(dt);
+    }
+
+    /* ---- Rendu ---- */
+    function cineRender(dt) {
+        const w = canvas.width / devicePixelRatio;
+        const h = canvas.height / devicePixelRatio;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        cineLaneAnim += (cineLane - cineLaneAnim) * Math.min(1, dt * 11);
+        cineWobble = Math.max(0, cineWobble - dt * 1.4);
+        cineFlash = Math.max(0, cineFlash - dt * 1.6);
+
+        if (cinePhase === "fade" || cinePhase === "approach" || cinePhase === "quake" || cinePhase === "eruption") {
+            cineDrawYard(w, h);
+        } else if (cinePhase === "landing" || cinePhase === "outro") {
+            cineDrawArrival(w, h);
+        } else {
+            cineDrawSky(w, h);
+        }
+
+        drawDust(ctx);
+
+        // éclair de l'explosion, par-dessus tout le reste
+        if (cineFlash > 0.01) {
+            ctx.fillStyle = "rgba(255,220,170," + cineFlash * 0.85 + ")";
+            ctx.fillRect(0, 0, w, h);
+        }
+
+        // secousse : appliquée en CSS sur le canvas (légère surtaille pour
+        // ne jamais laisser apparaître de bord noir)
+        if (cineShake > 0.15) {
+            const a = cineShake;
+            canvas.style.transform =
+                "translate(" + (Math.random() - 0.5) * a + "px," + (Math.random() - 0.5) * a + "px) rotate(" +
+                ((Math.random() - 0.5) * a * 0.05) + "deg) scale(" + (1 + a / 260) + ")";
+        } else {
+            canvas.style.transform = "";
+        }
+    }
+
+    // Phases au sol : la cour d'école habituelle, caméra qui se rapproche
+    function cineDrawYard(w, h) {
+        cameraX = -w * 0.45; // la trousse (worldX = 0) se retrouve à 45% de l'écran
+        const groundY = h * 0.68;
+        const fx = w * 0.45, fy = groundY - 26;
+
+        let zoom = 1;
+        if (cinePhase === "approach") zoom = 1 + 1.5 * cInOut(c01(cineT / CINE_TIMES.approach));
+        else if (cinePhase === "quake") zoom = 2.5;
+        else if (cinePhase === "eruption") zoom = 2.5 - 1.6 * cOut(c01(cineT / CINE_TIMES.eruption));
+
+        const erupt = cinePhase === "eruption" ? c01(cineT / CINE_TIMES.eruption) : 0;
+        const drop = cIn(erupt) * h * 1.5; // le décor plonge : on s'élève
+
+        ctx.save();
+        ctx.translate(fx, fy);
+        ctx.scale(zoom, zoom);
+        ctx.translate(-fx, -fy);
+        ctx.translate(0, drop);
+        drawBackground(w, h);
+        if (cinePhase === "quake" || cinePhase === "eruption") cineDrawCracks(w, h, groundY);
+        if (erupt > 0) cineDrawEruption(w, h, fx, groundY, erupt);
+        ctx.restore();
+
+        // La trousse : posée au sol, puis projetée vers le centre de l'écran
+        let tx = fx, ty = fy, size = 60 * zoom;
+        if (erupt > 0) {
+            tx = fx + (w * 0.5 - fx) * cOut(erupt);
+            ty = fy + drop * zoom - cOut(erupt) * h * 0.55;
+            cineRot += 0.25;
+        } else if (cinePhase === "quake") {
+            ty += Math.sin(performance.now() / 60) * 2;
+            cineRot = Math.sin(performance.now() / 220) * 0.08;
+        }
+        paintTrousse(ctx, tx, ty, size, cineRot);
+    }
+
+    // Fissures qui s'ouvrent dans le sol de la cour pendant la secousse
+    function cineDrawCracks(w, h, groundY) {
+        const p = cinePhase === "quake" ? c01((cineT - 3) / 5) : 1;
+        if (p <= 0) return;
+        ctx.save();
+        ctx.strokeStyle = "rgba(30,20,18," + (0.5 * p) + ")";
+        ctx.lineWidth = 3 + 5 * p;
+        for (let k = 0; k < 3; k++) {
+            const bx = w * (0.25 + k * 0.25);
+            ctx.beginPath();
+            ctx.moveTo(bx, groundY + 2);
+            for (let i = 1; i <= 5; i++) {
+                ctx.lineTo(bx + (seededRand(k * 9 + i) - 0.5) * 60 * p, groundY + 2 + i * 14);
+            }
+            ctx.stroke();
+        }
+        // lueur de lave dans les fissures les plus larges
+        ctx.strokeStyle = "rgba(255,110,30," + (0.55 * p) + ")";
+        ctx.lineWidth = 2 * p;
+        ctx.beginPath();
+        ctx.moveTo(w * 0.5, groundY + 2);
+        for (let i = 1; i <= 5; i++) ctx.lineTo(w * 0.5 + (seededRand(i) - 0.5) * 50 * p, groundY + 2 + i * 14);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    // Explosion : boule incandescente + éjectas depuis le point de départ
+    function cineDrawEruption(w, h, fx, groundY, p) {
+        const r = 30 + 420 * cOut(p);
+        const g = ctx.createRadialGradient(fx, groundY, 10, fx, groundY, r);
+        g.addColorStop(0, "rgba(255,240,190," + (1 - p) + ")");
+        g.addColorStop(0.35, "rgba(255,150,40," + (0.85 * (1 - p)) + ")");
+        g.addColorStop(1, "rgba(120,30,10,0)");
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(fx, groundY, r, 0, Math.PI * 2);
+        ctx.fill();
+        for (let i = 0; i < 14; i++) {
+            const a = -Math.PI / 2 + (seededRand(i) - 0.5) * 2.2;
+            const d = r * (0.4 + seededRand(i + 3) * 0.8);
+            ctx.fillStyle = "rgba(60,40,35," + (1 - p) + ")";
+            ctx.beginPath();
+            ctx.arc(fx + Math.cos(a) * d, groundY + Math.sin(a) * d, 5 + seededRand(i + 7) * 9, 0, Math.PI * 2);
+            ctx.fill();
+        }
+    }
+
+    // Phases en l'air : montée, stabilisation, roches, descente, échec
+    function cineDrawSky(w, h) {
+        let alt = 1;
+        if (cinePhase === "ascent") alt = cOut(c01(cineT / CINE_TIMES.ascent));
+        else if (cinePhase === "descent") alt = 1 - 0.3 * c01(cineT / CINE_TIMES.descent);
+
+        // ciel : bleu de cour -> bleu d'altitude
+        const sky = ctx.createLinearGradient(0, 0, 0, h);
+        sky.addColorStop(0, "rgb(" + Math.round(126 - 78 * alt) + "," + Math.round(200 - 122 * alt) + "," + Math.round(227 - 47 * alt) + ")");
+        sky.addColorStop(1, "rgb(" + Math.round(216 - 74 * alt) + "," + Math.round(243 - 71 * alt) + "," + Math.round(255 - 21 * alt) + ")");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, h);
+
+        // nuages traversés (défilent vers le bas quand on monte)
+        cineDrawCloudField(w, h, cineCloudScroll, 16, 0.85);
+        // mer de nuages sous nos pieds une fois en altitude
+        if (alt > 0.45) cineDrawCloudSea(w, h, (alt - 0.45) / 0.55);
+
+        // trousse
+        const bob = Math.sin(performance.now() / 620) * 8;
+        let ty = h * 0.52 + bob;
+        if (cinePhase === "ascent") ty = h * 1.2 + (h * 0.52 - h * 1.2) * cOut(c01(cineT / CINE_TIMES.ascent));
+        else if (cinePhase === "descent") ty = h * 0.5 + bob * 0.5;
+        const wob = cineWobble * Math.sin(performance.now() / 42) * 16;
+        const tx = cineLaneX(cineLaneAnim, w) + wob;
+        if (cinePhase === "descent") cineRot += 0.02;
+        paintTrousse(ctx, tx, ty, 70, cineRot + cineWobble * 0.25 * Math.sin(performance.now() / 60));
+
+        // roche volcanique en approche
+        const p = cineRockProgress();
+        if (p >= 0) {
+            const rx = w / 2 + (cineLaneX(cineRockLane, w) - w / 2) * p;
+            const ry = h * 0.06 + (ty - h * 0.06) * p;
+            cineDrawRock(ctx, rx, ry, 8 + 60 * p * p, cineRockIdx + 1);
+        }
+    }
+
+    function cineRockProgress() {
+        if (cinePhase === "death") return 1;
+        if (cinePhase !== "rocks") return -1;
+        if (cineRockState === "warn") return 0.42 * c01(cineRockT / CINE_ROCK_WARN);
+        if (cineRockState === "incoming") return 0.42 + 0.58 * c01(cineRockT / CINE_ROCK_TRAVEL);
+        return -1;
+    }
+
+    function cineDrawRock(c, x, y, r, seed) {
+        const halo = c.createRadialGradient(x, y, r * 0.3, x, y, r * 2);
+        halo.addColorStop(0, "rgba(255,110,30,0.35)");
+        halo.addColorStop(1, "rgba(255,110,30,0)");
+        c.fillStyle = halo;
+        c.beginPath(); c.arc(x, y, r * 2, 0, Math.PI * 2); c.fill();
+
+        c.save();
+        c.translate(x, y);
+        c.rotate(seed * 1.7 + performance.now() / 900);
+        c.beginPath();
+        for (let i = 0; i < 9; i++) {
+            const a = (i / 9) * Math.PI * 2;
+            const rad = r * (0.72 + seededRand(seed * 10 + i) * 0.4);
+            const px = Math.cos(a) * rad, py = Math.sin(a) * rad;
+            if (i === 0) c.moveTo(px, py); else c.lineTo(px, py);
+        }
+        c.closePath();
+        c.fillStyle = "#2f221f";
+        c.fill();
+        c.strokeStyle = "rgba(255,150,60,0.9)";
+        c.lineWidth = Math.max(1, r * 0.09);
+        c.beginPath();
+        c.moveTo(-r * 0.45, -r * 0.1);
+        c.lineTo(-r * 0.05, r * 0.18);
+        c.lineTo(r * 0.4, -r * 0.28);
+        c.stroke();
+        c.restore();
+    }
+
+    function cineDrawCloudField(w, h, scroll, count, alphaMul) {
+        for (let i = 0; i < count; i++) {
+            const r = 55 + seededRand(i * 7.7) * 95;
+            const x = seededRand(i * 3.3) * (w + 320) - 160;
+            const y = mod(seededRand(i * 5.1) * (h + 700) + scroll * (0.7 + seededRand(i) * 0.6), h + 700) - 300;
+            cineDrawPuff(ctx, x, y, r, 0.35 + 0.4 * seededRand(i * 2.2) * alphaMul);
+        }
+    }
+
+    function cineDrawPuff(c, x, y, r, alpha) {
+        c.fillStyle = "rgba(255,255,255," + alpha + ")";
+        c.beginPath();
+        c.arc(x, y, r, 0, Math.PI * 2);
+        c.arc(x + r * 0.75, y + r * 0.15, r * 0.72, 0, Math.PI * 2);
+        c.arc(x - r * 0.7, y + r * 0.2, r * 0.66, 0, Math.PI * 2);
+        c.fill();
+    }
+
+    // Mer de nuages : on est au-dessus, elle défile lentement en dessous
+    function cineDrawCloudSea(w, h, k) {
+        const base = h * (1.15 - 0.3 * k);
+        const drift = performance.now() / 90;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, k * 1.4);
+        for (let i = 0; i < 12; i++) {
+            const x = mod(i * 190 - drift, w + 380) - 190;
+            cineDrawPuff(ctx, x, base - 60 - seededRand(i) * 40, 90 + seededRand(i * 1.3) * 50, 0.9);
+        }
+        ctx.fillStyle = "rgba(255,255,255,0.92)";
+        ctx.fillRect(0, base - 10, w, h - base + 20);
+        ctx.restore();
+    }
+
+    // Atterrissage : le sol volcanique surgit, la trousse tombe dans un cratère
+    function cineDrawArrival(w, h) {
+        cameraX = 0;
+        const p = cinePhase === "landing" ? c01(cineT / CINE_TIMES.landing) : 1;
+        const impact = 0.58;
+        const rise = cinePhase === "landing" ? (1 - cOut(Math.min(1, p / impact))) * h * 0.85 : 0;
+
+        ctx.fillStyle = save.theme === "dark" ? "#150402" : "#8d2415";
+        ctx.fillRect(0, 0, w, h);
+        ctx.save();
+        ctx.translate(0, rise);
+        drawVolcanoBackground(w, h);
+        ctx.restore();
+
+        const groundY = h * 0.68 + rise;
+        const cx = w * 0.5;
+        // petit cratère d'atterrissage
+        if (p >= impact) {
+            ctx.fillStyle = "rgba(20,8,5,0.55)";
+            ctx.beginPath();
+            ctx.ellipse(cx, groundY + 8, 54, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        let ty;
+        if (p < impact) {
+            ty = h * 0.05 + (groundY - 26 - h * 0.05) * cIn(p / impact);
+            cineRot += 0.06;
+        } else {
+            ty = groundY - 22;
+            cineRot *= 0.85;
+            if (p < impact + 0.05) {
+                spawnDust(cx, groundY, 18, { jitter: 30, spread: 320, up: 190, size: 8, life: 1.1, color: "190,120,90" });
+            }
+        }
+        paintTrousse(ctx, cx, ty, 70, cineRot);
+
+        // Annonce finale
+        if (cinePhase === "outro") {
+            const a = c01(cineT / 0.6);
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#ffd23f";
+            ctx.font = "900 " + Math.round(Math.min(46, w * 0.062)) + "px 'Segoe UI', Arial, sans-serif";
+            ctx.shadowColor = "rgba(0,0,0,0.7)";
+            ctx.shadowBlur = 14;
+            ctx.fillText("🌋 " + tr("cineUnlocked"), w / 2, h * 0.22);
+            ctx.restore();
+        }
+    }
+
+    // Dessine la trousse (skin équipé compris) n'importe où sur un contexte donné
+    function paintTrousse(c, x, y, size, rot) {
+        const skin = getSkin(save.equippedSkin);
+        c.save();
+        c.translate(x, y);
+        c.rotate(rot || 0);
+        if (skin.isCoin) {
+            c.translate(-size / 2, -size / 2);
+            drawPixelCoin(c, size);
+        } else {
+            c.filter = rainbowOrFilter(skin.filter, performance.now());
+            if (trousseImg.complete && trousseImg.naturalWidth > 0) {
+                c.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+            } else {
+                c.fillStyle = "#e67e22";
+                c.fillRect(-size / 2, -size / 2, size, size);
+            }
+            c.filter = "none";
+        }
+        c.restore();
+    }
+
+    /* ---- Entrées pendant la cinématique ---- */
+    window.addEventListener("keydown", (e) => {
+        if (!cineActive) return;
+        if (e.code === "ArrowLeft") { e.preventDefault(); cineMove(-1); }
+        else if (e.code === "ArrowRight") { e.preventDefault(); cineMove(1); }
+        else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); cineAddClick(); }
+    });
+    window.addEventListener("pointerdown", (e) => {
+        if (!cineActive) return;
+        if (cinePhase === "descent") { cineAddClick(); return; }
+        if (cinePhase === "rocks") {
+            const rect = canvas.getBoundingClientRect();
+            cineMove(e.clientX < rect.left + rect.width / 2 ? -1 : 1);
+        }
+    });
 
     /* ============ 12. FIREBASE (SAUVEGARDE CLOUD + CLASSEMENT) ============ */
     const firebaseConfig = {
@@ -2297,10 +3433,46 @@
             en: { title: "Check out my other sites!", text: "Go to evyverse.vercel.app to discover my other projects!" },
         },
     ];
+    // Tutoriel spécifique au monde Volcan, joué une seule fois juste après
+    // la cinématique (voir cineFinish).
+    const VOLCANO_TUTORIAL = [
+        {
+            icon: "🌋",
+            fr: { title: "Bienvenue dans les Volcans !", text: "Le ciel est rouge, le sol est brûlant et la poussière vole partout. Sélectionne le monde depuis le menu pour y lancer ta trousse." },
+            en: { title: "Welcome to the Volcanoes!", text: "Red sky, burning ground and dust everywhere. Pick the world from the menu to throw your pencil case there." },
+        },
+        {
+            icon: "💨",
+            fr: { title: "Dérapages incontrôlés", text: "Ici, 1 atterrissage sur 4 part en glissade : la trousse râpe le sol et gagne 5 à 30 mètres... mais perd 10 de durabilité." },
+            en: { title: "Uncontrolled skids", text: "Here, 1 landing out of 4 turns into a skid: the case scrapes the ground and gains 5 to 30 metres... but loses 10 durability." },
+        },
+        {
+            icon: "🔧",
+            fr: { title: "Durabilité et réparation", text: "La durabilité va de 0 à 100. Dans la boutique, la réparation remet la trousse à neuf : 500 $ par tranche de 10 de durabilité manquante." },
+            en: { title: "Durability and repairs", text: "Durability runs from 0 to 100. In the shop, a repair makes the case good as new: $500 per 10 missing durability." },
+        },
+        {
+            icon: "🎒",
+            fr: { title: "Ta fiche trousse", text: "Clique sur la trousse de l'écran d'accueil pour voir sa durabilité, son nom, ton temps de jeu et ton meilleur score." },
+            en: { title: "Your case sheet", text: "Tap the pencil case on the home screen to see its durability, its name, your playtime and your best score." },
+        },
+    ];
+
     let tutorialStep = 0;
+    let tutorialSlides = TUTORIAL_SLIDES; // jeu de diapos actuellement affiché
+    let tutorialDoneCb = null;            // appelé à la fermeture, si défini
+
+    // Ouvre le tutoriel sur un jeu de diapos donné (accueil ou monde Volcan)
+    function startTutorial(slides, onDone) {
+        tutorialSlides = slides;
+        tutorialDoneCb = onDone || null;
+        tutorialStep = 0;
+        renderTutorialSlide();
+        document.getElementById("tutorial-overlay").classList.add("show");
+    }
 
     function renderTutorialSlide() {
-        const slide = TUTORIAL_SLIDES[tutorialStep];
+        const slide = tutorialSlides[tutorialStep];
         const localized = slide[save.lang] || slide.fr;
         document.getElementById("tutorial-icon").textContent = slide.icon;
         document.getElementById("tutorial-title").textContent = localized.title;
@@ -2308,31 +3480,35 @@
 
         const dots = document.getElementById("tutorial-dots");
         dots.innerHTML = "";
-        TUTORIAL_SLIDES.forEach((s, i) => {
+        tutorialSlides.forEach((s, i) => {
             const dot = document.createElement("div");
             dot.className = "tutorial-dot" + (i === tutorialStep ? " active" : "");
             dots.appendChild(dot);
         });
 
-        const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
+        const isLast = tutorialStep === tutorialSlides.length - 1;
         document.getElementById("btn-tutorial-next").textContent = isLast ? tr("tutorialDone") : tr("tutorialNext");
     }
 
     function closeTutorial() {
         document.getElementById("tutorial-overlay").classList.remove("show");
-        save.tutorialSeen = true;
-        persist();
+        if (tutorialDoneCb) {
+            tutorialDoneCb();
+            tutorialDoneCb = null;
+        } else {
+            save.tutorialSeen = true;
+            persist();
+        }
+        tutorialSlides = TUTORIAL_SLIDES;
     }
 
     function showTutorialIfNeeded() {
         if (save.tutorialSeen) return;
-        tutorialStep = 0;
-        renderTutorialSlide();
-        document.getElementById("tutorial-overlay").classList.add("show");
+        startTutorial(TUTORIAL_SLIDES);
     }
 
     document.getElementById("btn-tutorial-next").addEventListener("click", () => {
-        if (tutorialStep < TUTORIAL_SLIDES.length - 1) {
+        if (tutorialStep < tutorialSlides.length - 1) {
             tutorialStep++;
             renderTutorialSlide();
         } else {
@@ -2347,6 +3523,39 @@
         persist();
         applyLanguage();
         renderTutorialSlide(); // au cas où le tutoriel serait affiché
+    });
+
+    /* ============ 13bis. FICHE TROUSSE ET AIDE ============ */
+    // Petit récapitulatif ouvert en cliquant sur la trousse de l'écran d'accueil
+    function formatPlayTime(sec) {
+        const hrs = Math.floor(sec / 3600);
+        const min = Math.floor((sec % 3600) / 60);
+        return hrs > 0 ? hrs + " h " + min + " min" : min + " min";
+    }
+
+    function openTrousseModal() {
+        document.getElementById("info-dura").textContent = save.durability + " / 100";
+        document.getElementById("info-dura-bar").style.width = save.durability + "%";
+        document.getElementById("info-name").textContent = save.pseudo || "Trousse";
+        document.getElementById("info-time").textContent = formatPlayTime(save.playTime);
+        document.getElementById("info-best").textContent = save.bestDistance.toFixed(1) + " m";
+        document.getElementById("trousse-modal").classList.add("show");
+    }
+
+    document.getElementById("trousse-preview-wrap").addEventListener("click", openTrousseModal);
+    document.getElementById("btn-trousse-close").addEventListener("click", () => {
+        document.getElementById("trousse-modal").classList.remove("show");
+    });
+    document.getElementById("menu-help").addEventListener("click", () => {
+        document.getElementById("help-modal").classList.add("show");
+    });
+    document.getElementById("btn-help-close").addEventListener("click", () => {
+        document.getElementById("help-modal").classList.remove("show");
+    });
+    // Clic en dehors de la boîte = fermeture
+    ["trousse-modal", "help-modal"].forEach((id) => {
+        const el = document.getElementById(id);
+        el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
 
     /* ============ 14. TRICHES (console navigateur) ============ */
@@ -2398,13 +3607,39 @@
         show() {
             console.log(JSON.parse(JSON.stringify(save)));
         },
+        // Rejoue la cinématique du volcan (depuis n'importe quel écran)
+        cinematique() {
+            save.volcanFailedUntil = 0;
+            persist();
+            showScreen("menu");
+            startVolcanoCinematic();
+        },
+        // Remet le monde Volcan à l'état "pas encore découvert"
+        resetVolcan() {
+            save.volcanUnlocked = false;
+            save.volcanTutorialSeen = false;
+            save.volcanHelpAvailable = false;
+            save.volcanFailedUntil = 0;
+            save.currentWorld = "cour";
+            const volcanWorld = WORLDS.find(w => w.id === "volcans");
+            if (volcanWorld) volcanWorld.unlocked = false;
+            persist();
+            buildWorldsRow();
+            refreshMenu();
+            console.log("🌋 Monde Volcan remis à zéro");
+        },
+        setDurability(v) {
+            save.durability = Math.max(0, Math.min(100, v));
+            persist();
+            console.log("🔧 Durabilité :", save.durability);
+        },
         resetSave() {
             localStorage.removeItem(SAVE_KEY);
             location.reload();
         },
     };
     console.log(
-        "%c🎮 Triches dispo dans window.cheats : addMoney(n), unlockSkin(id), unlockAllSkins(), unlockTrail(id), setLevels(p, v), show(), resetSave()",
+        "%c🎮 Triches dispo dans window.cheats : addMoney(n), unlockSkin(id), unlockAllSkins(), unlockTrail(id), setLevels(p, v), cinematique(), resetVolcan(), setDurability(n), show(), resetSave()",
         "color:#ffd23f; font-weight:bold;"
     );
 
@@ -2416,6 +3651,18 @@
         persist();
     }
     applyLanguage();
+    // Le monde Volcan reste débloqué d'une session à l'autre
+    if (save.volcanUnlocked) {
+        const volcanWorld = WORLDS.find(w => w.id === "volcans");
+        if (volcanWorld) volcanWorld.unlocked = true;
+    } else if (save.currentWorld === "volcans") {
+        save.currentWorld = "cour";
+    }
+    // Compteur de temps de jeu (écrit sur le disque toutes les 30 s seulement)
+    setInterval(() => {
+        save.playTime++;
+        if (save.playTime % 30 === 0) persist();
+    }, 1000);
     buildWorldsRow();
     refreshMenu();
     if (!menuPreviewRAF) animateMenuPreview();
