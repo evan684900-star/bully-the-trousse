@@ -82,6 +82,12 @@
         /* ---------- ÉCRAN MENU ---------- */
         #screen-menu {
             background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 60%, var(--ground) 60%, var(--ground-dark) 100%);
+            transition: background 1.5s ease;
+        }
+        /* Monde Volcans sélectionné : ciel et sol rougis par la poussière,
+           cohérent avec le décor du jeu (voir drawVolcanoBackground en JS) */
+        html[data-world="volcans"] #screen-menu {
+            background: linear-gradient(180deg, #5c1b18, #b0451f 55%, #6b2a1e 60%, #3d1310 100%);
         }
 
         /* ---------- ANIMATION SOLEIL / LUNE (mode nuit) ----------
@@ -149,6 +155,22 @@
         /* Easter egg espace : pas de lune à faire lever, on est littéralement dessus */
         #screen-game.in-space .sky-anim .moon { opacity: 0; }
 
+        /* Monde Volcans : lune de sang la nuit, soleil à peine visible et
+           rougi par la poussière en suspension dans l'air le jour */
+        html[data-world="volcans"] .sky-anim .moon {
+            background: radial-gradient(circle at 35% 35%, #ffb199, #c23b2b 55%, #6e1810 100%);
+            box-shadow:
+                0 0 34px 10px rgba(200,50,30,0.5),
+                inset -10px -6px 0 -2px rgba(90,15,10,0.55),
+                inset 9px 11px 0 -7px rgba(90,15,10,0.45),
+                inset -5px 15px 0 -9px rgba(90,15,10,0.4);
+        }
+        html[data-world="volcans"][data-theme="light"] .sky-anim .sun {
+            opacity: 0.4;
+            background: radial-gradient(circle at 35% 35%, #ff8f6b, #c1401f 60%, #7a2210 100%);
+            box-shadow: 0 0 24px 8px rgba(200,60,20,0.35);
+        }
+
         /* Sur petit écran (mobile), on réduit, on colle au coin et on allège
            la lueur pour éviter que ça chevauche le titre (menu) ou la pastille
            distance (jeu). Placé en dernier pour gagner sur les règles ci-dessus
@@ -169,6 +191,8 @@
             }
             [data-theme="light"] .sky-anim .sun { top: 3%; }
             [data-theme="dark"] .sky-anim .moon { top: 3%; }
+            html[data-world="volcans"] .sky-anim .moon { box-shadow: 0 0 14px 4px rgba(200,50,30,0.45); }
+            html[data-world="volcans"][data-theme="light"] .sky-anim .sun { box-shadow: 0 0 16px 5px rgba(200,60,20,0.3); }
             /* Sur l'écran de jeu, le coin est pris par les pastilles $ / distance
                du HUD : on recentre pour rester dans l'espace libre entre les deux */
             #screen-game .sky-anim .celestial { left: 50%; margin-left: -15px; }
@@ -595,6 +619,29 @@
         }
         .toast.show { opacity: 1; }
 
+        /* Lien d'aide affiché sous les cartes de mondes après un échec aux Volcans */
+        .volcano-help-hint {
+            font-size: 13px;
+            color: var(--text-dim);
+            text-decoration: underline;
+            cursor: pointer;
+            text-align: center;
+            max-width: 280px;
+            margin-top: 2px;
+        }
+
+        /* Popup récapitulatif de la trousse (voir #trousse-info-overlay) */
+        #trousse-preview-wrap { cursor: pointer; }
+        .trousse-info-stats {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            font-size: 14px;
+            color: var(--text);
+            text-align: left;
+        }
+        .trousse-info-stats b { color: var(--accent); }
+
         .back-btn {
             position: absolute;
             top: calc(10px + env(safe-area-inset-top));
@@ -707,8 +754,25 @@
             </div>
             <!-- Rempli dynamiquement par buildWorldsRow() -->
             <div class="worlds-row" id="worlds-row"></div>
+            <!-- Affiché seulement après un échec aux Volcans (voir refreshMenu) -->
+            <div class="volcano-help-hint" id="volcano-help-hint" style="display:none;"></div>
         </div>
     </section>
+
+    <!-- Popup récapitulatif de la trousse (clic sur son image au menu) -->
+    <div class="modal-overlay" id="trousse-info-overlay">
+        <div class="tutorial-box" style="padding:24px;">
+            <button class="btn secondary small" id="btn-trousse-info-close" data-i18n="trousseInfoClose">Fermer ✕</button>
+            <div class="tutorial-icon">🎒</div>
+            <h2 id="trousse-info-name" style="margin:4px 0 14px; color:var(--accent);">-</h2>
+            <div class="trousse-info-stats">
+                <div><span data-i18n="trousseInfoDurability">Durabilité</span> : <b id="trousse-info-durability">100</b>/100</div>
+                <div><span data-i18n="trousseInfoPlaytime">Temps de jeu</span> : <b id="trousse-info-playtime">-</b></div>
+                <div><span data-i18n="trousseInfoThrows">Lancers effectués</span> : <b id="trousse-info-throws">0</b></div>
+                <div><span data-i18n="trousseInfoRecord">Record</span> : <b id="trousse-info-record">0 m</b></div>
+            </div>
+        </div>
+    </div>
 
     <!-- ÉCRAN DE JEU -->
     <section id="screen-game" class="screen">
@@ -745,6 +809,7 @@
             <h2 data-i18n="resultDistanceTitle">Distance parcourue</h2>
             <div class="distance"><span id="result-distance">0</span> m</div>
             <div class="earn">+<span id="result-earn">0</span> $</div>
+            <div id="result-slip" style="display:none; color:#ff5f5f; font-size:13px; font-weight:700; max-width:260px; margin:4px auto 0;"></div>
             <div class="buttons">
                 <button class="btn" id="btn-throw-again" data-i18n="btnThrowAgain">🔁 Relancer</button>
                 <button class="btn secondary" id="btn-result-shop" data-i18n="btnShop">🛒 Boutique</button>
@@ -809,6 +874,9 @@
 
     <!-- Musique de fond, démarrée au premier clic de l'utilisateur (voir plus bas) -->
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
+    <!-- Joué une fois pile quand le sol commence à trembler dans la cinématique
+         des Volcans (voir la phase "quake" de updateVolcanoCinematic) -->
+    <audio id="quake-audio" src="tremblementdeterre.m4a" preload="auto"></audio>
     <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
     <button id="btn-theme" class="theme-btn" title="Thème clair / sombre">🌙</button>
     <button id="btn-lang" class="lang-btn" title="Changer de langue">FR</button>
@@ -875,6 +943,28 @@
         tutorialSkip: { fr: "Passer ✕", en: "Skip ✕" },
         tutorialNext: { fr: "Suivant", en: "Next" },
         tutorialDone: { fr: "C'est parti !", en: "Let's go!" },
+
+        volcanoReplayConfirm: { fr: "Voulez-vous refaire la cinématique ?", en: "Do you want to replay the cutscene?" },
+        volcanoOnCooldown: { fr: "Réessaie dans", en: "Try again in" },
+        volcanoHelpAsk: { fr: "Tu veux de l'aide ?", en: "Want some help?" },
+        volcanoHelpText: {
+            fr: "Quand le symbole ⚠️ apparaît, appuie sur les flèches ← → (PC) ou tape à gauche/droite de l'écran (mobile) pour esquiver les roches. Bonne chance !",
+            en: "When the ⚠️ symbol appears, press ← → (PC) or tap the left/right side of the screen (mobile) to dodge the rocks. Good luck!",
+        },
+        volcanoClickQte: { fr: "CLIQUE VITE POUR REPRENDRE TON ÉQUILIBRE !", en: "CLICK FAST TO REGAIN YOUR BALANCE!" },
+        volcanoSlipMessage: {
+            fr: "⚠️ Dérapage incontrôlé ! Tu as perdu 10 de durabilité sur la trousse (va dans la Boutique pour la réparer).",
+            en: "⚠️ Uncontrolled slide! You lost 10 durability on the pencil case (go to the Shop to repair it).",
+        },
+        repairName: { fr: "Réparer la trousse", en: "Repair the pencil case" },
+        repairDesc: { fr: "Remet la trousse à 100 de durabilité (500 $ les 10 points à réparer).", en: "Restores the pencil case to 100 durability (500$ per 10 points repaired)." },
+        repairFull: { fr: "Intacte", en: "Undamaged" },
+        trousseInfoName: { fr: "Nom", en: "Name" },
+        trousseInfoDurability: { fr: "Durabilité", en: "Durability" },
+        trousseInfoPlaytime: { fr: "Temps de jeu", en: "Playtime" },
+        trousseInfoThrows: { fr: "Lancers effectués", en: "Throws made" },
+        trousseInfoRecord: { fr: "Record", en: "Record" },
+        trousseInfoClose: { fr: "Fermer ✕", en: "Close ✕" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -1029,6 +1119,14 @@
             equippedTrail: "blanche",
             theme: "dark", // "dark" ou "light", voir applyTheme()
             lang: "", // "fr" ou "en" ; vide = pas encore choisi, détecté au premier lancement
+            currentWorld: "cour", // "cour" ou "volcans" ; monde utilisé pour le décor du jeu
+            volcanoUnlocked: false, // passe à true après avoir réussi la cinématique des Volcans
+            volcanoFailUntil: 0, // horodatage (ms) avant lequel retenter la cinématique est bloqué
+            volcanoEverFailed: false, // pour afficher le lien d'aide une fois qu'on a raté au moins une fois
+            volcanoTutorialSeen: false,
+            durability: 100, // 0-100, seulement affectée par les dérapages du monde Volcans
+            totalThrows: 0,
+            playtimeSeconds: 0,
         };
     }
 
@@ -1051,6 +1149,30 @@
         localStorage.setItem(SAVE_KEY, JSON.stringify(save));
         pushCloudSave(); // best-effort, ne fait rien si Firebase n'est pas connecté
     }
+
+    // Temps de jeu total : tourne dès que l'app est ouverte (pas seulement
+    // pendant les lancers), sauvegardé de temps en temps plutôt qu'à chaque
+    // seconde pour ne pas spammer localStorage/Firebase.
+    setInterval(() => {
+        save.playtimeSeconds += 5;
+        persist();
+    }, 5000);
+
+    function formatPlaytime(totalSeconds) {
+        const h = Math.floor(totalSeconds / 3600);
+        const m = Math.floor((totalSeconds % 3600) / 60);
+        if (h > 0) return h + "h" + String(m).padStart(2, "0");
+        if (m > 0) return m + " min";
+        return "< 1 min";
+    }
+
+    // Reflète le monde actuellement sélectionné sur <html> pour que le CSS
+    // (ciel du menu, couleurs lune/soleil) puisse s'y adapter (voir data-world
+    // plus bas dans le CSS).
+    function applyWorldTheme() {
+        document.documentElement.setAttribute("data-world", save.currentWorld);
+    }
+    applyWorldTheme();
 
     function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
 
@@ -1186,6 +1308,13 @@
         document.getElementById("menu-vitesse").textContent = totalVitesse();
         document.getElementById("menu-record").textContent = save.bestDistance.toFixed(1) + " m";
         document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
+        buildWorldsRow();
+        // Lien d'aide affiché seulement après un premier échec aux Volcans,
+        // tant qu'on n'a pas fini par réussir
+        const helpHint = document.getElementById("volcano-help-hint");
+        helpHint.style.display = (save.volcanoEverFailed && !save.volcanoUnlocked) ? "block" : "none";
+        helpHint.textContent = "🌋 " + tr("volcanoHelpAsk");
+        helpHint.dataset.expanded = "false";
     }
 
     // Le skin "rainbow" n'a pas un filtre fixe : la teinte tourne en fonction
@@ -1198,22 +1327,56 @@
         return filter;
     }
 
-    // Construit les cartes de mondes en bas du menu (un seul déblocable pour l'instant)
+    // Construit les cartes de mondes en bas du menu. "Volcans" est un cas
+    // spécial : cliquer dessus tant qu'il n'est pas débloqué lance directement
+    // la tentative de cinématique (voir startVolcanoCinematic) plutôt que
+    // d'afficher un simple message "verrouillé".
     function buildWorldsRow() {
+        WORLDS[1].unlocked = save.volcanoUnlocked; // "volcans" : reflète la sauvegarde
         const row = document.getElementById("worlds-row");
         row.innerHTML = "";
-        WORLDS.forEach((w, idx) => {
+        WORLDS.forEach((w) => {
             const card = document.createElement("div");
-            card.className = "world-card" + (w.unlocked ? "" : " locked") + (idx === 0 ? " selected" : "");
+            card.className = "world-card" + (w.unlocked ? "" : " locked") + (w.id === save.currentWorld ? " selected" : "");
             card.innerHTML = '<div class="emoji">' + w.emoji + '</div><div class="name">' + w.name + '</div>';
-            card.addEventListener("click", () => {
-                if (!w.unlocked) {
-                    showToast("🔒 " + w.name + tr("worldLocked"));
-                    sfxError();
-                }
-            });
+            card.addEventListener("click", () => onWorldCardClick(w));
             row.appendChild(card);
         });
+    }
+
+    function onWorldCardClick(w) {
+        if (w.id === "volcans") {
+            if (save.volcanoUnlocked) {
+                if (confirm(tr("volcanoReplayConfirm"))) {
+                    startVolcanoCinematic(true);
+                } else if (save.currentWorld !== "volcans") {
+                    save.currentWorld = "volcans";
+                    persist();
+                    applyWorldTheme();
+                    buildWorldsRow();
+                }
+                return;
+            }
+            const remainMs = save.volcanoFailUntil - Date.now();
+            if (remainMs > 0) {
+                showToast("⏳ " + tr("volcanoOnCooldown") + " " + Math.ceil(remainMs / 60000) + " min");
+                sfxError();
+                return;
+            }
+            startVolcanoCinematic(false);
+            return;
+        }
+        if (!w.unlocked) {
+            showToast("🔒 " + w.name + tr("worldLocked"));
+            sfxError();
+            return;
+        }
+        if (save.currentWorld !== w.id) {
+            save.currentWorld = w.id;
+            persist();
+            applyWorldTheme();
+            buildWorldsRow();
+        }
     }
 
     // Boucle légère (juste pour l'image de prévisualisation) qui met à jour
@@ -1287,6 +1450,9 @@
                     }
                 }
             ));
+            // La durabilité n'existe que depuis le monde Volcans : pas la peine
+            // d'encombrer la boutique avant que le joueur l'ait débloqué.
+            if (save.volcanoUnlocked) body.appendChild(buildRepairCard());
         } else if (currentTab === "skins") {
             SKINS.forEach(skin => body.appendChild(buildSkinCard(skin)));
         } else {
@@ -1307,6 +1473,43 @@
         btn.className = "btn small";
         btn.textContent = cost + " $";
         btn.addEventListener("click", onBuy);
+        card.appendChild(btn);
+        return card;
+    }
+
+    // Carte de réparation : remet la durabilité à 100 (voir la mécanique de
+    // dérapage du monde Volcans dans onLanded). 500 $ les 10 points manquants.
+    function buildRepairCard() {
+        const missing = 100 - save.durability;
+        const cost = missing * 50;
+        const card = document.createElement("div");
+        card.className = "upgrade-card";
+        card.innerHTML =
+            '<div class="icon">🔧</div>' +
+            '<div class="info"><h3>' + tr("repairName") + ' <span class="level-badge">' + save.durability + '/100</span></h3>' +
+            '<p>' + tr("repairDesc") + '</p></div>';
+        const btn = document.createElement("button");
+        btn.className = "btn small" + (missing === 0 ? " secondary" : "");
+        if (missing === 0) {
+            btn.textContent = tr("repairFull");
+            btn.disabled = true;
+        } else {
+            btn.textContent = cost + " $";
+            btn.addEventListener("click", () => {
+                if (save.money >= cost) {
+                    save.money -= cost;
+                    save.durability = 100;
+                    persist();
+                    sfxBuy();
+                    showToast("✅ " + tr("repairName"));
+                    refreshShop();
+                    playPurchasePop();
+                } else {
+                    sfxError();
+                    showToast(tr("notEnoughMoney"));
+                }
+            });
+        }
         card.appendChild(btn);
         return card;
     }
@@ -1490,6 +1693,9 @@
     let phaseTimer = 0;            // chronomètre des phases spéciales (transition/flottaison/QTE)
     let qteResults = [];           // un booléen par anneau déjà résolu (true = réussi), longueur <= QTE_RING_COUNT
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
+    const SLIP_DURATION = 0.6;     // secondes, durée visuelle du dérapage (monde Volcans)
+    let slipStartWorldX = 0;       // worldX au moment où le dérapage commence
+    let slipDistancePx = 0;        // distance (px) ajoutée pendant le dérapage
     let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
 
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
@@ -1512,6 +1718,12 @@
         meterWrap.style.display = "none";
         hintText.style.display = "block";
         hintText.textContent = tr("hintCharge");
+        // Filet de sécurité : si un lancer normal démarre juste après une
+        // cinématique interrompue (ex: bouton Menu cliqué en plein milieu),
+        // on remet l'UI du jeu dans son état normal.
+        document.getElementById("btn-game-back").style.display = "";
+        document.querySelector("#screen-game .hud-top").style.display = "";
+        document.querySelector("#screen-game .sky-anim").style.display = "";
         resizeCanvas();
         requestAnimationFrame(gameLoop);
     }
@@ -1565,6 +1777,7 @@
 
         rotSpeed = 6 + v0 / 55;
         state = "flying";
+        save.totalThrows++;
         meterWrap.style.display = "none";
         hintText.style.display = "none";
         sfxLaunch();
@@ -1574,9 +1787,20 @@
     // Un clic/tap ou la touche Espace fait avancer la machine à états d'une étape
     canvas.addEventListener("pointerdown", (e) => {
         e.preventDefault();
+        if (volcanoActive) { handleVolcanoPointer(e); return; }
         handleTap();
     });
     window.addEventListener("keydown", (e) => {
+        if (volcanoActive) {
+            if (volcanoPhase === "dodge_warn" && (e.code === "ArrowLeft" || e.code === "ArrowRight")) {
+                e.preventDefault();
+                handleDodgeInput(e.code === "ArrowLeft" ? -1 : 1);
+            } else if (volcanoPhase === "click_qte" && e.code === "Space") {
+                e.preventDefault();
+                handleVolcanoClick();
+            }
+            return; // pendant la cinématique, on ne transmet pas à la logique normale
+        }
         if (e.code === "Space" && screens.game.classList.contains("active")) {
             e.preventDefault();
             handleTap();
@@ -1654,8 +1878,11 @@
     }
 
     // Appelé dès que la trousse touche le sol : calcule la distance, l'argent
-    // gagné, met à jour le record éventuel et affiche le panneau de résultat
-    function onLanded() {
+    // gagné, met à jour le record éventuel et affiche le panneau de résultat.
+    // isSlip = vrai si ce lancer s'est terminé par un dérapage (monde Volcans,
+    // voir l'état "sliding" du gameLoop) : la durabilité a déjà été réduite
+    // avant cet appel, ici on affiche juste le message dédié.
+    function onLanded(isSlip) {
         state = "landed";
         const distanceMeters = worldX / SCALE;
         if (distanceMeters > save.bestDistance) {
@@ -1707,6 +1934,10 @@
         document.getElementById("result-earn").textContent = earn;
         document.getElementById("game-money").textContent = save.money;
 
+        const slipEl = document.getElementById("result-slip");
+        slipEl.style.display = isSlip ? "block" : "none";
+        if (isSlip) slipEl.textContent = tr("volcanoSlipMessage");
+
         resultPanel.classList.add("show");
 
         if (inSpaceMode) {
@@ -1745,6 +1976,28 @@
     document.getElementById("btn-shop").addEventListener("click", () => showScreen("shop"));
     document.getElementById("btn-leaderboard").addEventListener("click", () => showScreen("leaderboard"));
     document.getElementById("btn-leaderboard-back").addEventListener("click", () => showScreen("menu"));
+
+    // Popup récapitulatif de la trousse (durabilité, temps de jeu, lancers, record)
+    document.getElementById("trousse-preview-wrap").addEventListener("click", () => {
+        document.getElementById("trousse-info-name").textContent = save.pseudo || "Trousse-????";
+        document.getElementById("trousse-info-durability").textContent = save.durability;
+        document.getElementById("trousse-info-playtime").textContent = formatPlaytime(save.playtimeSeconds);
+        document.getElementById("trousse-info-throws").textContent = save.totalThrows;
+        document.getElementById("trousse-info-record").textContent = save.bestDistance.toFixed(1) + " m";
+        document.getElementById("trousse-info-overlay").classList.add("show");
+    });
+    document.getElementById("btn-trousse-info-close").addEventListener("click", () => {
+        document.getElementById("trousse-info-overlay").classList.remove("show");
+    });
+
+    // Lien d'aide "tu veux de l'aide ?" affiché après un échec aux Volcans :
+    // un premier clic déplie l'explication des contrôles, pas besoin de la
+    // replier ensuite (elle redisparaît de toute façon si on réussit plus tard)
+    document.getElementById("volcano-help-hint").addEventListener("click", function () {
+        if (this.dataset.expanded === "true") return;
+        this.textContent = tr("volcanoHelpText");
+        this.dataset.expanded = "true";
+    });
 
     /* ============ 10. RENDU DU DÉCOR (canvas) ============ */
 
@@ -2007,6 +2260,107 @@
         }
     }
 
+    // Dessine un volcan en arrière-plan (silhouette + lueur de lave au sommet)
+    function drawVolcano(bx, groundY, seed) {
+        const height = 160 + seededRand(seed) * 90;
+        const baseWidth = height * 1.3;
+        ctx.fillStyle = "rgba(60,25,20,0.75)";
+        ctx.beginPath();
+        ctx.moveTo(bx - baseWidth / 2, groundY);
+        ctx.lineTo(bx - baseWidth * 0.12, groundY - height);
+        ctx.lineTo(bx + baseWidth * 0.12, groundY - height);
+        ctx.lineTo(bx + baseWidth / 2, groundY);
+        ctx.closePath();
+        ctx.fill();
+        // lueur de lave au sommet (cratère)
+        const glow = ctx.createRadialGradient(bx, groundY - height, 2, bx, groundY - height, 30);
+        glow.addColorStop(0, "rgba(255,180,60,0.9)");
+        glow.addColorStop(1, "rgba(255,80,20,0)");
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(bx, groundY - height, 30, 0, Math.PI * 2);
+        ctx.fill();
+        // filet de lave qui coule sur un flanc
+        ctx.strokeStyle = "rgba(255,120,40,0.7)";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        ctx.moveTo(bx + baseWidth * 0.05, groundY - height + 10);
+        ctx.lineTo(bx + baseWidth * 0.18, groundY - height * 0.4);
+        ctx.stroke();
+    }
+
+    // Décor du monde "Volcans" (débloqué via la cinématique, voir
+    // startVolcanoCinematic) : ciel rouge, volcans en arrière-plan, sol rougi
+    // et poussière en suspension. Même ligne d'horizon que la cour pour un
+    // atterrissage cohérent.
+    function drawVolcanoBackground(w, h) {
+        groundScreenY = h * 0.68;
+
+        const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
+        sky.addColorStop(0, "#3a0f0c");
+        sky.addColorStop(1, "#b0451f");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, groundScreenY);
+
+        // volcans lointains (parallaxe plus lente que le sol)
+        const volcanoSpacing = 260;
+        const parX = cameraX * 0.35;
+        const startIdx = Math.floor(parX / volcanoSpacing) - 1;
+        for (let i = startIdx; i < startIdx + Math.ceil(w / volcanoSpacing) + 2; i++) {
+            const worldPos = i * volcanoSpacing;
+            const sx = worldPos - parX;
+            if (sx < -180 || sx > w + 180) continue;
+            drawVolcano(sx, groundScreenY + 4, i);
+        }
+
+        // poussière rouge en suspension (légère parallaxe, comme les étoiles de l'espace)
+        const dustParX = -cameraX * 0.08;
+        for (let i = 0; i < 50; i++) {
+            const sx = mod(i * 97 + dustParX, w + 80) - 40;
+            const sy = seededRand(i * 4.2) * groundScreenY;
+            ctx.fillStyle = "rgba(255,140,90," + (0.15 + seededRand(i) * 0.25) + ")";
+            ctx.beginPath();
+            ctx.arc(sx, sy, 1.5 + seededRand(i + 1) * 2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // sol rougi par la cendre
+        const groundGrad = ctx.createLinearGradient(0, groundScreenY, 0, h);
+        groundGrad.addColorStop(0, "#8a3a2e");
+        groundGrad.addColorStop(1, "#4a1a12");
+        ctx.fillStyle = groundGrad;
+        ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+
+        // fissures/rochers décoratifs au sol (remplacent la craie de la cour)
+        const rockSpacing = 150;
+        const rockStartIdx = Math.floor(cameraX / rockSpacing) - 1;
+        for (let i = rockStartIdx; i < rockStartIdx + Math.ceil(w / rockSpacing) + 2; i++) {
+            const worldPos = i * rockSpacing + (seededRand(i + 0.6) - 0.5) * 50;
+            const sx = worldPos - cameraX;
+            if (sx < -20 || sx > w + 20) continue;
+            ctx.fillStyle = "rgba(30,15,12,0.5)";
+            ctx.beginPath();
+            ctx.ellipse(sx, groundScreenY + 6, 12 + seededRand(i) * 6, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        // repères de distance, comme les autres décors
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.fillStyle = "rgba(255,255,255,0.7)";
+        ctx.font = "12px sans-serif";
+        ctx.lineWidth = 2;
+        const startMeter = Math.floor((cameraX / SCALE) / 10) * 10;
+        for (let m = startMeter; m < startMeter + 200; m += 10) {
+            const sx = m * SCALE - cameraX;
+            if (sx < -20 || sx > w + 20) continue;
+            ctx.beginPath();
+            ctx.moveTo(sx, groundScreenY);
+            ctx.lineTo(sx, groundScreenY + 14);
+            ctx.stroke();
+            ctx.fillText(m + "m", sx + 4, groundScreenY + 26);
+        }
+    }
+
     // Nuages qui balaient tout l'écran pendant la transition, pour cacher le
     // changement de décor cour <-> espace. La couverture (opacité en cloche,
     // 0 -> 1 -> 0) garantit qu'on ne voit jamais le bascule se produire.
@@ -2166,12 +2520,570 @@
         ctx.restore();
     }
 
+    /* ============ CINÉMATIQUE DE DÉBLOCAGE "VOLCANS" ============
+       Machine à états entièrement séparée du lancer normal (voir volcanoPhase),
+       pilotée depuis gameLoop() mais avec son propre update+dessin par phase :
+       zoom_in -> quake (9s, séisme) -> launch (explosion) -> ascend (au-dessus
+       des nuages) -> dodge_warn/dodge_gap (x5, esquive des roches) -> click_qte
+       (rééquilibrage) -> landing (cratère) -> succès, ou fail_fade en cas
+       d'échec aux 3 coups. */
+    const VOLCANO_ZOOM_DURATION = 7;
+    const VOLCANO_QUAKE_DURATION = 9;      // précis, tel que demandé
+    const VOLCANO_LAUNCH_DURATION = 1.4;
+    const VOLCANO_ASCEND_DURATION = 2.6;
+    const VOLCANO_DODGE_WARN_DURATION = 0.8; // fenêtre de réaction par roche
+    const VOLCANO_DODGE_GAP_DURATION = 0.5;
+    const VOLCANO_ROCK_COUNT = 5;
+    const VOLCANO_CLICK_QTE_DURATION = 5;
+    const VOLCANO_CLICK_QTE_TARGET = 10;
+    const VOLCANO_LANDING_DURATION = 2;
+    const VOLCANO_FAIL_FADE_DURATION = 3;
+    const VOLCANO_LANE_OFFSET = 90; // px entre deux voies adjacentes
+
+    let volcanoActive = false;
+    let volcanoPhase = null;
+    let volcanoTimer = 0;
+    let volcanoIsReplay = false;
+    let volcanoZoomScale = 1;
+    let volcanoQuakePlayed = false;
+    let volcanoCloudDrift = 0;
+    let volcanoLane = 0;        // -1 gauche, 0 centre, 1 droite
+    let volcanoTargetLane = 0;  // voie visée par la roche en cours (figée au début de dodge_warn)
+    let volcanoRockIndex = 0;
+    let volcanoLives = 2;
+    let volcanoWobble = 0;      // >0 = petite secousse visuelle après un coup encaissé
+    let volcanoClickCount = 0;
+    let volcanoExplosionParticles = [];
+    let volcanoDustParticles = [];
+
+    function startVolcanoCinematic(isReplay) {
+        volcanoIsReplay = isReplay;
+        screens.game.classList.add("active");
+        resetThrow();
+
+        volcanoActive = true;
+        volcanoPhase = "zoom_in";
+        volcanoTimer = 0;
+        volcanoZoomScale = 1;
+        volcanoQuakePlayed = false;
+        volcanoCloudDrift = 0;
+        volcanoLane = 0;
+        volcanoRockIndex = 0;
+        volcanoLives = 2;
+        volcanoWobble = 0;
+        volcanoClickCount = 0;
+        volcanoExplosionParticles = [];
+        volcanoDustParticles = [];
+
+        meterWrap.style.display = "none";
+        hintText.style.display = "none";
+        document.getElementById("qte-wrap").classList.remove("show");
+        document.getElementById("btn-game-back").style.display = "none";
+        document.querySelector("#screen-game .hud-top").style.display = "none";
+        document.querySelector("#screen-game .sky-anim").style.display = "none";
+
+        // Fondu lent de l'écran d'accueil par-dessus le jeu qui démarre en
+        // dessous : le menu garde "active" (donc visible) mais passe au-dessus
+        // du canvas (z-index) et perd son opacité sur VOLCANO_ZOOM_DURATION.
+        screens.menu.classList.add("active");
+        screens.menu.style.zIndex = "5";
+        screens.menu.style.pointerEvents = "none";
+        screens.menu.style.opacity = "1";
+        screens.menu.style.transition = "opacity " + VOLCANO_ZOOM_DURATION + "s linear";
+        requestAnimationFrame(() => { screens.menu.style.opacity = "0"; });
+    }
+
+    // Restaure l'UI normale de l'écran de jeu, cachée pendant la cinématique.
+    // Nettoie aussi le style du menu au cas où la phase zoom_in n'aurait pas
+    // pu faire son propre nettoyage (ex: échec déclenché avant sa fin) : sans
+    // ça, le menu resterait invisible/inerte (opacity:0, pointer-events:none).
+    function endVolcanoCinematicUI() {
+        document.getElementById("btn-game-back").style.display = "";
+        document.querySelector("#screen-game .hud-top").style.display = "";
+        document.querySelector("#screen-game .sky-anim").style.display = "";
+        screens.menu.style.opacity = "";
+        screens.menu.style.transition = "";
+        screens.menu.style.zIndex = "";
+        screens.menu.style.pointerEvents = "";
+    }
+
+    // Dessine la trousse (image ou pièce selon le skin équipé) centrée sur
+    // l'origine actuelle du contexte canvas (à appeler après ctx.translate).
+    // Variante de drawTrousse() qui ne dépend pas de worldX/worldY/cameraX,
+    // pour pouvoir la positionner librement pendant la cinématique.
+    function drawTrousseSprite(size) {
+        const skin = getSkin(save.equippedSkin);
+        if (skin.isCoin) {
+            ctx.save();
+            ctx.translate(-size / 2, -size / 2);
+            drawPixelCoin(ctx, size);
+            ctx.restore();
+        } else {
+            ctx.save();
+            ctx.filter = rainbowOrFilter(skin.filter, performance.now());
+            if (trousseImg.complete && trousseImg.naturalWidth > 0) {
+                ctx.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+            } else {
+                ctx.fillStyle = "#e67e22";
+                ctx.fillRect(-size / 2, -size / 2, size, size);
+            }
+            ctx.filter = "none";
+            ctx.restore();
+        }
+    }
+
+    function drawWarningTriangle(x, y) {
+        ctx.save();
+        ctx.fillStyle = "#ffcc33";
+        ctx.strokeStyle = "#7a1f00";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(x, y - 22);
+        ctx.lineTo(x + 20, y + 16);
+        ctx.lineTo(x - 20, y + 16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#7a1f00";
+        ctx.font = "900 22px Arial, sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("!", x, y + 3);
+        ctx.restore();
+    }
+
+    // Texte centré qui revient à la ligne pour ne jamais déborder de maxWidth
+    // (ctx.font doit être déjà réglé avant l'appel). Utilisé par le QTE de clics.
+    function drawWrappedCenteredText(text, cx, y, maxWidth, lineHeight) {
+        const words = text.split(" ");
+        const lines = [];
+        let current = "";
+        words.forEach((word) => {
+            const test = current ? current + " " + word : word;
+            if (current && ctx.measureText(test).width > maxWidth) {
+                lines.push(current);
+                current = word;
+            } else {
+                current = test;
+            }
+        });
+        if (current) lines.push(current);
+        lines.forEach((line, i) => ctx.fillText(line, cx, y + i * lineHeight));
+    }
+
+    function drawVolcanoRock(x, y, r) {
+        ctx.save();
+        ctx.fillStyle = "#3a2a22";
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "rgba(255,120,40,0.7)";
+        ctx.beginPath();
+        ctx.arc(x - r * 0.2, y - r * 0.1, r * 0.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+    }
+
+    // Fond "au-dessus des nuages" utilisé pendant l'ascension et l'esquive :
+    // ciel dégagé en haut, tapis de nuages qui défile dans le bas de l'écran
+    // (on regarde vers le bas, pas vers l'espace).
+    function drawAboveClouds(w, h, drift) {
+        const sky = ctx.createLinearGradient(0, 0, 0, h);
+        sky.addColorStop(0, "#2f6fb0");
+        sky.addColorStop(0.6, "#bfe4ff");
+        sky.addColorStop(1, "#eaf6ff");
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, h);
+
+        ctx.fillStyle = "#ffffff";
+        const bandY = h * 0.62;
+        for (let i = -1; i < 8; i++) {
+            const cx = mod(i * 180 + drift, w + 360) - 180;
+            const cy = bandY + Math.sin(i * 1.7) * 18;
+            ctx.beginPath();
+            ctx.arc(cx, cy, 60, 0, Math.PI * 2);
+            ctx.arc(cx + 55, cy + 10, 46, 0, Math.PI * 2);
+            ctx.arc(cx - 50, cy + 14, 42, 0, Math.PI * 2);
+            ctx.arc(cx + 20, cy - 20, 38, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.fillStyle = "rgba(255,255,255,0.55)";
+        ctx.fillRect(0, bandY + 40, w, h - bandY - 40);
+    }
+
+    function spawnVolcanoExplosion(x, y) {
+        for (let i = 0; i < 26; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const speed = 100 + Math.random() * 220;
+            volcanoExplosionParticles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, life: 0.4 + Math.random() * 0.35, age: 0 });
+        }
+    }
+    function updateAndDrawExplosionParticles(dt) {
+        volcanoExplosionParticles.forEach(p => { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; });
+        volcanoExplosionParticles = volcanoExplosionParticles.filter(p => p.age < p.life);
+        volcanoExplosionParticles.forEach(p => {
+            const a = Math.max(0, 1 - p.age / p.life);
+            ctx.fillStyle = "rgba(255," + Math.round(120 + 100 * a) + ",40," + a + ")";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 4 * a + 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function spawnVolcanoDust(x, y) {
+        for (let i = 0; i < 18; i++) {
+            const angle = Math.random() * Math.PI - Math.PI; // vers le haut, en éventail
+            const speed = 60 + Math.random() * 90;
+            volcanoDustParticles.push({ x, y, vx: Math.cos(angle) * speed, vy: -Math.abs(Math.sin(angle) * speed) - 20, life: 0.6 + Math.random() * 0.4, age: 0 });
+        }
+    }
+    function updateAndDrawVolcanoDust(dt) {
+        volcanoDustParticles.forEach(p => { p.age += dt; p.x += p.vx * dt; p.y += p.vy * dt; p.vy += 140 * dt; });
+        volcanoDustParticles = volcanoDustParticles.filter(p => p.age < p.life);
+        volcanoDustParticles.forEach(p => {
+            const a = Math.max(0, 1 - p.age / p.life);
+            ctx.fillStyle = "rgba(180,90,60," + (a * 0.7) + ")";
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, 5 * a + 2, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    // Entrée dans le clic gauche/droite ou flèches ← → pendant dodge_warn (voir
+    // les écouteurs pointerdown/keydown plus haut). Le joueur peut changer
+    // d'avis plusieurs fois pendant la fenêtre : seule sa voie FINALE compte,
+    // comparée à volcanoTargetLane à la fin de dodge_warn.
+    function handleDodgeInput(dir) {
+        if (volcanoPhase !== "dodge_warn") return;
+        volcanoLane = Math.max(-1, Math.min(1, volcanoLane + dir));
+    }
+    function handleVolcanoPointer(e) {
+        if (volcanoPhase === "dodge_warn") {
+            const rect = canvas.getBoundingClientRect();
+            handleDodgeInput((e.clientX - rect.left) < rect.width / 2 ? -1 : 1);
+        } else if (volcanoPhase === "click_qte") {
+            handleVolcanoClick();
+        }
+    }
+    function handleVolcanoClick() {
+        if (volcanoPhase !== "click_qte") return;
+        volcanoClickCount++;
+        sfxCharge();
+    }
+
+    function beginVolcanoDodgeRock() {
+        volcanoPhase = "dodge_warn";
+        volcanoTimer = 0;
+        volcanoTargetLane = volcanoLane; // la roche vise la voie où le joueur se trouve maintenant
+    }
+
+    // Résout la roche en cours : touché seulement si la voie FINALE du joueur
+    // est toujours celle visée. 2 vies tolérées (petite secousse, la trousse
+    // "esquive de justesse"), le 3e coup est fatal (voir beginVolcanoFail).
+    function resolveVolcanoRockHit() {
+        const hit = volcanoLane === volcanoTargetLane;
+        if (hit) {
+            if (volcanoLives > 0) {
+                volcanoLives--;
+                volcanoWobble = 0.5;
+                sfxError();
+            } else {
+                beginVolcanoFail();
+                return;
+            }
+        } else {
+            sfxCharge();
+        }
+        volcanoRockIndex++;
+        volcanoPhase = "dodge_gap";
+        volcanoTimer = 0;
+    }
+
+    function beginVolcanoClickQte() {
+        volcanoPhase = "click_qte";
+        volcanoTimer = 0;
+        volcanoClickCount = 0;
+    }
+
+    function beginVolcanoLanding() {
+        volcanoPhase = "landing";
+        volcanoTimer = 0;
+        volcanoDustParticles = [];
+        // Le décor bascule ici : le joueur voit la cour habituelle disparaître
+        // au profit des Volcans pile au moment où la trousse commence à redescendre.
+        save.currentWorld = "volcans";
+        applyWorldTheme();
+    }
+
+    function beginVolcanoFail() {
+        volcanoPhase = "fail_fade";
+        volcanoTimer = 0;
+    }
+
+    function finishVolcanoSuccess() {
+        volcanoActive = false;
+        volcanoPhase = null;
+        endVolcanoCinematicUI();
+        const firstTime = !save.volcanoUnlocked;
+        save.volcanoUnlocked = true;
+        save.currentWorld = "volcans";
+        persist();
+        applyWorldTheme();
+        showScreen("menu");
+        if (firstTime) showVolcanoTutorial();
+    }
+
+    function finishVolcanoFail() {
+        volcanoActive = false;
+        volcanoPhase = null;
+        endVolcanoCinematicUI();
+        // Une tentative de rejeu (monde déjà débloqué) ne relance ni le
+        // cooldown ni le message d'aide : le monde reste débloqué de toute façon.
+        if (!volcanoIsReplay) {
+            save.volcanoFailUntil = Date.now() + 10 * 60 * 1000;
+            save.volcanoEverFailed = true;
+            persist();
+        }
+        showScreen("menu");
+    }
+
+    function updateVolcanoZoomIn(dt, w, h) {
+        const t = Math.min(volcanoTimer / VOLCANO_ZOOM_DURATION, 1);
+        volcanoZoomScale = 1 + t * 0.7;
+        const cx = w * 0.5, cy = groundScreenY;
+        cameraX = 0;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.scale(volcanoZoomScale, volcanoZoomScale);
+        ctx.translate(-cx, -cy);
+        drawBackground(w, h);
+        ctx.save();
+        ctx.translate(cx, cy);
+        drawTrousseSprite(60);
+        ctx.restore();
+        ctx.restore();
+
+        if (t >= 1) {
+            screens.menu.classList.remove("active");
+            screens.menu.style.opacity = "";
+            screens.menu.style.transition = "";
+            screens.menu.style.zIndex = "";
+            screens.menu.style.pointerEvents = "";
+            volcanoPhase = "quake";
+            volcanoTimer = 0;
+        }
+    }
+
+    function updateVolcanoQuake(dt, w, h) {
+        if (!volcanoQuakePlayed) {
+            volcanoQuakePlayed = true;
+            const audio = document.getElementById("quake-audio");
+            audio.currentTime = 0;
+            audio.play().catch(() => {});
+        }
+        const amp = 6 + Math.min(volcanoTimer / 0.6, 1) * 16;
+        const shakeX = (Math.random() - 0.5) * amp;
+        const shakeY = (Math.random() - 0.5) * amp;
+        const cx = w * 0.5, cy = groundScreenY;
+        cameraX = 0;
+        ctx.save();
+        ctx.translate(shakeX, shakeY);
+        ctx.translate(cx, cy);
+        ctx.scale(volcanoZoomScale, volcanoZoomScale);
+        ctx.translate(-cx, -cy);
+        drawBackground(w, h);
+        ctx.save();
+        ctx.translate(cx, cy);
+        drawTrousseSprite(60);
+        ctx.restore();
+        ctx.restore();
+
+        if (volcanoTimer >= VOLCANO_QUAKE_DURATION) {
+            volcanoPhase = "launch";
+            volcanoTimer = 0;
+        }
+    }
+
+    function updateVolcanoLaunch(dt, w, h) {
+        const t = Math.min(volcanoTimer / VOLCANO_LAUNCH_DURATION, 1);
+        cameraX = 0;
+        drawBackground(w, h);
+
+        const startX = w * 0.5, startY = groundScreenY;
+        const endX = w * 0.5, endY = h * 0.42;
+        const eased = 1 - Math.pow(1 - t, 3);
+        const sx = startX + (endX - startX) * eased;
+        const sy = startY + (endY - startY) * eased;
+
+        if (volcanoTimer < dt * 1.5 && volcanoExplosionParticles.length === 0) {
+            spawnVolcanoExplosion(startX, startY);
+            sfxCrash();
+        }
+        updateAndDrawExplosionParticles(dt);
+
+        ctx.save();
+        ctx.translate(sx, sy);
+        ctx.rotate(t * Math.PI * 2.4);
+        drawTrousseSprite(58);
+        ctx.restore();
+
+        if (t >= 1) {
+            volcanoPhase = "ascend";
+            volcanoTimer = 0;
+        }
+    }
+
+    function updateVolcanoAscend(dt, w, h) {
+        volcanoCloudDrift += dt * 30;
+        drawAboveClouds(w, h, volcanoCloudDrift);
+        const t = Math.min(volcanoTimer / VOLCANO_ASCEND_DURATION, 1);
+        const cx = w * 0.5, cy = h * 0.42 + Math.sin(volcanoTimer * 4) * 6;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.sin(volcanoTimer * 3) * 0.15);
+        drawTrousseSprite(58);
+        ctx.restore();
+
+        if (t >= 1) beginVolcanoDodgeRock();
+    }
+
+    function updateVolcanoDodgeWarn(dt, w, h) {
+        volcanoCloudDrift += dt * 30;
+        drawAboveClouds(w, h, volcanoCloudDrift);
+
+        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.42;
+        const rockX = w * 0.5 + volcanoTargetLane * VOLCANO_LANE_OFFSET;
+        const rockProgress = Math.min(volcanoTimer / VOLCANO_DODGE_WARN_DURATION, 1);
+        const rockY = -40 + (cy + 40) * rockProgress;
+        drawVolcanoRock(rockX, rockY, 28);
+
+        if (Math.sin(volcanoTimer * 18) > 0) drawWarningTriangle(cx, cy - 70);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        drawTrousseSprite(56);
+        ctx.restore();
+
+        if (volcanoTimer >= VOLCANO_DODGE_WARN_DURATION) resolveVolcanoRockHit();
+    }
+
+    function updateVolcanoDodgeGap(dt, w, h) {
+        volcanoCloudDrift += dt * 30;
+        drawAboveClouds(w, h, volcanoCloudDrift);
+        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.42;
+        let wobbleOffset = 0;
+        if (volcanoWobble > 0) {
+            volcanoWobble = Math.max(0, volcanoWobble - dt);
+            wobbleOffset = Math.sin(volcanoWobble * 40) * 8 * volcanoWobble;
+        }
+        ctx.save();
+        ctx.translate(cx + wobbleOffset, cy);
+        drawTrousseSprite(56);
+        ctx.restore();
+
+        if (volcanoTimer >= VOLCANO_DODGE_GAP_DURATION) {
+            if (volcanoRockIndex >= VOLCANO_ROCK_COUNT) beginVolcanoClickQte();
+            else beginVolcanoDodgeRock();
+        }
+    }
+
+    function updateVolcanoClickQte(dt, w, h) {
+        volcanoCloudDrift += dt * 70;
+        drawAboveClouds(w, h, volcanoCloudDrift);
+
+        const cx = w * 0.5, cy = h * 0.42;
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.sin(volcanoTimer * 10) * 0.08 * Math.min(volcanoClickCount, VOLCANO_CLICK_QTE_TARGET) / VOLCANO_CLICK_QTE_TARGET);
+        drawTrousseSprite(56);
+        ctx.restore();
+
+        ctx.save();
+        ctx.fillStyle = "#ff4444";
+        ctx.textAlign = "center";
+        const qteFontSize = Math.max(14, Math.min(20, w / 22));
+        ctx.font = "900 " + qteFontSize + "px Arial, sans-serif";
+        drawWrappedCenteredText(tr("volcanoClickQte"), w / 2, h * 0.14, w * 0.88, qteFontSize + 6);
+        ctx.font = "900 28px Arial, sans-serif";
+        ctx.fillText(Math.min(volcanoClickCount, VOLCANO_CLICK_QTE_TARGET) + " / " + VOLCANO_CLICK_QTE_TARGET, w / 2, h * 0.14 + 62);
+        ctx.restore();
+
+        if (volcanoTimer >= VOLCANO_CLICK_QTE_DURATION) beginVolcanoLanding();
+    }
+
+    function updateVolcanoLanding(dt, w, h) {
+        const t = Math.min(volcanoTimer / VOLCANO_LANDING_DURATION, 1);
+        cameraX = 0;
+        drawVolcanoBackground(w, h);
+
+        const startY = h * 0.42;
+        const fallT = Math.min(t / 0.6, 1);
+        const eased = fallT * fallT;
+        const cx = w * 0.5, cy = startY + (groundScreenY - startY) * eased;
+
+        if (fallT >= 1 && volcanoDustParticles.length === 0) {
+            spawnVolcanoDust(cx, groundScreenY);
+            sfxLand();
+        }
+        updateAndDrawVolcanoDust(dt);
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        drawTrousseSprite(56);
+        ctx.restore();
+
+        if (t >= 1) finishVolcanoSuccess();
+    }
+
+    function updateVolcanoFailFade(dt, w, h) {
+        drawAboveClouds(w, h, volcanoCloudDrift);
+        const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.42;
+        ctx.save();
+        ctx.translate(cx, cy);
+        drawTrousseSprite(56);
+        ctx.restore();
+
+        const t = Math.min(volcanoTimer / VOLCANO_FAIL_FADE_DURATION, 1);
+        ctx.fillStyle = "rgba(0,0,0," + t + ")";
+        ctx.fillRect(0, 0, w, h);
+
+        if (t >= 1) finishVolcanoFail();
+    }
+
+    function updateVolcanoCinematic(dt, now) {
+        const w = canvas.width / devicePixelRatio;
+        const h = canvas.height / devicePixelRatio;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+        groundScreenY = h * 0.68;
+        volcanoTimer += dt;
+
+        if (volcanoPhase === "zoom_in") updateVolcanoZoomIn(dt, w, h);
+        else if (volcanoPhase === "quake") updateVolcanoQuake(dt, w, h);
+        else if (volcanoPhase === "launch") updateVolcanoLaunch(dt, w, h);
+        else if (volcanoPhase === "ascend") updateVolcanoAscend(dt, w, h);
+        else if (volcanoPhase === "dodge_warn") updateVolcanoDodgeWarn(dt, w, h);
+        else if (volcanoPhase === "dodge_gap") updateVolcanoDodgeGap(dt, w, h);
+        else if (volcanoPhase === "click_qte") updateVolcanoClickQte(dt, w, h);
+        else if (volcanoPhase === "landing") updateVolcanoLanding(dt, w, h);
+        else if (volcanoPhase === "fail_fade") updateVolcanoFailFade(dt, w, h);
+    }
+
     // Boucle principale : appelée à chaque frame tant que l'écran de jeu est actif
     function gameLoop(now) {
         if (!screens.game.classList.contains("active")) return;
         if (!lastFrameTime) lastFrameTime = now;
         const dt = Math.min((now - lastFrameTime) / 1000, 0.032); // dt plafonné pour éviter les gros sauts
         lastFrameTime = now;
+
+        // Cinématique de déblocage des Volcans : machine à états entièrement
+        // à part (voir updateVolcanoCinematic), pour ne pas mélanger sa
+        // logique avec celle d'un lancer normal.
+        if (volcanoActive) {
+            updateVolcanoCinematic(dt, now);
+            requestAnimationFrame(gameLoop);
+            return;
+        }
 
         const w = canvas.width / devicePixelRatio;
         const h = canvas.height / devicePixelRatio;
@@ -2200,7 +3112,17 @@
             } else if (worldY <= 0 && vy < 0) {
                 // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
                 worldY = 0;
-                onLanded();
+                // Monde Volcans uniquement : 1 chance sur 4 de déraper à
+                // l'atterrissage (voir la phase "sliding" plus bas)
+                if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < 0.25) {
+                    slipStartWorldX = worldX;
+                    slipDistancePx = SCALE * (5 + Math.random() * 25); // 5 à 30m de bonus
+                    phaseTimer = 0;
+                    rotation = 0; rotSpeed = 0;
+                    state = "sliding";
+                } else {
+                    onLanded(false);
+                }
             } else {
                 // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
                 const targetCamera = worldX - w * 0.3;
@@ -2237,6 +3159,19 @@
             if (phaseTimer >= QTE_DURATION) {
                 advanceQteRing(false); // cet anneau a fini de rétrécir sans qu'on ait cliqué = raté
             }
+        } else if (state === "sliding") {
+            // Dérapage incontrôlé (monde Volcans) : la trousse continue de
+            // glisser/racler le sol sur SLIP_DURATION avant de vraiment s'arrêter
+            phaseTimer += dt;
+            const t = Math.min(phaseTimer / SLIP_DURATION, 1);
+            const eased = 1 - Math.pow(1 - t, 2); // ease-out : rapide puis ça freine
+            worldX = slipStartWorldX + slipDistancePx * eased;
+            cameraX = Math.max(0, worldX - w * 0.3);
+            document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
+            if (t >= 1) {
+                save.durability = Math.max(0, save.durability - 10);
+                onLanded(true);
+            }
         }
 
         updateMeterUI();
@@ -2244,6 +3179,8 @@
         screens.game.classList.toggle("in-space", inSpaceMode);
         if (inSpaceMode) {
             drawSpaceBackground(w, h);
+        } else if (save.currentWorld === "volcans") {
+            drawVolcanoBackground(w, h);
         } else {
             drawBackground(w, h);
         }
@@ -2420,10 +3357,30 @@
             en: { title: "Check out my other sites!", text: "Go to evyverse.vercel.app to discover my other projects!" },
         },
     ];
+
+    // Tutoriel spécifique montré une fois après la toute première réussite de
+    // la cinématique des Volcans (voir finishVolcanoSuccess) : réutilise le
+    // même carrousel/modal que le tutoriel principal (voir activeTutorialSlides
+    // ci-dessous) plutôt que de dupliquer le HTML/CSS pour une seule popup.
+    const VOLCANO_TUTORIAL_SLIDES = [
+        {
+            icon: "🌋",
+            fr: { title: "Bienvenue dans les Volcans !", text: "Ce monde remplace la cour d'école pour tes prochains lancers : ciel rouge, poussière, décor de volcans. Tu peux revenir à la Cour d'école (ou refaire cette cinématique) depuis le menu." },
+            en: { title: "Welcome to the Volcans!", text: "This world replaces the schoolyard for your next throws: red sky, dust, volcano scenery. You can switch back to Cour d'école (or replay this cutscene) from the menu." },
+        },
+        {
+            icon: "🛞",
+            fr: { title: "Durabilité et dérapages", text: "Ici, chaque atterrissage a 1 chance sur 4 de déraper : +5 à 30m de bonus, mais -10 de durabilité sur ta trousse. Répare-la à la Boutique (500$ les 10 points), ou clique sur ta trousse au menu pour voir son état." },
+            en: { title: "Durability and slides", text: "Here, every landing has a 1 in 4 chance to slide: +5 to 30m bonus distance, but -10 durability on your pencil case. Repair it in the Shop (500$ per 10 points), or click your pencil case at the menu to check its state." },
+        },
+    ];
+
     let tutorialStep = 0;
+    let activeTutorialSlides = TUTORIAL_SLIDES;
+    let activeTutorialFlagKey = "tutorialSeen";
 
     function renderTutorialSlide() {
-        const slide = TUTORIAL_SLIDES[tutorialStep];
+        const slide = activeTutorialSlides[tutorialStep];
         const localized = slide[save.lang] || slide.fr;
         document.getElementById("tutorial-icon").textContent = slide.icon;
         document.getElementById("tutorial-title").textContent = localized.title;
@@ -2431,31 +3388,42 @@
 
         const dots = document.getElementById("tutorial-dots");
         dots.innerHTML = "";
-        TUTORIAL_SLIDES.forEach((s, i) => {
+        activeTutorialSlides.forEach((s, i) => {
             const dot = document.createElement("div");
             dot.className = "tutorial-dot" + (i === tutorialStep ? " active" : "");
             dots.appendChild(dot);
         });
 
-        const isLast = tutorialStep === TUTORIAL_SLIDES.length - 1;
+        const isLast = tutorialStep === activeTutorialSlides.length - 1;
         document.getElementById("btn-tutorial-next").textContent = isLast ? tr("tutorialDone") : tr("tutorialNext");
     }
 
     function closeTutorial() {
         document.getElementById("tutorial-overlay").classList.remove("show");
-        save.tutorialSeen = true;
+        save[activeTutorialFlagKey] = true;
         persist();
     }
 
     function showTutorialIfNeeded() {
         if (save.tutorialSeen) return;
+        activeTutorialSlides = TUTORIAL_SLIDES;
+        activeTutorialFlagKey = "tutorialSeen";
+        tutorialStep = 0;
+        renderTutorialSlide();
+        document.getElementById("tutorial-overlay").classList.add("show");
+    }
+
+    function showVolcanoTutorial() {
+        if (save.volcanoTutorialSeen) return;
+        activeTutorialSlides = VOLCANO_TUTORIAL_SLIDES;
+        activeTutorialFlagKey = "volcanoTutorialSeen";
         tutorialStep = 0;
         renderTutorialSlide();
         document.getElementById("tutorial-overlay").classList.add("show");
     }
 
     document.getElementById("btn-tutorial-next").addEventListener("click", () => {
-        if (tutorialStep < TUTORIAL_SLIDES.length - 1) {
+        if (tutorialStep < activeTutorialSlides.length - 1) {
             tutorialStep++;
             renderTutorialSlide();
         } else {
@@ -2525,9 +3493,34 @@
             localStorage.removeItem(SAVE_KEY);
             location.reload();
         },
+        // Pratique pour tester la cinématique des Volcans (~40s) sans avoir à
+        // attendre chaque phase en temps réel : volcanoJump("quake") saute
+        // directement dedans. Phases valides : zoom_in, quake, launch, ascend,
+        // dodge_warn, dodge_gap, click_qte, landing, fail_fade.
+        volcanoState() {
+            console.log(JSON.stringify({ volcanoActive, volcanoPhase, volcanoTimer, volcanoLane, volcanoTargetLane, volcanoRockIndex, volcanoLives, volcanoClickCount }));
+        },
+        volcanoJump(phase) {
+            if (!volcanoActive) { console.warn("La cinématique des Volcans n'est pas en cours."); return; }
+            volcanoPhase = phase;
+            volcanoTimer = 0;
+            if (phase === "dodge_warn") volcanoTargetLane = volcanoLane;
+            console.log("🌋 Phase :", phase);
+        },
+        volcanoResetCooldown() {
+            save.volcanoFailUntil = 0;
+            persist();
+            console.log("🌋 Cooldown des Volcans réinitialisé.");
+        },
+        setDurability(n) {
+            save.durability = Math.max(0, Math.min(100, n));
+            persist();
+            if (screens.shop.classList.contains("active")) refreshShop();
+            console.log("🔧 Durabilité :", save.durability);
+        },
     };
     console.log(
-        "%c🎮 Triches dispo dans window.cheats : addMoney(n), unlockSkin(id), unlockAllSkins(), unlockTrail(id), setLevels(p, v), show(), resetSave()",
+        "%c🎮 Triches dispo dans window.cheats : addMoney(n), unlockSkin(id), unlockAllSkins(), unlockTrail(id), setLevels(p, v), show(), resetSave(), volcanoState(), volcanoJump(phase)",
         "color:#ffd23f; font-weight:bold;"
     );
 
