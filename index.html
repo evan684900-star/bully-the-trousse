@@ -97,6 +97,17 @@
             text-align: center;
             text-shadow: 0 3px 0 rgba(0,0,0,0.25);
         }
+        /* Numéro de version, cliquable pour ouvrir le journal des changements */
+        .version-tag {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 800;
+            color: #000;
+            text-shadow: none;
+            cursor: pointer;
+            text-decoration: underline;
+            margin-bottom: 2px;
+        }
         .title-card h1 {
             margin: 0;
             font-size: clamp(28px, 6vw, 46px);
@@ -689,6 +700,15 @@
         .dura-bar { height: 12px; border-radius: 999px; background: rgba(0,0,0,0.3); overflow: hidden; margin: 10px 0 2px; }
         .dura-bar > div { height: 100%; background: linear-gradient(90deg, #ff6b6b, #6bffb0); }
         .info-box .btn { margin-top: 18px; width: 100%; }
+        /* Deux boutons côte à côte (popup "refaire la cinématique ?") */
+        .replay-buttons { display: flex; gap: 10px; margin-top: 18px; }
+        .replay-buttons .btn { margin-top: 0; width: auto; flex: 1; }
+        /* Journal des changements : liste scrollable si elle s'allonge un jour */
+        .changelog-box { max-height: 80vh; overflow-y: auto; }
+        .changelog-entry + .changelog-entry { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,0.18); }
+        .changelog-entry h3 { margin: 0 0 8px; font-size: 16px; color: var(--accent); }
+        .changelog-entry .changelog-heading { margin: 10px 0 4px; font-weight: 800; font-size: 13px; }
+        .changelog-entry ul { margin: 0; padding-left: 20px; font-size: 13.5px; line-height: 1.55; }
         #trousse-preview-wrap { cursor: pointer; }
         /* Petit mot en bas du menu après un échec dans la cinématique */
         #menu-help {
@@ -713,6 +733,8 @@
     <section id="screen-menu" class="screen active">
         <div class="menu-wrap">
             <div class="title-card">
+                <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
+                <div class="version-tag" id="version-tag">v3.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -854,8 +876,29 @@
         </div>
     </div>
 
+    <!-- Proposé quand on reclique sur "Volcans" une fois déjà débloqué -->
+    <div class="modal-overlay" id="volcan-replay-modal">
+        <div class="info-box">
+            <h2 data-i18n="volcanReplayTitle">🌋 Refaire la cinématique ?</h2>
+            <p data-i18n="volcanReplayText">Tu peux revivre la cinématique de déblocage, ou aller directement au monde Volcans.</p>
+            <div class="replay-buttons">
+                <button class="btn" id="btn-volcan-replay-yes" data-i18n="volcanReplayYes">🔁 Refaire</button>
+                <button class="btn secondary" id="btn-volcan-replay-no" data-i18n="volcanReplayNo">🌋 Juste y aller</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Journal des changements (clic sur le numéro de version au menu) -->
+    <div class="modal-overlay" id="changelog-modal">
+        <div class="info-box changelog-box">
+            <h2 data-i18n="changelogTitle">📋 Journal des changements</h2>
+            <div id="changelog-list"></div>
+            <button class="btn" id="btn-changelog-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+
     <!-- Son du tremblement de terre de la cinématique -->
-    <audio id="sfx-quake" src="tremblementdeterre.m4a" preload="auto"></audio>
+    <audio id="sfx-quake" src="tremblementdeterre.mp3" preload="auto"></audio>
 
     <div class="toast" id="toast"></div>
 
@@ -928,7 +971,7 @@
         tutorialNext: { fr: "Suivant", en: "Next" },
         tutorialDone: { fr: "C'est parti !", en: "Let's go!" },
         // --- Monde Volcan : cinématique, dérapages, durabilité ---
-        volcanoRetry: { fr: "🌋 Le volcan gronde encore... réessaie dans ", en: "🌋 The volcano is still rumbling... try again in " },
+        volcanoRetry: { fr: "🌋 la trousse se repose... réessaie dans ", en: "🌋 The volcano is still rumbling... try again in " },
         cineClickPrompt: { fr: "Clique vite pour reprendre ton équilibre !", en: "Click fast to regain your balance!" },
         cineUnlocked: { fr: "MONDE VOLCANS DÉBLOQUÉ", en: "VOLCANO WORLD UNLOCKED" },
         menuHelp: { fr: "tu veux de l'aide ?", en: "need some help?" },
@@ -952,6 +995,13 @@
         },
         btnOk: { fr: "OK", en: "OK" },
         btnUnderstood: { fr: "Compris !", en: "Got it!" },
+        volcanReplayTitle: { fr: "🌋 Refaire la cinématique ?", en: "🌋 Replay the cutscene?" },
+        volcanReplayText: { fr: "Tu peux revivre la cinématique de déblocage, ou aller directement au monde Volcans.", en: "You can relive the unlock cutscene, or go straight to the Volcans world." },
+        volcanReplayYes: { fr: "🔁 Refaire", en: "🔁 Replay" },
+        volcanReplayNo: { fr: "🌋 Juste y aller", en: "🌋 Just go there" },
+        changelogTitle: { fr: "📋 Journal des changements", en: "📋 Changelog" },
+        changelogMajor: { fr: "Mise à jour majeure :", en: "Major update:" },
+        changelogMinor: { fr: "Ajouts mineurs :", en: "Minor additions:" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -1119,6 +1169,23 @@
 
     let save = loadSave();
 
+    // Migration : une version précédente du monde Volcan utilisait des noms de
+    // champs différents (ex: "volcanoUnlocked" au lieu de "volcanUnlocked").
+    // Sans ça, quelqu'un qui a testé cette ancienne version verrait le monde
+    // toujours marqué "verrouillé" malgré une cinématique déjà réussie.
+    // Appelée à la fois pour la sauvegarde locale (loadSave) et pour celle
+    // reçue du cloud (syncCloudSaveOnLogin) : les deux chemins peuvent
+    // renvoyer d'anciens noms de champs.
+    function migrateLegacyVolcanFields(merged, raw) {
+        if (!raw) return merged;
+        if (!merged.volcanUnlocked && raw.volcanoUnlocked) merged.volcanUnlocked = true;
+        if (!merged.volcanTutorialSeen && raw.volcanoTutorialSeen) merged.volcanTutorialSeen = true;
+        if (!merged.volcanHelpAvailable && raw.volcanoEverFailed && !raw.volcanoUnlocked) merged.volcanHelpAvailable = true;
+        if (!merged.volcanFailedUntil && raw.volcanoFailUntil) merged.volcanFailedUntil = raw.volcanoFailUntil;
+        if (!merged.playTime && raw.playtimeSeconds) merged.playTime = raw.playtimeSeconds;
+        return merged;
+    }
+
     function loadSave() {
         try {
             const raw = localStorage.getItem(SAVE_KEY);
@@ -1126,7 +1193,7 @@
             const parsed = JSON.parse(raw);
             // Object.assign avec defaultSave() en base : si on ajoute un nouveau
             // champ de sauvegarde plus tard, les anciennes parties ne cassent pas.
-            return Object.assign(defaultSave(), parsed);
+            return migrateLegacyVolcanFields(Object.assign(defaultSave(), parsed), parsed);
         } catch (e) {
             return defaultSave();
         }
@@ -1304,6 +1371,13 @@
                 if (!playable) {
                     showToast("🔒 " + w.name + tr("worldLocked"));
                     sfxError();
+                    return;
+                }
+                // Le monde Volcan est déjà débloqué : on propose de refaire la
+                // cinématique plutôt que de switcher tout de suite (voir les
+                // boutons #btn-volcan-replay-yes/no plus bas).
+                if (w.id === "volcans") {
+                    document.getElementById("volcan-replay-modal").classList.add("show");
                     return;
                 }
                 save.currentWorld = w.id;
@@ -2925,7 +2999,8 @@
                 break;
             case "descent":
                 cineCloudScroll -= 620 * dt;
-                if (cineClicks >= CINE_CLICK_TARGET || cineT >= CINE_TIMES.descent) cineSetPhase("landing");
+                if (cineClicks >= CINE_CLICK_TARGET) cineSetPhase("landing");
+                else if (cineT >= CINE_TIMES.descent) cineDie(); // pas assez cliqué à temps : échec, comme les roches
                 break;
             case "landing": {
                 const p = c01(cineT / CINE_TIMES.landing);
@@ -3321,8 +3396,13 @@
         if (!db || !currentUser) return;
         db.collection("users").doc(currentUser.uid).get().then((doc) => {
             if (doc.exists) {
-                save = Object.assign(defaultSave(), doc.data());
+                save = migrateLegacyVolcanFields(Object.assign(defaultSave(), doc.data()), doc.data());
                 localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+                if (save.volcanUnlocked) {
+                    const volcanWorld = WORLDS.find(w => w.id === "volcans");
+                    if (volcanWorld) volcanWorld.unlocked = true;
+                }
+                buildWorldsRow();
                 refreshMenu();
             } else {
                 if (!save.pseudo) save.pseudo = "Trousse-" + Math.floor(1000 + Math.random() * 9000);
@@ -3552,8 +3632,61 @@
     document.getElementById("btn-help-close").addEventListener("click", () => {
         document.getElementById("help-modal").classList.remove("show");
     });
+
+    // Popup "refaire la cinématique ?" (voir buildWorldsRow) : "Refaire" la
+    // relance depuis le début, "Juste y aller" sélectionne le monde Volcans
+    // sans repasser par la cinématique.
+    document.getElementById("btn-volcan-replay-yes").addEventListener("click", () => {
+        document.getElementById("volcan-replay-modal").classList.remove("show");
+        startVolcanoCinematic();
+    });
+    document.getElementById("btn-volcan-replay-no").addEventListener("click", () => {
+        document.getElementById("volcan-replay-modal").classList.remove("show");
+        save.currentWorld = "volcans";
+        persist();
+        sfxCharge();
+        buildWorldsRow();
+    });
+
+    // Journal des changements : un item par version, avec ses ajouts majeurs
+    // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
+    // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
+    // #version-tag synchronisés avec le numéro le plus récent).
+    const VERSION_NUMBER = "3.1";
+    const CHANGELOG = [
+        {
+            version: "3.1",
+            major: [
+                { fr: "Ajout d'un nouveau monde !", en: "Added a new world!" },
+                { fr: "Ajout d'un journal des changements", en: "Added a changelog" },
+            ],
+            minor: [
+                { fr: "Correction des bugs liés au nouveau monde", en: "Fixed bugs related to the new world" },
+            ],
+        },
+    ];
+    function renderChangelog() {
+        document.getElementById("changelog-list").innerHTML = CHANGELOG.map((entry) => {
+            const majorItems = entry.major.map((i) => "<li>" + (i[save.lang] || i.fr) + "</li>").join("");
+            const minorItems = entry.minor.map((i) => "<li>" + (i[save.lang] || i.fr) + "</li>").join("");
+            return '<div class="changelog-entry">' +
+                "<h3>v" + entry.version + "</h3>" +
+                (entry.major.length ? '<p class="changelog-heading">' + tr("changelogMajor") + "</p><ul>" + majorItems + "</ul>" : "") +
+                (entry.minor.length ? '<p class="changelog-heading">' + tr("changelogMinor") + "</p><ul>" + minorItems + "</ul>" : "") +
+                "</div>";
+        }).join("");
+    }
+    document.getElementById("version-tag").textContent = "v" + VERSION_NUMBER;
+    document.getElementById("version-tag").addEventListener("click", () => {
+        renderChangelog();
+        document.getElementById("changelog-modal").classList.add("show");
+    });
+    document.getElementById("btn-changelog-close").addEventListener("click", () => {
+        document.getElementById("changelog-modal").classList.remove("show");
+    });
+
     // Clic en dehors de la boîte = fermeture
-    ["trousse-modal", "help-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
