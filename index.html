@@ -2667,6 +2667,9 @@
         return [Math.round(lerp(c1[0], c2[0], t)), Math.round(lerp(c1[1], c2[1], t)), Math.round(lerp(c1[2], c2[2], t))];
     }
 
+    // Triangle "⚠️ !" clignotant (voir l'appel dans updateVolcanoDodgeWarn,
+    // qui ne dessine que si Math.sin(...) > 0) posé en bas de l'écran, dans la
+    // colonne visée par la roche - le signal que le joueur doit lire.
     function drawWarningTriangle(x, y) {
         ctx.save();
         ctx.fillStyle = "#ffcc33";
@@ -2711,6 +2714,8 @@
         });
     }
 
+    // Roche volcanique (cercle sombre + lueur de lave) qui monte du bas de
+    // l'écran vers la trousse pendant l'esquive (voir updateVolcanoDodgeWarn).
     function drawVolcanoRock(x, y, r) {
         ctx.save();
         ctx.fillStyle = "#3a2a22";
@@ -2761,6 +2766,9 @@
         }
     }
 
+    // Gerbe de particules orangées (explosion du décollage, voir
+    // updateVolcanoLaunch) : éclatent dans toutes les directions puis
+    // s'estompent - visuel uniquement, aucun impact sur le gameplay.
     function spawnVolcanoExplosion(x, y) {
         for (let i = 0; i < 26; i++) {
             const angle = Math.random() * Math.PI * 2;
@@ -2780,6 +2788,9 @@
         });
     }
 
+    // Petit nuage de poussière (couleur terre/rouille) soulevé à l'atterrissage
+    // dans le cratère, voir updateVolcanoLanding - même logique de particules
+    // que spawnVolcanoExplosion mais plus lent et vers le haut en éventail.
     function spawnVolcanoDust(x, y) {
         for (let i = 0; i < 18; i++) {
             const angle = Math.random() * Math.PI - Math.PI; // vers le haut, en éventail
@@ -2897,6 +2908,12 @@
         showScreen("menu");
     }
 
+    // Phase 1/9 (visuel) : le décor de la cour d'école (drawBackground, celui
+    // du jeu normal) est zoomé progressivement autour de la trousse pendant
+    // que le menu, resté visible par-dessus (voir startVolcanoCinematic),
+    // s'estompe en fondu. volcanoZoomScale grimpe de 1 à 1.7 et n'est jamais
+    // remis à 1 ensuite : les phases suivantes (secousse, décollage) le
+    // réutilisent tel quel pour garder la caméra "proche".
     function updateVolcanoZoomIn(dt, w, h) {
         const t = Math.min(volcanoTimer / VOLCANO_ZOOM_DURATION, 1);
         volcanoZoomScale = 1 + t * 0.7;
@@ -2924,6 +2941,12 @@
         }
     }
 
+    // Phase 2/9 (visuel) : même cour zoomée que updateVolcanoZoomIn, mais avec
+    // un décalage aléatoire (shakeX/shakeY, amplitude qui monte sur les 0.6
+    // premières secondes) appliqué à TOUT le dessin - décor + trousse - pour
+    // simuler la secousse. Dure VOLCANO_QUAKE_DURATION (9s, pile la durée du
+    // fichier audio). Le son n'est déclenché qu'une fois, à la toute première
+    // frame de cette phase (volcanoQuakePlayed), pas avant.
     function updateVolcanoQuake(dt, w, h) {
         if (!volcanoQuakePlayed) {
             volcanoQuakePlayed = true;
@@ -2954,9 +2977,11 @@
         }
     }
 
-    // Décollage rapide et violent : la caméra reste zoomée/proche (même
-    // transform que la secousse, volcanoZoomScale n'est jamais réinitialisé)
-    // au lieu de revenir brutalement à un plan large.
+    // Phase 3/9 (visuel) : décollage rapide et violent (0.55s, easing
+    // quintique très marqué en fin de course) - la caméra reste zoomée/proche
+    // (même transform que la secousse, volcanoZoomScale n'est jamais
+    // réinitialisé) au lieu de revenir brutalement à un plan large. Explosion
+    // de particules à l'instant du décollage (voir spawnVolcanoExplosion).
     function updateVolcanoLaunch(dt, w, h) {
         const t = Math.min(volcanoTimer / VOLCANO_LAUNCH_DURATION, 1);
         const cx = w * 0.5, cy = groundScreenY;
@@ -2992,9 +3017,11 @@
         }
     }
 
-    // Traversée des nuages : même principe que la transition cour <-> espace
-    // (drawCloudSweep) mais en continu, plus dense et bien plus longue - on
-    // "monte à travers" plutôt que de juste cacher un changement de décor.
+    // Phase 4/9 (visuel) : traversée des nuages, même principe que la
+    // transition cour <-> espace (drawCloudSweep) mais en continu, plus dense
+    // et bien plus longue (VOLCANO_ASCEND_DURATION = 4s) - on "monte à
+    // travers" plutôt que de juste cacher un changement de décor. La trousse
+    // flotte/tangue légèrement (sin) pour ne pas rester figée à l'écran.
     function updateVolcanoAscend(dt, w, h) {
         volcanoCloudDrift += dt * 190;
         drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
@@ -3009,9 +3036,11 @@
         if (t >= 1) beginVolcanoDodgeRock();
     }
 
-    // Les roches viennent D'EN BAS (on est au-dessus des nuages, elles montent
-    // vers la trousse) et le triangle d'alerte est en bas de l'écran, dans la
-    // colonne où la roche va arriver - pas au-dessus de la trousse.
+    // Phase 5/9 (visuel), répétée VOLCANO_ROCK_COUNT (5) fois : les roches
+    // viennent D'EN BAS (on est au-dessus des nuages, elles montent vers la
+    // trousse) et le triangle d'alerte est en bas de l'écran, dans la colonne
+    // où la roche va arriver - pas au-dessus de la trousse. Le triangle
+    // clignote (Math.sin) pendant toute la fenêtre de réaction de 0.8s.
     function updateVolcanoDodgeWarn(dt, w, h) {
         volcanoCloudDrift += dt * 190;
         drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
@@ -3034,6 +3063,12 @@
         if (volcanoTimer >= VOLCANO_DODGE_WARN_DURATION) resolveVolcanoRockHit();
     }
 
+    // Phase 6/9 (visuel) : courte pause entre deux roches. Si la précédente a
+    // touché (mais qu'il restait une vie), la trousse "vacille" brièvement -
+    // wobbleOffset est un sinus amorti (l'amplitude retombe avec volcanoWobble
+    // qui décroît vers 0) plutôt qu'un aller-retour linéaire, pour un effet
+    // plus organique. Rien à afficher si la roche a été esquivée (wobbleOffset
+    // reste à 0 dans ce cas, voir resolveVolcanoRockHit).
     function updateVolcanoDodgeGap(dt, w, h) {
         volcanoCloudDrift += dt * 190;
         drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
@@ -3054,6 +3089,10 @@
         }
     }
 
+    // Phase 7/9 (visuel) : mêmes nuages plein écran que l'esquive, mais qui
+    // défilent plus vite (dt*260 contre dt*190) et virent progressivement au
+    // rouge (redness = 0 -> 1 sur toute la durée du QTE, voir drawCloudsFullscreen)
+    // pour donner un sentiment d'urgence croissante.
     function updateVolcanoClickQte(dt, w, h) {
         volcanoCloudDrift += dt * 260;
         const redness = Math.min(volcanoTimer / VOLCANO_CLICK_QTE_DURATION, 1);
@@ -3086,6 +3125,12 @@
         if (volcanoTimer >= VOLCANO_CLICK_QTE_DURATION) beginVolcanoLanding();
     }
 
+    // Phase 8/9 (visuel) : le décor bascule ICI sur le rendu du monde Volcans
+    // (drawVolcanoBackground - ciel rouge, volcans, sol rougi) puisque
+    // save.currentWorld a déjà été mis à "volcans" par beginVolcanoLanding.
+    // La trousse tombe (easing quadratique, "fallT") jusqu'au sol, puis une
+    // volée de poussière est déclenchée une seule fois à l'impact
+    // (volcanoDustParticles.length === 0 sert de garde anti-répétition).
     function updateVolcanoLanding(dt, w, h) {
         const t = Math.min(volcanoTimer / VOLCANO_LANDING_DURATION, 1);
         cameraX = 0;
@@ -3110,6 +3155,11 @@
         if (t >= 1) finishVolcanoSuccess();
     }
 
+    // Phase 9/9 (visuel, uniquement en cas d'échec au 3e coup) : le décor de
+    // nuages reste figé (volcanoCloudDrift n'avance plus, cette phase ne
+    // l'incrémente pas) pendant qu'un voile noir grandit par-dessus tout le
+    // reste (rgba(0,0,0,t), t: 0 -> 1) sur VOLCANO_FAIL_FADE_DURATION (3s),
+    // jusqu'à l'écran totalement noir avant le retour au menu.
     function updateVolcanoFailFade(dt, w, h) {
         drawCloudsFullscreen(w, h, volcanoCloudDrift, 0);
         const cx = w * 0.5 + volcanoLane * VOLCANO_LANE_OFFSET, cy = h * 0.5;
@@ -3125,6 +3175,12 @@
         if (t >= 1) finishVolcanoFail();
     }
 
+    // Dispatcheur visuel de la cinématique, appelé une fois par frame depuis
+    // gameLoop (voir le branchement volcanoActive plus bas) tant qu'elle
+    // tourne : prépare le canvas (transform, clear, ligne d'horizon) puis
+    // délègue tout le dessin de la frame à la fonction update*() de la phase
+    // en cours - c'est cette fonction-ci qui fait le lien entre la machine à
+    // états (volcanoPhase) et les dix update*() ci-dessus qui dessinent réellement.
     function updateVolcanoCinematic(dt, now) {
         const w = canvas.width / devicePixelRatio;
         const h = canvas.height / devicePixelRatio;
