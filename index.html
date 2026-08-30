@@ -82,6 +82,120 @@
         /* ---------- ÉCRAN MENU ---------- */
         #screen-menu {
             background: linear-gradient(180deg, var(--sky-top), var(--sky-bottom) 60%, var(--ground) 60%, var(--ground-dark) 100%);
+            transition: background 1.5s ease;
+        }
+        /* Monde Volcans sélectionné : ciel et sol rougis par la poussière,
+           cohérent avec le décor du jeu (voir cineDrawArrival/drawVolcanoBackground) */
+        html[data-world="volcans"] #screen-menu {
+            background: linear-gradient(180deg, #5c1b18, #b0451f 55%, #6b2a1e 60%, #3d1310 100%);
+        }
+
+        /* ---------- ANIMATION SOLEIL / LUNE (mode nuit) ----------
+           Même bloc de markup dupliqué dans le menu et l'écran de jeu : la
+           position du soleil/lune et l'opacité du voile nocturne changent
+           juste avec [data-theme], donc la transition CSS anime automatiquement
+           la "levée"/"chute" à chaque bascule du thème, sans boucle JS. Posé
+           APRÈS le fond (gradient du menu, ou le <canvas> du jeu) et AVANT le
+           reste du contenu de l'écran, pour rester visible derrière les
+           boutons/HUD. */
+        .sky-anim {
+            position: absolute;
+            left: 0; right: 0; top: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+        #screen-menu .sky-anim { bottom: 40%; }
+        #screen-game .sky-anim { bottom: 32%; }
+
+        .sky-anim .tint {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(6,10,34,0.75), rgba(18,26,64,0.3));
+            opacity: 0;
+            transition: opacity 2s ease;
+        }
+        [data-theme="dark"] .sky-anim .tint { opacity: 1; }
+
+        .sky-anim .star {
+            position: absolute;
+            width: 3px; height: 3px;
+            border-radius: 50%;
+            background: #fff;
+            opacity: 0;
+            transition: opacity 1.6s ease 0.3s;
+            box-shadow: 0 0 4px 1px rgba(255,255,255,0.8);
+        }
+        [data-theme="dark"] .sky-anim .star { opacity: 0.9; }
+
+        .sky-anim .celestial {
+            position: absolute;
+            left: 68%;
+            width: 48px;
+            height: 48px;
+            margin-left: -24px;
+            border-radius: 50%;
+            top: 120%;
+            opacity: 0;
+            transition: top 2.4s cubic-bezier(.65,0,.35,1), opacity 1.8s ease;
+        }
+        .sky-anim .sun {
+            background: radial-gradient(circle at 35% 35%, #fff6c8, #ffd23f 55%, #ffa620 100%);
+            box-shadow: 0 0 46px 14px rgba(255,190,60,0.55);
+        }
+        .sky-anim .moon {
+            background: radial-gradient(circle at 35% 35%, #ffffff, #e6ebf7 60%, #b9c2da 100%);
+            box-shadow:
+                0 0 32px 8px rgba(220,225,255,0.45),
+                inset -10px -6px 0 -2px rgba(160,168,190,0.55),
+                inset 9px 11px 0 -7px rgba(160,168,190,0.45),
+                inset -5px 15px 0 -9px rgba(160,168,190,0.4);
+        }
+        [data-theme="light"] .sky-anim .sun { top: 12%; opacity: 1; }
+        [data-theme="dark"] .sky-anim .moon { top: 10%; opacity: 1; }
+        /* Easter egg espace : pas de lune à faire lever, on est littéralement dessus */
+        #screen-game.in-space .sky-anim .moon { opacity: 0; }
+
+        /* Monde Volcans : lune de sang la nuit, soleil à peine visible et
+           rougi par la poussière en suspension dans l'air le jour */
+        html[data-world="volcans"] .sky-anim .moon {
+            background: radial-gradient(circle at 35% 35%, #ffb199, #c23b2b 55%, #6e1810 100%);
+            box-shadow:
+                0 0 34px 10px rgba(200,50,30,0.5),
+                inset -10px -6px 0 -2px rgba(90,15,10,0.55),
+                inset 9px 11px 0 -7px rgba(90,15,10,0.45),
+                inset -5px 15px 0 -9px rgba(90,15,10,0.4);
+        }
+        html[data-world="volcans"][data-theme="light"] .sky-anim .sun {
+            opacity: 0.4;
+            background: radial-gradient(circle at 35% 35%, #ff8f6b, #c1401f 60%, #7a2210 100%);
+            box-shadow: 0 0 24px 8px rgba(200,60,20,0.35);
+        }
+
+        /* Sur petit écran (mobile), on réduit, on colle au coin et on allège
+           la lueur pour éviter que ça chevauche le titre (menu) ou la pastille
+           distance (jeu). Placé en dernier pour gagner sur les règles ci-dessus
+           (même spécificité, la cascade tranche à l'ordre). */
+        @media (max-width: 480px) {
+            .sky-anim .celestial {
+                left: 90%;
+                width: 30px;
+                height: 30px;
+                margin-left: -15px;
+            }
+            .sky-anim .sun { box-shadow: 0 0 18px 6px rgba(255,190,60,0.45); }
+            .sky-anim .moon {
+                box-shadow:
+                    0 0 14px 4px rgba(220,225,255,0.4),
+                    inset -6px -4px 0 -1px rgba(160,168,190,0.55),
+                    inset 6px 7px 0 -5px rgba(160,168,190,0.45);
+            }
+            [data-theme="light"] .sky-anim .sun { top: 3%; }
+            [data-theme="dark"] .sky-anim .moon { top: 3%; }
+            html[data-world="volcans"] .sky-anim .moon { box-shadow: 0 0 14px 4px rgba(200,50,30,0.45); }
+            html[data-world="volcans"][data-theme="light"] .sky-anim .sun { box-shadow: 0 0 16px 5px rgba(200,60,20,0.3); }
+            /* Sur l'écran de jeu, le coin est pris par les pastilles $ / distance
+               du HUD : on recentre pour rester dans l'espace libre entre les deux */
+            #screen-game .sky-anim .celestial { left: 50%; margin-left: -15px; }
         }
         .menu-wrap {
             position: absolute;
@@ -731,10 +845,21 @@
 
     <!-- ÉCRAN MENU -->
     <section id="screen-menu" class="screen active">
+        <div class="sky-anim" aria-hidden="true">
+            <div class="tint"></div>
+            <div class="star" style="left:15%; top:18%;"></div>
+            <div class="star" style="left:28%; top:8%;"></div>
+            <div class="star" style="left:70%; top:14%;"></div>
+            <div class="star" style="left:82%; top:28%;"></div>
+            <div class="star" style="left:50%; top:6%;"></div>
+            <div class="star" style="left:90%; top:10%;"></div>
+            <div class="celestial sun"></div>
+            <div class="celestial moon"></div>
+        </div>
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.2</div>
+                <div class="version-tag" id="version-tag">v3.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -760,6 +885,17 @@
     <!-- ÉCRAN DE JEU -->
     <section id="screen-game" class="screen">
         <canvas id="game-canvas"></canvas>
+        <div class="sky-anim" aria-hidden="true">
+            <div class="tint"></div>
+            <div class="star" style="left:15%; top:18%;"></div>
+            <div class="star" style="left:28%; top:8%;"></div>
+            <div class="star" style="left:70%; top:14%;"></div>
+            <div class="star" style="left:82%; top:28%;"></div>
+            <div class="star" style="left:50%; top:6%;"></div>
+            <div class="star" style="left:90%; top:10%;"></div>
+            <div class="celestial sun"></div>
+            <div class="celestial moon"></div>
+        </div>
         <button class="btn secondary small back-btn" id="btn-game-back" data-i18n="btnBackMenu">← Menu</button>
         <div class="hud-top">
             <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
@@ -781,6 +917,8 @@
             <h2 data-i18n="resultDistanceTitle">Distance parcourue</h2>
             <div class="distance"><span id="result-distance">0</span> m</div>
             <div class="earn">+<span id="result-earn">0</span> $</div>
+            <!-- Multiplicateur de la Trousse Pièce, quand il se déclenche (voir onLanded) -->
+            <div id="result-coin" style="display:none; color:var(--accent); font-size:13px; font-weight:800; max-width:280px; margin:6px auto 0;"></div>
             <!-- Message rouge affiché uniquement après un dérapage (monde Volcan) -->
             <div id="result-skid" style="display:none; color:#ff6b6b; font-size:12.5px; font-weight:700; line-height:1.45; max-width:280px; margin:8px auto 0;"></div>
             <div class="buttons">
@@ -793,7 +931,7 @@
         <div class="coin-popup" id="coin-popup">
             <canvas id="coin-popup-canvas" width="200" height="200"></canvas>
             <div id="coin-popup-text">x2</div>
-            <div id="coin-popup-jackpot">t'as eu un fois 5 !?! prend une capture d'écran !!</div>
+            <div id="coin-popup-jackpot">t'as eu un fois 5 !?! prend une capture d'écran !! (prend en 5 du coup)</div>
         </div>
         <!-- Surcouche de la cinématique du monde Volcan (voir section 9bis) -->
         <div id="cine-ui">
@@ -1313,6 +1451,13 @@
         applyTheme();
     });
 
+    // Reflète le monde actuellement sélectionné sur <html> pour que le CSS
+    // (ciel du menu, couleurs lune/soleil, voir .sky-anim) puisse s'y adapter.
+    function applyWorldTheme() {
+        document.documentElement.setAttribute("data-world", save.currentWorld);
+    }
+    applyWorldTheme();
+
     /* ============ 6. NAVIGATION ENTRE LES 3 ÉCRANS ============ */
     const screens = {
         menu: document.getElementById("screen-menu"),
@@ -1356,6 +1501,7 @@
     // tant qu'il n'a pas été découvert, mais rester cliquable est volontaire :
     // c'est ce clic qui lance la cinématique (voir startVolcanoCinematic).
     function buildWorldsRow() {
+        applyWorldTheme();
         const row = document.getElementById("worlds-row");
         row.innerHTML = "";
         WORLDS.forEach((w) => {
@@ -1693,6 +1839,8 @@
     let rotation = 0;     // angle de rotation actuel de la trousse (radians)
     let rotSpeed = 0;     // vitesse de rotation du lancer en cours (radians/s)
     let cameraX = 0;      // décalage de caméra pour suivre la trousse pendant le vol
+    let cameraY = 0;       // pareil, mais en hauteur : évite que la trousse sorte du cadre par le haut sur un lancer puissant
+    const VERTICAL_SAFE_TOP = 90; // marge (px) toujours laissée entre le haut de l'écran et la trousse une fois la caméra en action
     let t0 = 0;           // horodatage du début de la phase en cours (charge / précision)
     let lastFrameTime = 0;
     let lockedPower = 0;    // puissance verrouillée (0.4 à 1.0) lors du 1er clic
@@ -1724,6 +1872,7 @@
         vx = 0; vy = 0;
         rotation = 0;
         cameraX = 0;
+        cameraY = 0;
         spaceEggTriggered = false;
         inSpaceMode = false;
         phaseTimer = 0;
@@ -1732,6 +1881,7 @@
         trailPoints = [];
         didSkid = false;
         document.getElementById("result-skid").style.display = "none";
+        document.getElementById("result-coin").style.display = "none";
         document.getElementById("qte-wrap").classList.remove("show");
         document.getElementById("coin-popup").classList.remove("show", "fading");
         resultPanel.classList.remove("show");
@@ -1920,9 +2070,15 @@
                 if (roll < acc) { coinMultiplier = m.value; break; }
             }
         }
+        const coinEl = document.getElementById("result-coin");
         if (coinMultiplier) {
+            const earnBeforeCoin = earn;
             earn = Math.round(earn * coinMultiplier);
             showCoinPopup(coinMultiplier);
+            coinEl.textContent = "🪙 Multiplicateur x" + coinMultiplier + " ! (+" + (earn - earnBeforeCoin) + "$ grâce au bonus)";
+            coinEl.style.display = "block";
+        } else {
+            coinEl.style.display = "none";
         }
 
         save.money += earn;
@@ -2301,9 +2457,11 @@
 
     // Convertit une position "monde" (worldX/worldY) en position à l'écran,
     // en tenant compte du décalage de caméra et du fait que worldY augmente
-    // vers le haut alors que l'écran augmente vers le bas.
+    // vers le haut alors que l'écran augmente vers le bas. cameraY suit la
+    // trousse en hauteur (voir gameLoop) pour qu'un lancer très puissant ne
+    // la fasse jamais sortir du cadre par le haut.
     function worldToScreen(x, y) {
-        return { sx: x - cameraX, sy: groundScreenY - y };
+        return { sx: x - cameraX, sy: groundScreenY - y + cameraY };
     }
 
     // Dessine la traînée derrière la trousse à partir des positions récentes
@@ -2416,6 +2574,8 @@
         const h = canvas.height / devicePixelRatio;
         ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
         ctx.clearRect(0, 0, w, h);
+        // Pas de lune à faire "lever" quand on est déjà dessus (easter egg espace)
+        screens.game.classList.toggle("in-space", inSpaceMode);
 
         if (state === "flying") {
             // intégration physique simple (méthode d'Euler) :
@@ -2449,6 +2609,10 @@
                 // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
                 const targetCamera = worldX - w * 0.3;
                 cameraX = Math.max(0, targetCamera);
+                // ...et pareil en hauteur : sans ça, un lancer assez puissant fait
+                // sortir la trousse par le haut de l'écran avant même l'apogée.
+                const groundY = h * 0.68;
+                cameraY = Math.max(0, VERTICAL_SAFE_TOP - groundY + worldY);
                 document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
             }
         } else if (state === "skidding") {
@@ -3652,8 +3816,17 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.2";
+    const VERSION_NUMBER = "3.3";
     const CHANGELOG = [
+        {
+            version: "3.3",
+            major: [],
+            minor: [
+                { fr: "Animation du soleil et de la lune restaurée (avait disparu par erreur)", en: "Sun and moon animation restored (had been dropped by mistake)" },
+                { fr: "La caméra suit maintenant aussi la trousse en hauteur, pas seulement en longueur", en: "The camera now follows the pencil case vertically too, not just horizontally" },
+                { fr: "Le multiplicateur de la Trousse Pièce est maintenant affiché dans le panneau de résultat", en: "The Coin Pencil Case's multiplier is now shown in the result panel" },
+            ],
+        },
         {
             version: "3.2",
             major: [],
