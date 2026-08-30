@@ -734,7 +734,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.1</div>
+                <div class="version-tag" id="version-tag">v3.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1066,14 +1066,14 @@
     // Skin "Trousse Pièce" : à chaque lancer, COIN_BONUS_CHANCE de déclencher
     // un bonus, puis le multiplicateur exact est tiré parmi COIN_MULTIPLIERS
     // (sous-probabilités qui s'appliquent SI le bonus s'est déclenché).
-    const COIN_BONUS_CHANCE = 0.10;
+    const COIN_BONUS_CHANCE = 0.40;
     const COIN_MULTIPLIERS = [
         { value: 1.6, chance: 0.60 },
-        { value: 2, chance: 0.20 },
+        { value: 2, chance: 0.29 },
         { value: 3, chance: 0.10 },
         { value: 5, chance: 0.01 },
-        // les 9% restants (0.60+0.20+0.10+0.01 = 0.91) ne donnent aucun bonus,
-        // même si les COIN_BONUS_CHANCE de départ se sont déclenchées
+        // 0.60+0.29+0.10+0.01 = 1.00 : il ne reste plus de trou, un bonus
+        // déclenché (COIN_BONUS_CHANCE) donne toujours un multiplicateur visible
     ];
 
     /* ============ 2. DONNÉES STATIQUES ============ */
@@ -1116,13 +1116,13 @@
             bonusPuissance: 5, bonusVitesse: 5, filter: "rainbow" // cas spécial : géré par rainbowOrFilter()
         },
         {
-            // Clin d'œil "pile ou face" : pas de bonus de stats, mais 10% de
+            // Clin d'œil "pile ou face" : pas de bonus de stats, mais 40% de
             // chance à chaque lancer de multiplier le score du coup (voir
             // COIN_BONUS_CHANCE et onLanded()). Dessinée comme une pièce
             // pixelisée à part (voir drawPixelCoin) plutôt que réutiliser
             // l'image de la trousse.
             id: "piece", name: "Trousse Pièce", cost: 2500,
-            desc: "Aucun bonus de stats, mais 10% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3... voire x5) !",
+            desc: "Aucun bonus de stats, mais 40% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3... voire x5) !",
             bonusPuissance: 0, bonusVitesse: 0, filter: "none", isCoin: true
         },
     ];
@@ -3652,8 +3652,16 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.1";
+    const VERSION_NUMBER = "3.2";
     const CHANGELOG = [
+        {
+            version: "3.2",
+            major: [],
+            minor: [
+                { fr: "Chance de bonus de la Trousse Pièce augmentée (10% → 40%)", en: "Coin Pencil Case bonus chance increased (10% → 40%)" },
+                { fr: "Multiplicateur x2 plus fréquent (20% → 29%) : un bonus déclenché donne maintenant toujours un multiplicateur", en: "x2 multiplier is now more frequent (20% → 29%): a triggered bonus now always gives a multiplier" },
+            ],
+        },
         {
             version: "3.1",
             major: [
