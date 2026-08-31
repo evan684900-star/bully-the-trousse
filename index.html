@@ -2259,7 +2259,10 @@
     // Dessine tout le fond du niveau "Cour d'école" : ciel, bâtiments, sol,
     // craies au sol, arbres et repères de distance. Appelée à chaque frame.
     function drawBackground(w, h) {
-        groundScreenY = h * 0.68;
+        // + cameraY : le sol/décor descend avec la ligne d'horizon quand la
+        // caméra "regarde plus haut" pour garder la trousse dans le cadre
+        // (voir gameLoop) - sans ça, seule la trousse bougeait, pas le décor.
+        groundScreenY = h * 0.68 + cameraY;
 
         // ciel (dégradé bleu clair)
         const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
@@ -2344,7 +2347,7 @@
     // lunaire cratérisé (dessiné à la place de drawBackground() une fois en
     // mode espace). Même ligne d'horizon que la cour, pour un atterrissage cohérent.
     function drawSpaceBackground(w, h) {
-        groundScreenY = h * 0.68;
+        groundScreenY = h * 0.68 + cameraY;
 
         const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
         sky.addColorStop(0, "#05040f");
@@ -2461,7 +2464,9 @@
     // trousse en hauteur (voir gameLoop) pour qu'un lancer très puissant ne
     // la fasse jamais sortir du cadre par le haut.
     function worldToScreen(x, y) {
-        return { sx: x - cameraX, sy: groundScreenY - y + cameraY };
+        // cameraY est déjà intégré à groundScreenY (voir drawBackground &
+        // co.), donc le sol/décor et la trousse se déplacent ensemble.
+        return { sx: x - cameraX, sy: groundScreenY - y };
     }
 
     // Dessine la traînée derrière la trousse à partir des positions récentes
@@ -2776,7 +2781,7 @@
     // Thème sombre = nuit : lune de sang. Thème clair = jour : le soleil est
     // à peine visible et vire au rouge à cause de la poussière dans l'air.
     function drawVolcanoBackground(w, h) {
-        groundScreenY = h * 0.68;
+        groundScreenY = h * 0.68 + cameraY;
         const night = save.theme === "dark";
 
         const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
