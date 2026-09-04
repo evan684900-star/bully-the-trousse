@@ -859,7 +859,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.3</div>
+                <div class="version-tag" id="version-tag">v3.3.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1843,6 +1843,14 @@
     const meterMarker = document.getElementById("meter-marker");
     const hintText = document.getElementById("hint-text");
     const resultPanel = document.getElementById("result-panel");
+    // Voile nocturne + soleil/lune CSS de l'écran de jeu (voir .sky-anim) : ce
+    // calque est positionné en dur ("bottom: 32%") pour matcher la ligne
+    // d'horizon PAR DÉFAUT du canvas (h*0.68). Quand cameraY décale cette
+    // ligne d'horizon vers le bas (voir gameLoop), ce calque doit descendre
+    // d'autant, sinon le voile/l'astre se détache du décor qu'il est censé
+    // habiller (on voit le fond "jour" dépasser au-dessus du voile de nuit,
+    // ou le soleil/la lune flotter au-dessus de sa position attendue).
+    const gameSkyAnim = document.querySelector("#screen-game .sky-anim");
 
     let trousseImg = new Image();
     trousseImg.src = "trousse-skin-1.png";
@@ -2704,6 +2712,10 @@
         }
 
         updateMeterUI();
+        // Garde le voile nocturne + soleil/lune CSS calé sur la ligne d'horizon
+        // du canvas, qui elle-même descend de cameraY quand la caméra suit la
+        // trousse en hauteur (voir gameSkyAnim plus haut).
+        gameSkyAnim.style.bottom = "calc(32% - " + cameraY + "px)";
         if (inSpaceMode) {
             drawSpaceBackground(w, h);
         } else if (save.currentWorld === "volcans") {
@@ -3860,8 +3872,15 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.3";
+    const VERSION_NUMBER = "3.3.1";
     const CHANGELOG = [
+        {
+            version: "3.3.1",
+            major: [],
+            minor: [
+                { fr: "Correction d'un bug qui datait : quand la caméra suivait la trousse dans les airs, le décor (voile de nuit, soleil/lune) restait collé à sa position au lieu de suivre, ce qui laissait voir le fond derrière lui", en: "Fixed a long-standing bug: when the camera followed the pencil case into the air, the scenery (night veil, sun/moon) stayed glued to its old position instead of following, revealing the background behind it" },
+            ],
+        },
         {
             version: "3.3",
             major: [],
