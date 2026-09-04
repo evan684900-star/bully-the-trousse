@@ -3996,9 +3996,97 @@
             localStorage.removeItem(SAVE_KEY);
             location.reload();
         },
+
+        // ---- Déclencheurs d'évènements (popups, sons, cinématiques) ----
+        // Utiles pour prévisualiser un évènement sans avoir à le provoquer en
+        // jouant vraiment. Ne touchent pas à la sauvegarde sauf mention contraire.
+        coinBonus(multiplier) {
+            showScreen("game");
+            showCoinPopup(multiplier || 2);
+            console.log("🪙 Popup bonus pièce affichée, x" + (multiplier || 2));
+        },
+        milestonePopup(meters) {
+            const m = meters || 100;
+            showToast("🎉 Palier des " + m + "m atteint ! +" + (50 * Math.max(1, Math.round(m / 100))) + "$");
+            console.log("🎉 Popup de palier affichée (" + m + "m)");
+        },
+        trousseInfo() {
+            openTrousseModal();
+            console.log("🎒 Fiche de la trousse ouverte");
+        },
+        aidePopup() {
+            document.getElementById("help-modal").classList.add("show");
+            console.log("🌋 Popup d'aide (Volcans) affichée");
+        },
+        volcanReplayPopup() {
+            document.getElementById("volcan-replay-modal").classList.add("show");
+            console.log("🌋 Popup \"refaire la cinématique ?\" affichée");
+        },
+        repairBrokenPopup() {
+            document.getElementById("repair-broken-modal").classList.add("show");
+            console.log("🎒 Popup \"trousse cassée\" affichée");
+        },
+        changelogPopup() {
+            renderChangelog();
+            document.getElementById("changelog-modal").classList.add("show");
+            console.log("📋 Journal des changements ouvert");
+        },
+        quakeSound() {
+            const audio = document.getElementById("sfx-quake");
+            audio.currentTime = 0;
+            audio.play();
+            console.log("🌋 Son de tremblement de terre joué");
+        },
+        toggleTheme() {
+            save.theme = save.theme === "dark" ? "light" : "dark";
+            persist();
+            applyTheme();
+            console.log("🌗 Thème :", save.theme);
+        },
+
+        // Liste toutes les commandes dispo, regroupées par catégorie.
+        help() {
+            console.log("%c🎮 Commandes disponibles dans window.cheats", "color:#ffd23f; font-weight:bold; font-size:13px;");
+            console.log(
+                "%cÉconomie / progression%c\n" +
+                "  addMoney(n)              — ajoute n $\n" +
+                "  setLevels(p, v)          — fixe le niveau Puissance/Vitesse\n" +
+                "  setDurability(n)         — fixe la durabilité de la trousse (0-100)\n" +
+                "  unlockSkin(id)           — débloque et équipe un skin\n" +
+                "  unlockAllSkins()         — débloque tous les skins\n" +
+                "  unlockTrail(id)          — débloque et équipe une traînée",
+                "color:#6bffb0; font-weight:bold;", "color:inherit;"
+            );
+            console.log(
+                "%cÉvènements / popups%c\n" +
+                "  coinBonus(multiplier)    — popup plein écran du bonus pièce (défaut x2)\n" +
+                "  milestonePopup(meters)   — toast de palier atteint (défaut 100m)\n" +
+                "  trousseInfo()            — fiche de la trousse (durabilité, record...)\n" +
+                "  aidePopup()              — popup \"besoin d'aide ?\" du monde Volcans\n" +
+                "  repairBrokenPopup()      — popup \"trousse cassée\" (0 de durabilité)\n" +
+                "  volcanReplayPopup()      — popup \"refaire la cinématique ?\"\n" +
+                "  changelogPopup()         — ouvre le journal des changements\n" +
+                "  cinematique()            — rejoue la cinématique de déblocage du volcan\n" +
+                "  quakeSound()             — joue le son de tremblement de terre",
+                "color:#6bffb0; font-weight:bold;", "color:inherit;"
+            );
+            console.log(
+                "%cMonde / thème%c\n" +
+                "  resetVolcan()            — remet le monde Volcans à \"pas encore débloqué\"\n" +
+                "  toggleTheme()            — bascule thème clair / sombre",
+                "color:#6bffb0; font-weight:bold;", "color:inherit;"
+            );
+            console.log(
+                "%cDivers%c\n" +
+                "  show()                   — affiche la sauvegarde actuelle\n" +
+                "  resetSave()              — efface toute la sauvegarde et recharge\n" +
+                "  help()                   — affiche cette liste",
+                "color:#6bffb0; font-weight:bold;", "color:inherit;"
+            );
+        },
     };
     console.log(
-        "%c🎮 Triches dispo dans window.cheats : addMoney(n), unlockSkin(id), unlockAllSkins(), unlockTrail(id), setLevels(p, v), cinematique(), resetVolcan(), setDurability(n), show(), resetSave()",
+        "%c🎮 Triches dispo dans window.cheats — tape window.cheats.help() pour la liste complète",
         "color:#ffd23f; font-weight:bold;"
     );
 
