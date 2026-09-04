@@ -1026,6 +1026,15 @@
         </div>
     </div>
 
+    <!-- Bloque le clic sur "Jouer" quand la durabilité est à 0 -->
+    <div class="modal-overlay" id="repair-broken-modal">
+        <div class="info-box">
+            <h2 data-i18n="repairBrokenTitle">🎒 Trousse cassée !</h2>
+            <p data-i18n="repairBrokenText"></p>
+            <button class="btn" id="btn-repair-broken-go" data-i18n="btnGoRepair">🔧 Aller réparer</button>
+        </div>
+    </div>
+
     <!-- Journal des changements (clic sur le numéro de version au menu) -->
     <div class="modal-overlay" id="changelog-modal">
         <div class="info-box changelog-box">
@@ -1127,6 +1136,13 @@
         repairDesc: { fr: "Remet la durabilité à 100. 500 $ par tranche de 10 de durabilité manquante.", en: "Restores durability to 100. $500 per 10 missing durability." },
         repairFull: { fr: "Intacte", en: "Good as new" },
         repairDone: { fr: "🔧 Trousse réparée !", en: "🔧 Pencil case repaired!" },
+        repairPartialDone: { fr: "🔧 Réparation partielle avec tout ton argent !", en: "🔧 Partial repair with all your money!" },
+        repairBrokenTitle: { fr: "🎒 Trousse cassée !", en: "🎒 Broken pencil case!" },
+        repairBrokenText: {
+            fr: "Ta trousse est à 0 de durabilité, impossible de jouer. Va la réparer à la boutique.",
+            en: "Your pencil case is at 0 durability, you can't play. Go repair it in the shop."
+        },
+        btnGoRepair: { fr: "🔧 Aller réparer", en: "🔧 Go repair" },
         skidWarning: {
             fr: "Dérapage incontrôlé : vous avez perdu 10 de durabilité sur la trousse (allez dans la boutique pour réparer la trousse).",
             en: "Uncontrolled skid: your pencil case lost 10 durability (go to the shop to repair it)."
@@ -1663,6 +1679,17 @@
                     showToast(tr("repairDone"));
                     refreshShop();
                     playPurchasePop();
+                } else if (Math.floor(save.money / 50) > 0) {
+                    // Pas assez pour une réparation complète : on répare avec
+                    // tout l'argent dispo (50 $ par point de durabilité).
+                    const pointsBought = Math.floor(save.money / 50);
+                    save.durability = Math.min(100, save.durability + pointsBought);
+                    save.money -= pointsBought * 50;
+                    persist();
+                    sfxBuy();
+                    showToast(tr("repairPartialDone"));
+                    refreshShop();
+                    playPurchasePop();
                 } else {
                     sfxError();
                     showToast(tr("notEnoughMoney"));
@@ -2135,7 +2162,19 @@
     document.getElementById("btn-game-back").addEventListener("click", () => showScreen("menu"));
     document.getElementById("btn-shop-back").addEventListener("click", () => showScreen("menu"));
     document.getElementById("btn-shop-play").addEventListener("click", () => showScreen("game"));
-    document.getElementById("btn-play").addEventListener("click", () => showScreen("game"));
+    document.getElementById("btn-play").addEventListener("click", () => {
+        if (save.durability <= 0) {
+            sfxError();
+            document.getElementById("repair-broken-modal").classList.add("show");
+            return;
+        }
+        showScreen("game");
+    });
+    document.getElementById("btn-repair-broken-go").addEventListener("click", () => {
+        document.getElementById("repair-broken-modal").classList.remove("show");
+        showScreen("shop");
+        switchShopTab("upgrades");
+    });
     document.getElementById("btn-shop").addEventListener("click", () => showScreen("shop"));
     document.getElementById("btn-leaderboard").addEventListener("click", () => showScreen("leaderboard"));
     document.getElementById("btn-leaderboard-back").addEventListener("click", () => showScreen("menu"));
@@ -3873,7 +3912,7 @@
     });
 
     // Clic en dehors de la boîte = fermeture
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
