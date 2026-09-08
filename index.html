@@ -325,6 +325,33 @@
         .world-card .name { font-size: 12px; font-weight: 700; margin-top: 4px; }
         .world-card.selected { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent) inset; }
 
+        /* Carte "Succès", insérée entre Volcans et Plage dans la rangée des mondes */
+        .world-card.achv-card { border-color: var(--accent); position: relative; }
+        .achv-badge {
+            position: absolute; top: -8px; right: -6px;
+            background: var(--accent); color: #1a1a1a;
+            font-size: 10px; font-weight: 800;
+            border-radius: 999px; padding: 2px 6px;
+            min-width: 18px;
+        }
+
+        /* ---------- MODALE SUCCÈS ---------- */
+        .achv-box { max-height: 80vh; overflow-y: auto; }
+        .achievement-row {
+            display: flex; align-items: center; gap: 12px;
+            background: var(--card-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+        .achievement-row.locked { opacity: 0.5; }
+        .achievement-row .icon { font-size: 26px; width: 34px; text-align: center; }
+        .achievement-row .info { flex: 1; }
+        .achievement-row .info h3 { margin: 0 0 3px; font-size: 14px; }
+        .achievement-row .info p { margin: 0; font-size: 11.5px; color: var(--text-dim); }
+
         /* ---------- ÉCRAN DE JEU ---------- */
         /* Tout le décor + la trousse sont dessinés dans ce <canvas> en JS */
         #screen-game canvas {
@@ -1035,6 +1062,15 @@
         </div>
     </div>
 
+    <!-- Succès (bouton entre Volcans et Plage dans la rangée des mondes) -->
+    <div class="modal-overlay" id="achv-modal">
+        <div class="info-box achv-box">
+            <h2 data-i18n="achvModalTitle">🏆 Succès</h2>
+            <div id="achv-list"></div>
+            <button class="btn" id="btn-achv-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+
     <!-- Journal des changements (clic sur le numéro de version au menu) -->
     <div class="modal-overlay" id="changelog-modal">
         <div class="info-box changelog-box">
@@ -1156,6 +1192,31 @@
         changelogTitle: { fr: "📋 Journal des changements", en: "📋 Changelog" },
         changelogMajor: { fr: "Mise à jour majeure :", en: "Major update:" },
         changelogMinor: { fr: "Ajouts mineurs :", en: "Minor additions:" },
+        achvCardName: { fr: "Succès", en: "Achievements" },
+        achvModalTitle: { fr: "🏆 Succès", en: "🏆 Achievements" },
+        achvUnlockedPrefix: { fr: "🏆 Succès débloqué : ", en: "🏆 Achievement unlocked: " },
+        achvFirstThrowName: { fr: "Premier envol", en: "First launch" },
+        achvFirstThrowDesc: { fr: "Fais un premier lancer.", en: "Make a first throw." },
+        achv100mName: { fr: "100 mètres", en: "100 meters" },
+        achv100mDesc: { fr: "Atteins un record de 100 m.", en: "Reach a record of 100 m." },
+        achv500mName: { fr: "500 mètres", en: "500 meters" },
+        achv500mDesc: { fr: "Atteins un record de 500 m.", en: "Reach a record of 500 m." },
+        achv1000mName: { fr: "1000 mètres", en: "1000 meters" },
+        achv1000mDesc: { fr: "Atteins un record de 1000 m.", en: "Reach a record of 1000 m." },
+        achvPerfectName: { fr: "Lancer parfait", en: "Perfect throw" },
+        achvPerfectDesc: { fr: "Réussis un lancer parfait.", en: "Land a perfect throw." },
+        achvVolcanName: { fr: "Éruption maîtrisée", en: "Eruption mastered" },
+        achvVolcanDesc: { fr: "Débloque le monde Volcans.", en: "Unlock the Volcans world." },
+        achvBrokenName: { fr: "Trousse en miettes", en: "Pencil case in pieces" },
+        achvBrokenDesc: { fr: "Casse complètement ta trousse (durabilité à 0).", en: "Break your pencil case completely (durability at 0)." },
+        achvCollectorName: { fr: "Collectionneur", en: "Collector" },
+        achvCollectorDesc: { fr: "Possède tous les skins de trousse.", en: "Own every pencil case skin." },
+        achvRichName: { fr: "Fortune faite", en: "Fortune made" },
+        achvRichDesc: { fr: "Accumule 5000 $.", en: "Accumulate $5000." },
+        achvJackpotName: { fr: "Jackpot !", en: "Jackpot!" },
+        achvJackpotDesc: { fr: "Obtiens un multiplicateur x5 avec la Trousse Pièce.", en: "Get a x5 multiplier with the Coin Pencil Case." },
+        achvDedicatedName: { fr: "Joueur assidu", en: "Dedicated player" },
+        achvDedicatedDesc: { fr: "Cumule 1 heure de jeu.", en: "Reach 1 hour of cumulative playtime." },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -1240,6 +1301,23 @@
         { id: "ville", name: "Ville", emoji: "🏙️", unlocked: false },
     ];
 
+    // Système de succès : chaque entrée est vérifiée dans checkAchievements()
+    // (appelée à chaque persist()) contre l'état courant de "save". Une fois
+    // débloqué, l'id reste dans save.unlockedAchievements pour toujours.
+    const ACHIEVEMENTS = [
+        { id: "premierLancer", emoji: "🚀", nameKey: "achvFirstThrowName", descKey: "achvFirstThrowDesc", check: (s) => s.totalThrows >= 1 },
+        { id: "cent100m", emoji: "📏", nameKey: "achv100mName", descKey: "achv100mDesc", check: (s) => s.bestDistance >= 100 },
+        { id: "cinq500m", emoji: "🏹", nameKey: "achv500mName", descKey: "achv500mDesc", check: (s) => s.bestDistance >= 500 },
+        { id: "mille1000m", emoji: "🌠", nameKey: "achv1000mName", descKey: "achv1000mDesc", check: (s) => s.bestDistance >= 1000 },
+        { id: "lancerParfait", emoji: "✨", nameKey: "achvPerfectName", descKey: "achvPerfectDesc", check: (s) => s.hasPerfectThrow },
+        { id: "volcanDebloque", emoji: "🌋", nameKey: "achvVolcanName", descKey: "achvVolcanDesc", check: (s) => s.volcanUnlocked },
+        { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
+        { id: "collectionneur", emoji: "🎨", nameKey: "achvCollectorName", descKey: "achvCollectorDesc", check: (s) => s.ownedSkins.length >= SKINS.length },
+        { id: "riche5000", emoji: "💰", nameKey: "achvRichName", descKey: "achvRichDesc", check: (s) => s.money >= 5000 },
+        { id: "jackpotX5", emoji: "🪙", nameKey: "achvJackpotName", descKey: "achvJackpotDesc", check: (s) => s.hasJackpot },
+        { id: "joueurAssidu", emoji: "⏱️", nameKey: "achvDedicatedName", descKey: "achvDedicatedDesc", check: (s) => s.playTime >= 3600 },
+    ];
+
     // Chaque skin réutilise la même image (trousse-skin-1.png) mais applique
     // un filtre CSS/canvas différent pour changer les couleurs, plus un bonus
     // de statistiques ajouté par-dessus les niveaux achetés en boutique.
@@ -1318,6 +1396,12 @@
             volcanTutorialSeen: false, // tutoriel spécifique au monde Volcan
             durability: 100,           // 0 à 100, perdue lors des dérapages, réparable en boutique
             playTime: 0,               // secondes de jeu cumulées
+            // --- Succès ---
+            unlockedAchievements: [],  // ids des succès déjà débloqués (voir ACHIEVEMENTS)
+            totalThrows: 0,            // nombre total de lancers effectués
+            hasPerfectThrow: false,    // au moins un lancer parfait déjà réussi
+            hasBrokenDurability: false,// la trousse est déjà tombée à 0 de durabilité
+            hasJackpot: false,         // multiplicateur x5 de la Trousse Pièce déjà obtenu
         };
     }
 
@@ -1356,6 +1440,27 @@
     function persist() {
         localStorage.setItem(SAVE_KEY, JSON.stringify(save));
         pushCloudSave(); // best-effort, ne fait rien si Firebase n'est pas connecté
+        checkAchievements();
+    }
+
+    // Vérifie tous les succès pas encore débloqués contre l'état courant de la
+    // sauvegarde. Appelée à chaque persist() : pas besoin de l'appeler à la main
+    // après chaque action, il suffit que l'action fasse persist() comme d'habitude.
+    function checkAchievements() {
+        let changed = false;
+        ACHIEVEMENTS.forEach((a) => {
+            if (!save.unlockedAchievements.includes(a.id) && a.check(save)) {
+                save.unlockedAchievements.push(a.id);
+                changed = true;
+                showToast(tr("achvUnlockedPrefix") + tr(a.nameKey));
+                sfxBuy();
+            }
+        });
+        // Ne relance pas persist() (récursion) : simple sauvegarde directe.
+        if (changed) {
+            localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+            pushCloudSave();
+        }
     }
 
     function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
@@ -1548,7 +1653,40 @@
                 buildWorldsRow();
             });
             row.appendChild(card);
+            // Bouton "Succès" : placé juste après la carte Volcans, donc entre
+            // Volcans et Plage dans WORLDS (voir la liste plus haut).
+            if (w.id === "volcans") row.appendChild(buildAchvCard());
         });
+    }
+
+    // Carte cliquable ouvrant la modale des succès (voir renderAchievements).
+    function buildAchvCard() {
+        const card = document.createElement("div");
+        card.className = "world-card achv-card";
+        card.innerHTML = '<div class="emoji">🏆</div><div class="name">' + tr("achvCardName") + '</div>' +
+            '<div class="achv-badge">' + save.unlockedAchievements.length + "/" + ACHIEVEMENTS.length + "</div>";
+        card.addEventListener("click", () => {
+            renderAchievements();
+            document.getElementById("achv-modal").classList.add("show");
+        });
+        return card;
+    }
+
+    // Reconstruit la liste des succès dans la modale, débloqués en premier.
+    function renderAchievements() {
+        const list = document.getElementById("achv-list");
+        const sorted = ACHIEVEMENTS.slice().sort((a, b) => {
+            const ua = save.unlockedAchievements.includes(a.id) ? 0 : 1;
+            const ub = save.unlockedAchievements.includes(b.id) ? 0 : 1;
+            return ua - ub;
+        });
+        list.innerHTML = sorted.map((a) => {
+            const unlocked = save.unlockedAchievements.includes(a.id);
+            return '<div class="achievement-row' + (unlocked ? "" : " locked") + '">' +
+                '<div class="icon">' + (unlocked ? a.emoji : "🔒") + '</div>' +
+                '<div class="info"><h3>' + tr(a.nameKey) + '</h3><p>' + tr(a.descKey) + '</p></div>' +
+                '</div>';
+        }).join("");
     }
 
     // Boucle légère (juste pour l'image de prévisualisation) qui met à jour
@@ -2071,11 +2209,14 @@
     function onLanded() {
         state = "landed";
         const distanceMeters = worldX / SCALE;
+        save.totalThrows++;
+        if (isPerfect) save.hasPerfectThrow = true;
         // Un dérapage abîme la trousse : -10 de durabilité et message rouge
         // dans le panneau de résultat (réparation en boutique).
         const skidEl = document.getElementById("result-skid");
         if (didSkid) {
             save.durability = Math.max(0, save.durability - SKID_DURABILITY_COST);
+            if (save.durability <= 0) save.hasBrokenDurability = true;
             skidEl.textContent = tr("skidWarning");
             skidEl.style.display = "block";
         } else {
@@ -2107,6 +2248,7 @@
         }
         const coinEl = document.getElementById("result-coin");
         if (coinMultiplier) {
+            if (coinMultiplier === 5) save.hasJackpot = true;
             const earnBeforeCoin = earn;
             earn = Math.round(earn * coinMultiplier);
             showCoinPopup(coinMultiplier);
@@ -3930,8 +4072,12 @@
         document.getElementById("changelog-modal").classList.remove("show");
     });
 
+    document.getElementById("btn-achv-close").addEventListener("click", () => {
+        document.getElementById("achv-modal").classList.remove("show");
+    });
+
     // Clic en dehors de la boîte = fermeture
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
