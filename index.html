@@ -1224,9 +1224,10 @@
         achvDedicatedName: { fr: "Joueur assidu", en: "Dedicated player" },
         achvDedicatedDesc: { fr: "Cumule 1 heure de jeu.", en: "Reach 1 hour of cumulative playtime." },
         achvPctNotEnough: {
-            fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (10 minimum, ",
-            en: "Not enough active players yet for reliable stats (10 minimum, "
+            fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
+            en: "Not enough active players yet for reliable stats ("
         },
+        achvPctNotEnoughMin: { fr: " minimum, ", en: " minimum, " },
         achvPctNotEnoughSuffix: { fr: " actuellement).", en: " right now)." },
         achvPctActivePlayers: { fr: " joueurs actifs.", en: " active players." },
         achvPctOffline: { fr: "Statistiques indisponibles hors ligne.", en: "Stats unavailable offline." },
@@ -3839,7 +3840,7 @@
         return ref.get().then((snap) => snap.size);
     }
 
-    const ACHV_MIN_ACTIVE_PLAYERS = 10; // en dessous, le pool est jugé trop petit pour un % fiable
+    const ACHV_MIN_ACTIVE_PLAYERS = 5; // en dessous, le pool est jugé trop petit pour un % fiable
 
     // Charge le nombre de joueurs actifs puis, si le pool est assez grand, le
     // nombre de joueurs ayant débloqué chaque succès. Purement décoratif : en
@@ -3853,7 +3854,7 @@
         statusEl.textContent = tr("achvPctLoading");
         countDocs(db.collection("activePlayers")).then((totalActive) => {
             if (totalActive < ACHV_MIN_ACTIVE_PLAYERS) {
-                statusEl.textContent = tr("achvPctNotEnough") + totalActive + tr("achvPctNotEnoughSuffix");
+                statusEl.textContent = tr("achvPctNotEnough") + ACHV_MIN_ACTIVE_PLAYERS + tr("achvPctNotEnoughMin") + totalActive + tr("achvPctNotEnoughSuffix");
                 return;
             }
             statusEl.textContent = totalActive + tr("achvPctActivePlayers");
