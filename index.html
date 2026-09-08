@@ -929,7 +929,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.5.2</div>
+                <div class="version-tag" id="version-tag">v3.5.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1266,6 +1266,10 @@
         achv500mDesc: { fr: "Atteins un record de 500 m.", en: "Reach a record of 500 m." },
         achv1000mName: { fr: "1000 mètres", en: "1000 meters" },
         achv1000mDesc: { fr: "Atteins un record de 1000 m.", en: "Reach a record of 1000 m." },
+        achv1500mName: { fr: "1500 mètres", en: "1500 meters" },
+        achv1500mDesc: { fr: "Atteins un record de 1500 m.", en: "Reach a record of 1500 m." },
+        achv2000mName: { fr: "2000 mètres", en: "2000 meters" },
+        achv2000mDesc: { fr: "Atteins un record de 2000 m.", en: "Reach a record of 2000 m." },
         achvPerfectName: { fr: "Lancer parfait", en: "Perfect throw" },
         achvPerfectDesc: { fr: "Réussis un lancer parfait.", en: "Land a perfect throw." },
         achvVolcanName: { fr: "Éruption maîtrisée", en: "Eruption mastered" },
@@ -1280,6 +1284,12 @@
         achvJackpotDesc: { fr: "Obtiens un multiplicateur x5 (ou plus) avec la Trousse Pièce.", en: "Get a x5 (or higher) multiplier with the Coin Pencil Case." },
         achvDedicatedName: { fr: "Joueur assidu", en: "Dedicated player" },
         achvDedicatedDesc: { fr: "Cumule 1 heure de jeu.", en: "Reach 1 hour of cumulative playtime." },
+        achv50ThrowsName: { fr: "Bras rodé", en: "Well-oiled arm" },
+        achv50ThrowsDesc: { fr: "Effectue 50 lancers.", en: "Make 50 throws." },
+        achvAllTrailsName: { fr: "Sillage complet", en: "Full trail set" },
+        achvAllTrailsDesc: { fr: "Possède toutes les traînées.", en: "Own every trail." },
+        achvSpaceEggName: { fr: "Vers l'infini...", en: "To infinity..." },
+        achvSpaceEggDesc: { fr: "???", en: "???" },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
             en: "Not enough active players yet for reliable stats ("
@@ -1391,6 +1401,8 @@
         { id: "cent100m", emoji: "📏", nameKey: "achv100mName", descKey: "achv100mDesc", check: (s) => s.bestDistance >= 100 },
         { id: "cinq500m", emoji: "🏹", nameKey: "achv500mName", descKey: "achv500mDesc", check: (s) => s.bestDistance >= 500 },
         { id: "mille1000m", emoji: "🌠", nameKey: "achv1000mName", descKey: "achv1000mDesc", check: (s) => s.bestDistance >= 1000 },
+        { id: "mille1500m", emoji: "🌌", nameKey: "achv1500mName", descKey: "achv1500mDesc", check: (s) => s.bestDistance >= 1500 },
+        { id: "deuxMille2000m", emoji: "🪐", nameKey: "achv2000mName", descKey: "achv2000mDesc", check: (s) => s.bestDistance >= 2000 },
         { id: "lancerParfait", emoji: "✨", nameKey: "achvPerfectName", descKey: "achvPerfectDesc", check: (s) => s.hasPerfectThrow },
         { id: "volcanDebloque", emoji: "🌋", nameKey: "achvVolcanName", descKey: "achvVolcanDesc", check: (s) => s.volcanUnlocked },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
@@ -1398,6 +1410,9 @@
         { id: "riche5000", emoji: "💰", nameKey: "achvRichName", descKey: "achvRichDesc", check: (s) => s.money >= 5000 },
         { id: "jackpotX5", emoji: "🪙", nameKey: "achvJackpotName", descKey: "achvJackpotDesc", check: (s) => s.hasJackpot },
         { id: "joueurAssidu", emoji: "⏱️", nameKey: "achvDedicatedName", descKey: "achvDedicatedDesc", check: (s) => s.playTime >= 3600 },
+        { id: "cinquanteLancers", emoji: "💪", nameKey: "achv50ThrowsName", descKey: "achv50ThrowsDesc", check: (s) => s.totalThrows >= 50 },
+        { id: "toutesTrainees", emoji: "🌈", nameKey: "achvAllTrailsName", descKey: "achvAllTrailsDesc", check: (s) => s.ownedTrails.length >= TRAILS.length },
+        { id: "easterEggEspace", emoji: "🛸", nameKey: "achvSpaceEggName", descKey: "achvSpaceEggDesc", check: (s) => s.hasTriggeredSpaceEgg },
     ];
 
     // Chaque skin réutilise la même image (trousse-skin-1.png) mais applique
@@ -1484,6 +1499,7 @@
             hasPerfectThrow: false,    // au moins un lancer parfait déjà réussi
             hasBrokenDurability: false,// la trousse est déjà tombée à 0 de durabilité
             hasJackpot: false,         // multiplicateur x5 de la Trousse Pièce déjà obtenu
+            hasTriggeredSpaceEgg: false, // easter egg "vers l'espace" déjà déclenché une fois
         };
     }
 
@@ -2886,6 +2902,7 @@
                 // on vient d'atteindre l'apogée avec la combinaison easter egg :
                 // on gèle la position et on bascule vers la séquence spatiale
                 spaceEggTriggered = false; // ne se déclenche qu'une fois par lancer
+                save.hasTriggeredSpaceEgg = true;
                 state = "space_transition";
                 phaseTimer = 0;
             } else if (worldY <= 0 && vy < 0) {
@@ -4198,8 +4215,15 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.5.2";
+    const VERSION_NUMBER = "3.5.3";
     const CHANGELOG = [
+        {
+            version: "3.5.3",
+            major: [],
+            minor: [
+                { fr: "5 nouveaux succès : records de 1500 m et 2000 m, 50 lancers effectués, toutes les traînées possédées, et un succès secret 🛸", en: "5 new achievements: 1500 m and 2000 m records, 50 throws made, every trail owned, and a secret 🛸 achievement" },
+            ],
+        },
         {
             version: "3.5.2",
             major: [],
