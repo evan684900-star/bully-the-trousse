@@ -199,19 +199,23 @@
         }
         .menu-wrap {
             position: absolute;
-            inset: 0;
+            /* "bottom" réservé (pas juste du padding) pour que la zone occupée par
+               les icônes flottantes (musique/thème/langue/liens) ne fasse jamais
+               partie de la zone visible au repos (scroll à 0) : avec un simple
+               padding-bottom, cette réserve n'existe qu'EN BAS du contenu qui
+               défile, donc ne protège rien tant qu'on n'a pas scrollé jusque-là.
+               En réduisant la hauteur de la boîte elle-même, le contenu qui
+               dépasse une fois ces icônes retirées de l'équation défile proprement
+               au lieu de passer derrière elles. */
+            top: 0; left: 0; right: 0;
+            bottom: calc(64px + env(safe-area-inset-bottom));
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: flex-start;
             padding: 24px 16px 16px;
             gap: 10px;
-            /* Sur petit écran, la rangée des mondes (5 cartes) peut dépasser la
-               hauteur visible : on autorise le défilement au lieu de laisser le
-               bas du menu se faire cacher/chevaucher par les icônes flottantes
-               (musique/thème/langue/liens), toujours au-dessus (voir leur z-index). */
             overflow-y: auto;
-            padding-bottom: calc(64px + env(safe-area-inset-bottom));
         }
         .title-card {
             text-align: center;
