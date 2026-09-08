@@ -370,7 +370,10 @@
            des téléphones (iPhone) au lieu de passer dessous */
         .hud-top {
             position: absolute;
-            top: calc(10px + env(safe-area-inset-top));
+            /* Décalé sous le bouton "← Menu" (.back-btn, même coin haut-gauche) pour
+               ne pas passer dessous sur les écrans étroits (mobile) : sans ce décalage,
+               le bouton (z-index supérieur) cache complètement la pile d'argent. */
+            top: calc(58px + env(safe-area-inset-top));
             left: calc(10px + env(safe-area-inset-left));
             right: calc(10px + env(safe-area-inset-right));
             display: flex;
@@ -891,7 +894,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.3.1</div>
+                <div class="version-tag" id="version-tag">v3.4.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -963,7 +966,7 @@
         <div class="coin-popup" id="coin-popup">
             <canvas id="coin-popup-canvas" width="200" height="200"></canvas>
             <div id="coin-popup-text">x2</div>
-            <div id="coin-popup-jackpot">t'as eu un fois 5 !?! prend une capture d'écran !! (prend en 5 du coup)</div>
+            <div id="coin-popup-jackpot"></div>
         </div>
         <!-- Surcouche de la cinématique du monde Volcan (voir section 9bis) -->
         <div id="cine-ui">
@@ -1220,7 +1223,7 @@
         achvRichName: { fr: "Fortune faite", en: "Fortune made" },
         achvRichDesc: { fr: "Accumule 5000 $.", en: "Accumulate $5000." },
         achvJackpotName: { fr: "Jackpot !", en: "Jackpot!" },
-        achvJackpotDesc: { fr: "Obtiens un multiplicateur x5 avec la Trousse Pièce.", en: "Get a x5 multiplier with the Coin Pencil Case." },
+        achvJackpotDesc: { fr: "Obtiens un multiplicateur x5 (ou plus) avec la Trousse Pièce.", en: "Get a x5 (or higher) multiplier with the Coin Pencil Case." },
         achvDedicatedName: { fr: "Joueur assidu", en: "Dedicated player" },
         achvDedicatedDesc: { fr: "Cumule 1 heure de jeu.", en: "Reach 1 hour of cumulative playtime." },
         achvPctNotEnough: {
@@ -1232,6 +1235,8 @@
         achvPctActivePlayers: { fr: " joueurs actifs.", en: " active players." },
         achvPctOffline: { fr: "Statistiques indisponibles hors ligne.", en: "Stats unavailable offline." },
         achvPctLoading: { fr: "Chargement des statistiques...", en: "Loading stats..." },
+        jackpotTextX5: { fr: "t'as eu un fois 5 !?! prend une capture d'écran !! (prend en 5 du coup)", en: "you got a five multiplier!?! take a screenshot!! (take 5 of them while you're at it)" },
+        jackpotTextX10: { fr: "UN FOIS 10 !?! PERSONNE VA TE CROIRE, PREND UNE CAPTURE D'ÉCRAN TOUT DE SUITE !!", en: "A TEN MULTIPLIER!?! NOBODY WILL BELIEVE YOU, TAKE A SCREENSHOT RIGHT NOW!!" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -1285,10 +1290,12 @@
     const SPACE_EGG_ACCURACY_MAX = -0.6;  // value doit être très à gauche (zone verte du début)
     const CLOUD_TRANSITION_DURATION = 0.8; // secondes, nuages qui cachent le changement de décor
     const SPACE_FLOAT_DURATION = 1.3;      // secondes, flottement avant le QTE
-    const QTE_RING_COUNT = 3;              // nombre d'anneaux dans la séquence du QTE
+    const QTE_RING_COUNT = 5;              // nombre d'anneaux dans la séquence du QTE
     const QTE_DURATION = 0.9;              // secondes pendant lesquelles CHAQUE anneau rétrécit
     const QTE_RING_START = 110;            // rayon de départ de l'anneau qui rétrécit (px)
-    const QTE_RING_TARGET = 46;            // rayon de l'anneau-cible fixe (px)
+    // La cible n'est plus une taille fixe : elle est tirée au hasard (petit/moyen/
+    // grand) à chaque anneau, ce qui empêche de mémoriser le timing d'un coup.
+    const QTE_RING_SIZES = [30, 46, 65];   // rayons possibles de l'anneau-cible (px) : petit, moyen, grand
     const QTE_RING_TOLERANCE = 15;         // marge acceptée autour de la cible pour réussir
     const SPACE_BOOST_VX = 2600;           // vitesse folle horizontale si tous les anneaux sont réussis
     const SPACE_BOOST_VY = 150;
@@ -1301,8 +1308,9 @@
         { value: 1.6, chance: 0.60 },
         { value: 2, chance: 0.29 },
         { value: 3, chance: 0.10 },
-        { value: 5, chance: 0.01 },
-        // 0.60+0.29+0.10+0.01 = 1.00 : il ne reste plus de trou, un bonus
+        { value: 5, chance: 0.009 },
+        { value: 10, chance: 0.001 },
+        // 0.60+0.29+0.10+0.009+0.001 = 1.00 : il ne reste plus de trou, un bonus
         // déclenché (COIN_BONUS_CHANCE) donne toujours un multiplicateur visible
     ];
 
@@ -1369,7 +1377,7 @@
             // pixelisée à part (voir drawPixelCoin) plutôt que réutiliser
             // l'image de la trousse.
             id: "piece", name: "Trousse Pièce", cost: 2500,
-            desc: "Aucun bonus de stats, mais 40% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3... voire x5) !",
+            desc: "Aucun bonus de stats, mais 40% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3, x5... voire x10) !",
             bonusPuissance: 0, bonusVitesse: 0, filter: "none", isCoin: true
         },
     ];
@@ -2044,6 +2052,7 @@
     let inSpaceMode = false;       // le décor actuellement affiché est-il celui de l'espace ?
     let phaseTimer = 0;            // chronomètre des phases spéciales (transition/flottaison/QTE)
     let qteResults = [];           // un booléen par anneau déjà résolu (true = réussi), longueur <= QTE_RING_COUNT
+    let qteTargetRadius = QTE_RING_SIZES[0]; // taille de l'anneau-cible du round en cours (voir pickQteTargetRadius)
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
     let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
 
@@ -2157,8 +2166,8 @@
         else if (state === "charging_power") lockPower();
         else if (state === "charging_angle") lockAccuracyAndLaunch();
         else if (state === "qte") {
-            // réussi seulement si l'anneau qui rétrécit est proche de la cible fixe
-            const hit = Math.abs(currentQteRingRadius() - QTE_RING_TARGET) <= QTE_RING_TOLERANCE;
+            // réussi seulement si l'anneau qui rétrécit est proche de la cible de ce round
+            const hit = Math.abs(currentQteRingRadius() - qteTargetRadius) <= QTE_RING_TOLERANCE;
             advanceQteRing(hit);
         }
         else if (state === "landed") { /* rien à faire, les boutons du panneau de résultat gèrent la suite */ }
@@ -2179,7 +2188,14 @@
             finishQte();
         } else {
             phaseTimer = 0; // relance un nouvel anneau
+            qteTargetRadius = pickQteTargetRadius();
         }
+    }
+
+    // Tire une taille de cible au hasard (petit/moyen/grand, voir QTE_RING_SIZES)
+    // pour empêcher de mémoriser le timing d'un round sur l'autre.
+    function pickQteTargetRadius() {
+        return QTE_RING_SIZES[Math.floor(Math.random() * QTE_RING_SIZES.length)];
     }
 
     // Une fois les QTE_RING_COUNT anneaux résolus : le boost final dépend du
@@ -2266,7 +2282,7 @@
         }
         const coinEl = document.getElementById("result-coin");
         if (coinMultiplier) {
-            if (coinMultiplier === 5) save.hasJackpot = true;
+            if (coinMultiplier >= 5) save.hasJackpot = true;
             const earnBeforeCoin = earn;
             earn = Math.round(earn * coinMultiplier);
             showCoinPopup(coinMultiplier);
@@ -2317,7 +2333,12 @@
         popupCtx.clearRect(0, 0, popupCanvas.width, popupCanvas.height);
         drawPixelCoin(popupCtx, popupCanvas.width, "PAF");
         document.getElementById("coin-popup-text").textContent = "x" + multiplier;
-        jackpot.style.display = multiplier === 5 ? "block" : "none";
+        if (multiplier >= 5) {
+            jackpot.textContent = multiplier >= 10 ? tr("jackpotTextX10") : tr("jackpotTextX5");
+            jackpot.style.display = "block";
+        } else {
+            jackpot.style.display = "none";
+        }
         popup.classList.remove("fading");
         popup.classList.add("show");
         setTimeout(() => popup.classList.add("fading"), 700);
@@ -2652,7 +2673,7 @@
         ctx.strokeStyle = "rgba(107,255,176,0.9)";
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.arc(cx, cy, QTE_RING_TARGET, 0, Math.PI * 2);
+        ctx.arc(cx, cy, qteTargetRadius, 0, Math.PI * 2);
         ctx.stroke();
 
         ctx.strokeStyle = "rgba(255,255,255,0.95)";
@@ -2861,6 +2882,7 @@
                 state = "qte";
                 phaseTimer = 0;
                 qteResults = [];
+                qteTargetRadius = pickQteTargetRadius();
                 document.getElementById("qte-wrap").classList.add("show");
                 renderQteDots();
             }
@@ -4101,8 +4123,19 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.3.1";
+    const VERSION_NUMBER = "3.4.1";
     const CHANGELOG = [
+        {
+            version: "3.4.1",
+            major: [
+                { fr: "Ajout d'un système de succès (bouton entre Volcans et Plage), avec le % de joueurs actifs ayant débloqué chacun", en: "Added an achievement system (button between Volcans and Plage), showing the % of active players who unlocked each one" },
+            ],
+            minor: [
+                { fr: "Correction d'un bug d'affichage mobile : l'argent gagné après un lancer était caché derrière le bouton \"← Menu\"", en: "Fixed a mobile display bug: the money earned after a throw was hidden behind the \"← Menu\" button" },
+                { fr: "La Trousse Pièce peut maintenant tomber sur un multiplicateur x10 (0,1% de chance) ; le x5 passe de 1% à 0,9%", en: "The Coin Pencil Case can now roll a x10 multiplier (0.1% chance); x5 drops from 1% to 0.9%" },
+                { fr: "Difficulté augmentée sur le QTE en apesanteur : 5 anneaux au lieu de 3, avec une cible de taille aléatoire (petite/moyenne/grande) à chaque round", en: "Increased difficulty on the zero-G QTE: 5 rings instead of 3, with a randomly sized target (small/medium/large) each round" },
+            ],
+        },
         {
             version: "3.3.1",
             major: [],
