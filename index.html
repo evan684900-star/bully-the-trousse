@@ -734,6 +734,40 @@
             align-items: center;
             justify-content: center;
         }
+        /* Petit lien discret en bas à gauche, ouvre #links-modal */
+        .links-btn {
+            position: fixed;
+            bottom: calc(10px + env(safe-area-inset-bottom));
+            left: calc(10px + env(safe-area-inset-left));
+            z-index: 20;
+            height: 42px;
+            padding: 0 14px;
+            border-radius: 999px;
+            border: 2px solid var(--panel-border);
+            background: var(--panel-bg);
+            color: var(--text-dim);
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .links-list { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 0; }
+        .links-list a {
+            display: block;
+            background: var(--card-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            color: var(--text);
+            text-decoration: none;
+            font-weight: 700;
+            font-size: 14px;
+            text-align: left;
+        }
+        .links-list a span { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-top: 2px; }
+
         /* ---------- CINÉMATIQUE DU MONDE VOLCAN ---------- */
         /* La cinématique réutilise le canvas et les décors du jeu : on masque
            simplement le HUD (body.cine-mode) et on superpose #cine-ui. */
@@ -745,7 +779,8 @@
         body.cine-mode #btn-game-back,
         body.cine-mode .mute-btn,
         body.cine-mode .theme-btn,
-        body.cine-mode .lang-btn { display: none !important; }
+        body.cine-mode .lang-btn,
+        body.cine-mode .links-btn { display: none !important; }
         #game-canvas { transform-origin: 50% 50%; }
 
         #cine-ui { position: absolute; inset: 0; display: none; z-index: 40; pointer-events: none; }
@@ -894,7 +929,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.4.1</div>
+                <div class="version-tag" id="version-tag">v3.5.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1089,6 +1124,24 @@
         </div>
     </div>
 
+    <!-- "Mes liens" (bouton discret en bas à gauche, visible sur les 3 écrans) -->
+    <div class="modal-overlay" id="links-modal">
+        <div class="info-box">
+            <h2 data-i18n="linksTitle">🔗 Mes liens</h2>
+            <div class="links-list">
+                <a href="https://evyverse.vercel.app" target="_blank" rel="noopener noreferrer">
+                    🌐 evyverse.vercel.app
+                    <span data-i18n="linksSiteDesc">Mon site</span>
+                </a>
+                <a href="https://whatsapp.com/channel/0029VbDIKVI4IBh8MLKV2y25" target="_blank" rel="noopener noreferrer">
+                    💬 <span data-i18n="linksWhatsappLabel">Chaîne WhatsApp</span>
+                    <span data-i18n="linksWhatsappDesc">Actus de ce jeu</span>
+                </a>
+            </div>
+            <button class="btn" id="btn-links-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+
     <!-- Son du tremblement de terre de la cinématique -->
     <audio id="sfx-quake" src="tremblementdeterre.mp3" preload="auto"></audio>
 
@@ -1099,6 +1152,7 @@
     <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
     <button id="btn-theme" class="theme-btn" title="Thème clair / sombre">🌙</button>
     <button id="btn-lang" class="lang-btn" title="Changer de langue">FR</button>
+    <button id="btn-links" class="links-btn" data-i18n="linksButton">🔗 Mes liens</button>
 </div>
 
 <!-- SDK Firebase (compat, sans étape de build) : auth anonyme + Firestore.
@@ -1237,6 +1291,11 @@
         achvPctLoading: { fr: "Chargement des statistiques...", en: "Loading stats..." },
         jackpotTextX5: { fr: "t'as eu un fois 5 !?! prend une capture d'écran !! (prend en 5 du coup)", en: "you got a five multiplier!?! take a screenshot!! (take 5 of them while you're at it)" },
         jackpotTextX10: { fr: "UN FOIS 10 !?! PERSONNE VA TE CROIRE, PREND UNE CAPTURE D'ÉCRAN TOUT DE SUITE !!", en: "A TEN MULTIPLIER!?! NOBODY WILL BELIEVE YOU, TAKE A SCREENSHOT RIGHT NOW!!" },
+        linksButton: { fr: "🔗 Mes liens", en: "🔗 My links" },
+        linksTitle: { fr: "🔗 Mes liens", en: "🔗 My links" },
+        linksSiteDesc: { fr: "Mon site", en: "My site" },
+        linksWhatsappLabel: { fr: "Chaîne WhatsApp", en: "WhatsApp channel" },
+        linksWhatsappDesc: { fr: "Actus de ce jeu", en: "Updates about this game" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -3168,6 +3227,7 @@
     let cineFlash = 0;        // éclair de l'explosion
     let cineCloudScroll = 0;
     let cineRot = 0;
+    let cineSavedTheme = null; // thème du joueur avant la cinématique (voir startVolcanoCinematic/cineTeardown)
 
     function cIn(t) { return t * t * t; }
     function cOut(t) { return 1 - Math.pow(1 - t, 3); }
@@ -3189,6 +3249,14 @@
 
     function startVolcanoCinematic() {
         cineActive = true;
+        // Le voile de nuit bugue avec les décors de la cinématique : on force le
+        // mode jour pendant qu'elle tourne, et on remet le thème d'origine à la fin
+        // (voir cineTeardown).
+        cineSavedTheme = save.theme;
+        if (save.theme !== "light") {
+            save.theme = "light";
+            applyTheme();
+        }
         document.body.classList.add("cine-mode");
         // L'écran de jeu s'affiche DERRIÈRE le menu, qui se dissout doucement.
         screens.game.classList.add("active");
@@ -3296,6 +3364,13 @@
         canvas.style.transform = "";
         cineUI.fade.style.opacity = 0;
         dustParticles = [];
+        // Remet le thème du joueur tel qu'il était avant la cinématique (voir
+        // startVolcanoCinematic, qui forçait le mode jour le temps qu'elle tourne).
+        if (cineSavedTheme !== null) {
+            save.theme = cineSavedTheme;
+            cineSavedTheme = null;
+            applyTheme();
+        }
     }
 
     function cineFinish() {
@@ -4123,8 +4198,16 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.4.1";
+    const VERSION_NUMBER = "3.5.2";
     const CHANGELOG = [
+        {
+            version: "3.5.2",
+            major: [],
+            minor: [
+                { fr: "Correction d'un bug d'affichage pendant la cinématique du volcan : le voile de nuit posait problème en thème sombre. Le mode jour est maintenant forcé le temps de la cinématique, puis ton thème d'origine est restauré", en: "Fixed a display bug during the volcano cutscene: the night veil caused issues in dark theme. Day mode is now forced for the duration of the cutscene, then your original theme is restored" },
+                { fr: "Ajout d'un bouton \"Mes liens\" en bas à gauche, avec le site (evyverse.vercel.app) et la chaîne WhatsApp du jeu", en: "Added a \"My links\" button in the bottom-left corner, with the site (evyverse.vercel.app) and the game's WhatsApp channel" },
+            ],
+        },
         {
             version: "3.4.1",
             major: [],
@@ -4195,8 +4278,15 @@
         document.getElementById("achv-modal").classList.remove("show");
     });
 
+    document.getElementById("btn-links").addEventListener("click", () => {
+        document.getElementById("links-modal").classList.add("show");
+    });
+    document.getElementById("btn-links-close").addEventListener("click", () => {
+        document.getElementById("links-modal").classList.remove("show");
+    });
+
     // Clic en dehors de la boîte = fermeture
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
