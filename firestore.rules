@@ -28,5 +28,18 @@ service cloud.firestore {
                    && request.resource.data.bestDistance >= 0
                    && request.resource.data.bestDistance <= 100000;
     }
+
+    // Statistiques publiques du système de succès (% de joueurs par succès,
+    // voir la modale "Succès") : juste assez de données pour compter des
+    // comptes, jamais le contenu d'une sauvegarde. Lecture publique (pour les
+    // requêtes count()), chacun ne peut marquer que son propre compte.
+    match /activePlayers/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+    match /achvUnlocks/{achvId}/players/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
   }
 }

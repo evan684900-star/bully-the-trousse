@@ -351,6 +351,11 @@
         .achievement-row .info { flex: 1; }
         .achievement-row .info h3 { margin: 0 0 3px; font-size: 14px; }
         .achievement-row .info p { margin: 0; font-size: 11.5px; color: var(--text-dim); }
+        .achievement-row .pct {
+            font-size: 11px; font-weight: 800; color: var(--accent);
+            white-space: nowrap; text-align: right; min-width: 42px;
+        }
+        .achv-pool-status { font-size: 11.5px; color: var(--text-dim); margin: -4px 0 10px; text-align: center; }
 
         /* ---------- ÉCRAN DE JEU ---------- */
         /* Tout le décor + la trousse sont dessinés dans ce <canvas> en JS */
@@ -1066,6 +1071,7 @@
     <div class="modal-overlay" id="achv-modal">
         <div class="info-box achv-box">
             <h2 data-i18n="achvModalTitle">🏆 Succès</h2>
+            <p id="achv-pool-status" class="achv-pool-status"></p>
             <div id="achv-list"></div>
             <button class="btn" id="btn-achv-close" data-i18n="btnOk">OK</button>
         </div>
@@ -1217,6 +1223,14 @@
         achvJackpotDesc: { fr: "Obtiens un multiplicateur x5 avec la Trousse Pièce.", en: "Get a x5 multiplier with the Coin Pencil Case." },
         achvDedicatedName: { fr: "Joueur assidu", en: "Dedicated player" },
         achvDedicatedDesc: { fr: "Cumule 1 heure de jeu.", en: "Reach 1 hour of cumulative playtime." },
+        achvPctNotEnough: {
+            fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (10 minimum, ",
+            en: "Not enough active players yet for reliable stats (10 minimum, "
+        },
+        achvPctNotEnoughSuffix: { fr: " actuellement).", en: " right now)." },
+        achvPctActivePlayers: { fr: " joueurs actifs.", en: " active players." },
+        achvPctOffline: { fr: "Statistiques indisponibles hors ligne.", en: "Stats unavailable offline." },
+        achvPctLoading: { fr: "Chargement des statistiques...", en: "Loading stats..." },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -1454,6 +1468,7 @@
                 changed = true;
                 showToast(tr("achvUnlockedPrefix") + tr(a.nameKey));
                 sfxBuy();
+                pushAchvUnlock(a.id); // best-effort, alimente le % de joueurs (voir section 12)
             }
         });
         // Ne relance pas persist() (récursion) : simple sauvegarde directe.
@@ -1682,11 +1697,13 @@
         });
         list.innerHTML = sorted.map((a) => {
             const unlocked = save.unlockedAchievements.includes(a.id);
-            return '<div class="achievement-row' + (unlocked ? "" : " locked") + '">' +
+            return '<div class="achievement-row' + (unlocked ? "" : " locked") + '" data-achv="' + a.id + '">' +
                 '<div class="icon">' + (unlocked ? a.emoji : "🔒") + '</div>' +
                 '<div class="info"><h3>' + tr(a.nameKey) + '</h3><p>' + tr(a.descKey) + '</p></div>' +
+                '<div class="pct">—</div>' +
                 '</div>';
         }).join("");
+        loadAchievementStats(); // best-effort, remplit les "pct" et le statut du pool ci-dessus
     }
 
     // Boucle légère (juste pour l'image de prévisualisation) qui met à jour
@@ -3771,6 +3788,7 @@
                 persist(); // écrit en local ET envoie au cloud (pushCloudSave seul aurait sauté le localStorage)
             }
             document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
+            syncAchievementStats(); // rattrape les succès déjà débloqués avant l'ajout de ce système
         }).catch((err) => console.error("Lecture de la sauvegarde cloud impossible :", err));
     }
 
@@ -3781,6 +3799,74 @@
         if (!db || !currentUser) return;
         db.collection("users").doc(currentUser.uid).set(save, { merge: true })
             .catch((err) => console.error("Sauvegarde cloud impossible :", err));
+    }
+
+    // --- Statistiques publiques des succès (% de joueurs) ---
+    // Un compte est "actif" dès qu'il a fait au moins un lancer. On garde une
+    // trace publique (mais anonyme, un simple uid) de qui est actif et de qui
+    // a débloqué quel succès, dans deux collections à part de "users" (privée) :
+    // ça permet de compter sans jamais exposer le contenu des sauvegardes.
+    function markPlayerActive() {
+        if (!db || !currentUser || save.totalThrows < 1) return;
+        db.collection("activePlayers").doc(currentUser.uid).set({ active: true }, { merge: true })
+            .catch((err) => console.error("Marquage du compte actif impossible :", err));
+    }
+
+    // Best-effort : signale qu'un succès donné vient d'être débloqué par ce compte.
+    function pushAchvUnlock(id) {
+        if (!db || !currentUser) return;
+        markPlayerActive();
+        db.collection("achvUnlocks").doc(id).collection("players").doc(currentUser.uid)
+            .set({ unlocked: true }, { merge: true })
+            .catch((err) => console.error("Envoi du succès impossible :", err));
+    }
+
+    // Rattrapage exécuté une fois à la connexion : renvoie chaque succès déjà
+    // débloqué localement, au cas où le compte existait avant ce système de
+    // statistiques (sinon ces succès resteraient invisibles dans les %).
+    function syncAchievementStats() {
+        markPlayerActive();
+        save.unlockedAchievements.forEach((id) => pushAchvUnlock(id));
+    }
+
+    // Compte les documents d'une collection/requête ; utilise l'agrégation
+    // count() quand elle est disponible (rapide, ne télécharge pas les docs),
+    // sinon retombe sur un .get() classique (SDK plus ancien).
+    function countDocs(ref) {
+        if (typeof ref.count === "function") {
+            return ref.count().get().then((snap) => snap.data().count);
+        }
+        return ref.get().then((snap) => snap.size);
+    }
+
+    const ACHV_MIN_ACTIVE_PLAYERS = 10; // en dessous, le pool est jugé trop petit pour un % fiable
+
+    // Charge le nombre de joueurs actifs puis, si le pool est assez grand, le
+    // nombre de joueurs ayant débloqué chaque succès. Purement décoratif : en
+    // cas d'échec ou hors ligne, la modale reste utilisable sans pourcentages.
+    function loadAchievementStats() {
+        const statusEl = document.getElementById("achv-pool-status");
+        if (!FIREBASE_ENABLED || !db) {
+            statusEl.textContent = tr("achvPctOffline");
+            return;
+        }
+        statusEl.textContent = tr("achvPctLoading");
+        countDocs(db.collection("activePlayers")).then((totalActive) => {
+            if (totalActive < ACHV_MIN_ACTIVE_PLAYERS) {
+                statusEl.textContent = tr("achvPctNotEnough") + totalActive + tr("achvPctNotEnoughSuffix");
+                return;
+            }
+            statusEl.textContent = totalActive + tr("achvPctActivePlayers");
+            ACHIEVEMENTS.forEach((a) => {
+                countDocs(db.collection("achvUnlocks").doc(a.id).collection("players")).then((count) => {
+                    const pctEl = document.querySelector('.achievement-row[data-achv="' + a.id + '"] .pct');
+                    if (pctEl) pctEl.textContent = Math.round((count / totalActive) * 100) + " %";
+                }).catch((err) => console.error("Comptage du succès " + a.id + " impossible :", err));
+            });
+        }).catch((err) => {
+            console.error("Comptage des joueurs actifs impossible :", err);
+            statusEl.textContent = tr("achvPctOffline");
+        });
     }
 
     // Met à jour l'entrée du classement (un seul document par joueur, écrasé
