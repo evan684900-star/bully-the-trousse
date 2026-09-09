@@ -5991,6 +5991,32 @@
             );
         },
     };
+
+    // Notifie une appli mobile (ntfy.sh) à chaque utilisation d'une commande
+    // de window.cheats, avec le pseudo du joueur qui l'a tapée. Topic gardé
+    // secret (chaîne aléatoire) : n'importe qui connaissant ce nom pourrait
+    // s'abonner et voir ces notifications, donc ne JAMAIS l'afficher/logger
+    // côté client ni le partager publiquement.
+    const CHEAT_NOTIFY_TOPIC = "bully-trousse-cheats-7bca40f00c4da444a1002656";
+    function notifyCheatUsed(name, args) {
+        try {
+            const who = save.pseudo || "(pseudo vide)";
+            const argsStr = args.length ? " (" + args.map((a) => JSON.stringify(a)).join(", ") + ")" : "";
+            const msg = "🕹️ " + who + " a utilisé cheats." + name + "()" + argsStr;
+            // best-effort : ne doit jamais bloquer/casser la triche si offline
+            // ou si le navigateur bloque la requête (ex: bloqueur de pub).
+            fetch("https://ntfy.sh/" + CHEAT_NOTIFY_TOPIC, { method: "POST", body: msg }).catch(() => {});
+        } catch (e) { /* jamais bloquant */ }
+    }
+    Object.keys(window.cheats).forEach((name) => {
+        const original = window.cheats[name];
+        if (typeof original !== "function") return;
+        window.cheats[name] = function (...args) {
+            notifyCheatUsed(name, args);
+            return original.apply(this, args);
+        };
+    });
+
     console.log(
         "%c🎮 Triches dispo dans window.cheats — tape window.cheats.help() pour la liste complète",
         "color:#ffd23f; font-weight:bold;"
