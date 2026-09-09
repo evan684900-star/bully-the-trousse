@@ -5042,6 +5042,11 @@
             save.pseudo = next.trim().slice(0, 24);
             persist();
             document.getElementById("leaderboard-pseudo").textContent = save.pseudo;
+            // Le classement (scores/{uid}) n'est normalement réécrit que sur un
+            // nouveau record (voir pushScoreIfRecord) : sans ce push explicite,
+            // un changement de pseudo n'apparaîtrait dans le classement qu'au
+            // prochain record battu.
+            pushScoreIfRecord(save.bestDistance);
         }
     });
 
