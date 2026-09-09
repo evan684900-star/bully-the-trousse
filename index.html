@@ -370,6 +370,31 @@
         }
         .achv-pool-status { font-size: 11.5px; color: var(--text-dim); margin: -4px 0 10px; text-align: center; }
 
+        /* ---------- MODALE DÉFIS QUOTIDIENS ---------- */
+        .challenges-box { max-height: 80vh; overflow-y: auto; }
+        .world-card.achv-card.challenge-ready { box-shadow: 0 0 0 2px var(--accent); }
+        .challenge-row {
+            display: flex; align-items: center; gap: 12px;
+            background: var(--card-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 12px;
+            padding: 10px 12px;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+        .challenge-row.claimed { opacity: 0.55; }
+        .challenge-row .icon { font-size: 26px; width: 34px; text-align: center; }
+        .challenge-row .info { flex: 1; }
+        .challenge-row .info h3 { margin: 0 0 6px; font-size: 13.5px; font-weight: 600; }
+        .challenge-bar { height: 10px; border-radius: 999px; background: rgba(0,0,0,0.3); overflow: hidden; }
+        .challenge-bar > div { height: 100%; background: linear-gradient(90deg, #ffd23f, #ff9f43); }
+        .challenge-progress { margin: 4px 0 0; font-size: 11px; color: var(--text-dim); }
+        .challenge-claim-btn { white-space: nowrap; }
+        .challenge-reward-tag {
+            font-size: 11px; font-weight: 800; color: var(--accent);
+            white-space: nowrap; text-align: right; min-width: 46px;
+        }
+
         /* ---------- ÉCRAN DE JEU ---------- */
         /* Tout le décor + la trousse sont dessinés dans ce <canvas> en JS */
         #screen-game canvas {
@@ -1078,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v4.3.1</div>
+                <div class="version-tag" id="version-tag">v5.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1274,6 +1299,16 @@
         </div>
     </div>
 
+    <!-- Défis quotidiens (bouton entre Volcans et Succès dans la rangée des mondes) -->
+    <div class="modal-overlay" id="challenges-modal">
+        <div class="info-box challenges-box">
+            <h2 data-i18n="challengesModalTitle">📅 Défis quotidiens</h2>
+            <p id="challenges-reset-info" class="achv-pool-status"></p>
+            <div id="challenges-list"></div>
+            <button class="btn" id="btn-challenges-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+
     <!-- Journal des changements (clic sur le numéro de version au menu) -->
     <div class="modal-overlay" id="changelog-modal">
         <div class="info-box changelog-box">
@@ -1466,6 +1501,16 @@
         changelogMinor: { fr: "Ajouts mineurs :", en: "Minor additions:" },
         achvCardName: { fr: "Succès", en: "Achievements" },
         achvModalTitle: { fr: "🏆 Succès", en: "🏆 Achievements" },
+        challengesCardName: { fr: "Défis", en: "Challenges" },
+        challengesModalTitle: { fr: "📅 Défis quotidiens", en: "📅 Daily challenges" },
+        challengesResetInfo: { fr: "Se renouvellent chaque jour à minuit.", en: "Refresh every day at midnight." },
+        challengeClaimed: { fr: "✅ Réclamé", en: "✅ Claimed" },
+        challengeThrowsDesc: { fr: "Lance ta trousse {target} fois", en: "Throw your pencil case {target} times" },
+        challengeDistanceDesc: { fr: "Atteins {target} m en un seul lancer", en: "Reach {target} m in a single throw" },
+        challengeEarnDesc: { fr: "Gagne {target} $ aujourd'hui", en: "Earn {target}$ today" },
+        challengePerfectDesc: { fr: "Réussis {target} lancer(s) parfait(s)", en: "Land {target} perfect throw(s)" },
+        challengeVolcanDesc: { fr: "Lance {target} fois dans le monde Volcan", en: "Throw {target} times in the Volcano world" },
+        challengeSkidDesc: { fr: "Déclenche {target} dérapage(s)", en: "Trigger {target} skid(s)" },
         achvUnlockedPrefix: { fr: "🏆 Succès débloqué : ", en: "🏆 Achievement unlocked: " },
         achvFirstThrowName: { fr: "Premier envol", en: "First launch" },
         achvFirstThrowDesc: { fr: "Fais un premier lancer.", en: "Make a first throw." },
@@ -1706,6 +1751,37 @@
         { id: "qteParfait", emoji: "🎯", nameKey: "achvPerfectQteName", descKey: "achvPerfectQteDesc", check: (s) => s.hasPerfectQte },
     ];
 
+    // Défis quotidiens (voir ensureDailyChallenges/bumpDailyChallenge) : 3 tirés
+    // au hasard chaque jour parmi ces types, avec un palier de difficulté
+    // choisi au hasard (tiers). "volcan"/"skid" ne sont proposés que si le
+    // monde Volcan est débloqué (voir generateDailyChallenges).
+    const CHALLENGE_POOL = [
+        {
+            kind: "throws", emoji: "🎒", descKey: "challengeThrowsDesc",
+            tiers: [{ target: 5, reward: 150 }, { target: 10, reward: 280 }, { target: 15, reward: 400 }],
+        },
+        {
+            kind: "distance", emoji: "📏", descKey: "challengeDistanceDesc",
+            tiers: [{ target: 60, reward: 150 }, { target: 120, reward: 300 }, { target: 200, reward: 500 }],
+        },
+        {
+            kind: "earn", emoji: "💰", descKey: "challengeEarnDesc",
+            tiers: [{ target: 300, reward: 150 }, { target: 800, reward: 350 }, { target: 1500, reward: 600 }],
+        },
+        {
+            kind: "perfect", emoji: "✨", descKey: "challengePerfectDesc",
+            tiers: [{ target: 1, reward: 150 }, { target: 2, reward: 300 }, { target: 3, reward: 450 }],
+        },
+        {
+            kind: "volcan", emoji: "🌋", descKey: "challengeVolcanDesc", requiresVolcan: true,
+            tiers: [{ target: 3, reward: 200 }, { target: 6, reward: 400 }],
+        },
+        {
+            kind: "skid", emoji: "💨", descKey: "challengeSkidDesc", requiresVolcan: true,
+            tiers: [{ target: 2, reward: 200 }, { target: 4, reward: 400 }],
+        },
+    ];
+
     // Chaque skin réutilise la même image (trousse-skin-1.png) mais applique
     // un filtre CSS/canvas différent pour changer les couleurs, plus un bonus
     // de statistiques ajouté par-dessus les niveaux achetés en boutique.
@@ -1843,6 +1919,9 @@
             dailyBestDistance: {},     // { "AAAA-MM-JJ": mètres } meilleur lancer du jour, sur 7 jours
             isPrivate: false,          // compte privé : les autres voient une banderole au lieu du profil
             avatarEmoji: "",           // icône de profil choisie dans AVATAR_EMOJIS, vide = avatar par défaut
+            // --- Défis quotidiens (voir CHALLENGE_POOL et ensureDailyChallenges) ---
+            dailyChallengeDate: "",    // "AAAA-MM-JJ" du jour où dailyChallenges a été généré
+            dailyChallenges: [],       // [{ kind, target, progress, reward, claimed }, ...]
         };
     }
 
@@ -2161,9 +2240,12 @@
                 buildWorldsRow();
             });
             row.appendChild(card);
-            // Bouton "Succès" : placé juste après la carte Volcans, donc entre
-            // Volcans et Plage dans WORLDS (voir la liste plus haut).
-            if (w.id === "volcans") row.appendChild(buildAchvCard());
+            // Boutons "Succès" et "Défis" : placés juste après la carte Volcans,
+            // donc entre Volcans et Plage dans WORLDS (voir la liste plus haut).
+            if (w.id === "volcans") {
+                row.appendChild(buildAchvCard());
+                row.appendChild(buildChallengesCard());
+            }
         });
     }
 
@@ -2197,6 +2279,104 @@
                 '</div>';
         }).join("");
         loadAchievementStats(); // best-effort, remplit les "pct" et le statut du pool ci-dessus
+    }
+
+    /* ============ Défis quotidiens (voir CHALLENGE_POOL) ============ */
+
+    // Tire 3 défis parmi CHALLENGE_POOL (un palier de difficulté au hasard
+    // pour chacun), en excluant les défis liés au Volcan tant qu'il n'est pas
+    // débloqué pour ne pas coincer un joueur sur un objectif impossible.
+    function generateDailyChallenges() {
+        const available = CHALLENGE_POOL.filter((def) => !def.requiresVolcan || save.volcanUnlocked);
+        const shuffled = available.slice().sort(() => Math.random() - 0.5);
+        return shuffled.slice(0, 3).map((def) => {
+            const tier = def.tiers[Math.floor(Math.random() * def.tiers.length)];
+            return { kind: def.kind, target: tier.target, reward: tier.reward, progress: 0, claimed: false };
+        });
+    }
+
+    // (Re)génère les défis du jour si la date a changé depuis la dernière
+    // visite. Appelée à chaque fois qu'on a besoin de save.dailyChallenges à
+    // jour (carte du menu, modale, progression) : pas besoin d'un hook séparé
+    // au chargement.
+    function ensureDailyChallenges() {
+        const today = todayKey();
+        if (save.dailyChallengeDate === today && save.dailyChallenges.length) return;
+        save.dailyChallengeDate = today;
+        save.dailyChallenges = generateDailyChallenges();
+        persist();
+    }
+
+    // Fait progresser un défi en cours (mode "add" cumule, "max" garde la
+    // meilleure valeur atteinte) : voir les appels dans onLanded().
+    function bumpDailyChallenge(kind, amount, mode) {
+        ensureDailyChallenges();
+        const c = save.dailyChallenges.find((c) => c.kind === kind);
+        if (!c || c.claimed) return;
+        c.progress = mode === "max" ? Math.max(c.progress, amount) : c.progress + amount;
+    }
+
+    function claimDailyChallenge(idx) {
+        const c = save.dailyChallenges[idx];
+        if (!c || c.claimed || c.progress < c.target) return;
+        c.claimed = true;
+        save.money += c.reward;
+        recordDailyEarning(c.reward);
+        persist();
+        refreshMenu();
+        sfxBuy();
+        showToast("🎯 +" + c.reward + "$ !");
+        renderDailyChallenges();
+    }
+
+    // Carte cliquable ouvrant la modale des défis (voir renderDailyChallenges).
+    function buildChallengesCard() {
+        ensureDailyChallenges();
+        const doneCount = save.dailyChallenges.filter((c) => c.progress >= c.target).length;
+        const claimableCount = save.dailyChallenges.filter((c) => c.progress >= c.target && !c.claimed).length;
+        const card = document.createElement("div");
+        card.className = "world-card achv-card" + (claimableCount > 0 ? " challenge-ready" : "");
+        card.innerHTML = '<div class="emoji">📅</div><div class="name">' + tr("challengesCardName") + '</div>' +
+            '<div class="achv-badge">' + doneCount + "/" + save.dailyChallenges.length + "</div>";
+        card.addEventListener("click", () => {
+            renderDailyChallenges();
+            document.getElementById("challenges-modal").classList.add("show");
+        });
+        return card;
+    }
+
+    // Reconstruit la liste des défis du jour dans la modale.
+    function renderDailyChallenges() {
+        ensureDailyChallenges();
+        document.getElementById("challenges-reset-info").textContent = tr("challengesResetInfo");
+        const list = document.getElementById("challenges-list");
+        list.innerHTML = save.dailyChallenges.map((c, i) => {
+            const def = CHALLENGE_POOL.find((p) => p.kind === c.kind);
+            const shownRaw = Math.min(c.progress, c.target);
+            const shown = c.kind === "distance" ? shownRaw.toFixed(1) : Math.round(shownRaw);
+            const pct = Math.min(100, Math.round((c.progress / c.target) * 100));
+            const done = c.progress >= c.target;
+            const unit = c.kind === "distance" ? " m" : c.kind === "earn" ? " $" : "";
+            const desc = tr(def.descKey).replace("{target}", c.target);
+            let action;
+            if (c.claimed) {
+                action = '<div class="challenge-reward-tag">' + tr("challengeClaimed") + '</div>';
+            } else if (done) {
+                action = '<button class="btn small challenge-claim-btn" data-idx="' + i + '">+' + c.reward + ' $</button>';
+            } else {
+                action = '<div class="challenge-reward-tag">+' + c.reward + ' $</div>';
+            }
+            return '<div class="challenge-row' + (c.claimed ? " claimed" : "") + '">' +
+                '<div class="icon">' + def.emoji + '</div>' +
+                '<div class="info"><h3>' + desc + '</h3>' +
+                '<div class="challenge-bar"><div style="width:' + pct + '%"></div></div>' +
+                '<p class="challenge-progress">' + shown + " / " + c.target + unit + '</p></div>' +
+                action +
+                '</div>';
+        }).join("");
+        list.querySelectorAll(".challenge-claim-btn").forEach((btn) => {
+            btn.addEventListener("click", () => claimDailyChallenge(parseInt(btn.dataset.idx, 10)));
+        });
     }
 
     // Boucle légère (juste pour l'image de prévisualisation) qui met à jour
@@ -2834,6 +3014,7 @@
         save.money += earn;
         recordDailyEarning(earn);
         recordDailyDistance(distanceMeters);
+        let totalGainedThisThrow = earn;
 
         // Récompense de palier (100m, 200m, ...) : ne se déclenche qu'une seule
         // fois par palier, même si un lancer (ex: boost spatial) en franchit
@@ -2845,8 +3026,18 @@
             save.milestoneReached = milestone;
             save.money += milestoneBonus;
             recordDailyEarning(milestoneBonus);
+            totalGainedThisThrow += milestoneBonus;
             showToast("🎉 Palier des " + (milestone * 100) + "m atteint ! +" + milestoneBonus + "$");
         }
+
+        // Progression des défis quotidiens (voir CHALLENGE_POOL) : "volcan"/
+        // "skid" seulement au monde Volcan hors apesanteur, comme le dérapage.
+        bumpDailyChallenge("throws", 1, "add");
+        bumpDailyChallenge("distance", distanceMeters, "max");
+        bumpDailyChallenge("earn", totalGainedThisThrow, "add");
+        if (isPerfect) bumpDailyChallenge("perfect", 1, "add");
+        if (didSkid) bumpDailyChallenge("skid", 1, "add");
+        if (save.currentWorld === "volcans" && !inSpaceMode) bumpDailyChallenge("volcan", 1, "add");
 
         persist();
 
@@ -5272,8 +5463,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "4.3.1";
+    const VERSION_NUMBER = "5.0.0";
     const CHANGELOG = [
+        {
+            version: "5.0.0",
+            major: [
+                { fr: "Ajout des défis quotidiens : 3 objectifs tirés au hasard chaque jour (lancers, distance, argent gagné, lancers parfaits, et des défis spéciaux Volcan une fois débloqué), avec une récompense en argent à réclamer une fois complétés", en: "Added daily challenges: 3 goals picked at random each day (throws, distance, money earned, perfect throws, and special Volcano challenges once unlocked), with a money reward to claim once completed" },
+            ],
+            minor: [],
+        },
         {
             version: "4.3.1",
             major: [],
@@ -5462,6 +5660,10 @@
         document.getElementById("achv-modal").classList.remove("show");
     });
 
+    document.getElementById("btn-challenges-close").addEventListener("click", () => {
+        document.getElementById("challenges-modal").classList.remove("show");
+    });
+
     document.getElementById("btn-links").addEventListener("click", () => {
         document.getElementById("links-modal").classList.add("show");
     });
@@ -5474,7 +5676,7 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "challenges-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
