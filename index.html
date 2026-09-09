@@ -1103,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.1.0</div>
+                <div class="version-tag" id="version-tag">v5.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1542,6 +1542,8 @@
         achv50ThrowsDesc: { fr: "Effectue 50 lancers.", en: "Make 50 throws." },
         achv100ThrowsName: { fr: "J'ai des courbatures", en: "I'm sore all over" },
         achv100ThrowsDesc: { fr: "Effectue 100 lancers.", en: "Make 100 throws." },
+        achvPoopName: { fr: "💩", en: "💩" },
+        achvPoopDesc: { fr: "💩", en: "💩" },
         achvAllTrailsName: { fr: "Sillage complet", en: "Full trail set" },
         achvAllTrailsDesc: { fr: "Possède toutes les traînées.", en: "Own every trail." },
         achvSpaceEggName: { fr: "Vers l'infini...", en: "To infinity..." },
@@ -1749,6 +1751,7 @@
         { id: "joueurAssidu", emoji: "⏱️", nameKey: "achvDedicatedName", descKey: "achvDedicatedDesc", check: (s) => s.playTime >= 3600 },
         { id: "cinquanteLancers", emoji: "💪", nameKey: "achv50ThrowsName", descKey: "achv50ThrowsDesc", check: (s) => s.totalThrows >= 50 },
         { id: "centLancers", emoji: "🦵", nameKey: "achv100ThrowsName", descKey: "achv100ThrowsDesc", check: (s) => s.totalThrows >= 100 },
+        { id: "cacaCache", emoji: "💩", nameKey: "achvPoopName", descKey: "achvPoopDesc", check: (s) => s.hasFoundPoopEgg },
         { id: "toutesTrainees", emoji: "🌈", nameKey: "achvAllTrailsName", descKey: "achvAllTrailsDesc", check: (s) => s.ownedTrails.length >= TRAILS.length },
         { id: "easterEggEspace", emoji: "🛸", nameKey: "achvSpaceEggName", descKey: "achvSpaceEggDesc", check: (s) => s.hasTriggeredSpaceEgg },
         { id: "qteParfait", emoji: "🎯", nameKey: "achvPerfectQteName", descKey: "achvPerfectQteDesc", check: (s) => s.hasPerfectQte },
@@ -1916,6 +1919,7 @@
             hasJackpot: false,         // multiplicateur x5 de la Trousse Pièce déjà obtenu
             hasTriggeredSpaceEgg: false, // easter egg "vers l'espace" déjà déclenché une fois
             hasPerfectQte: false,      // les 5 anneaux du QTE en apesanteur déjà réussis d'affilée
+            hasFoundPoopEgg: false,    // easter egg 💩 caché derrière un bâtiment (Cour d'école) déjà trouvé
             // --- Compte / profil ---
             totalMoneyEarned: 0,       // argent gagné depuis le début (ne diminue jamais, contrairement à "money")
             dailyEarnings: {},         // { "AAAA-MM-JJ": montant } sur les 7 derniers jours (voir pruneDailyMap)
@@ -2786,6 +2790,39 @@
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
     let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
 
+    // Easter egg 💩 : caché derrière un bâtiment de la Cour d'école, visible
+    // seulement pendant la préparation du lancer (avant le décollage), donc
+    // à une position d'écran fixe puisque la caméra ne bouge pas encore (voir
+    // poopEggScreenPos, drawPoopEgg, et le hit-test dans pointerdown).
+    const CITY_BUILDING_SPACING = 260; // doit rester identique à drawBackground()
+    const POOP_EGG_BUILDING_INDEX = 1;
+    // Décalage depuis le coin bas-gauche du bâtiment (voir drawBuilding) :
+    // dans l'interstice entre 2 fenêtres, à l'écart de la porte et de l'arbre
+    // planté juste devant ce bâtiment (positions figées par seededRand, donc
+    // vérifiées une fois pour toutes plutôt que laissées au hasard).
+    const POOP_EGG_OFFSET_X = 126, POOP_EGG_OFFSET_Y = -10;
+    const POOP_EGG_SIZE = 15;
+    const POOP_EGG_HIT_RADIUS = 16;
+
+    function poopEggVisible() {
+        return save.currentWorld === "cour" && (state === "idle" || state === "charging_power" || state === "charging_angle");
+    }
+
+    function poopEggScreenPos() {
+        const bx = POOP_EGG_BUILDING_INDEX * CITY_BUILDING_SPACING - cameraX * 0.25;
+        return { x: bx + POOP_EGG_OFFSET_X, y: groundScreenY + POOP_EGG_OFFSET_Y };
+    }
+
+    function drawPoopEgg() {
+        const { x, y } = poopEggScreenPos();
+        ctx.save();
+        ctx.font = POOP_EGG_SIZE + "px sans-serif";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText("💩", x, y);
+        ctx.restore();
+    }
+
     // Monde Volcan : 1 atterrissage sur 4 part en dérapage incontrôlé, qui
     // rallonge le lancer mais abîme la trousse (voir startSkid / onLanded).
     const SKID_CHANCE = 0.25;
@@ -2890,8 +2927,32 @@
     canvas.addEventListener("pointerdown", (e) => {
         e.preventDefault();
         if (cineActive) return; // pendant la cinématique, c'est cineTap qui gère
+        // Easter egg 💩 : un clic dessus est "absorbé" (ne lance pas la charge
+        // de puissance) pour laisser le temps de voir la découverte.
+        if (poopEggVisible() && hitsPoopEgg(e)) {
+            revealPoopEgg();
+            return;
+        }
         handleTap();
     });
+
+    // Distance entre le clic (converti en coordonnées du canvas) et le centre
+    // de l'easter egg 💩 (voir poopEggScreenPos), comparée à sa zone cliquable.
+    function hitsPoopEgg(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const { x: ex, y: ey } = poopEggScreenPos();
+        return Math.hypot(x - ex, y - ey) <= POOP_EGG_HIT_RADIUS;
+    }
+
+    function revealPoopEgg() {
+        showToast("💩");
+        if (!save.hasFoundPoopEgg) {
+            save.hasFoundPoopEgg = true;
+            persist();
+        }
+    }
     window.addEventListener("keydown", (e) => {
         if (cineActive) return;
         if (e.code === "Space" && screens.game.classList.contains("active")) {
@@ -3275,13 +3336,16 @@
         // dans le calcul de position : un modulo là-dedans faisait "sauter" les
         // bâtiments de tout un cran (~260px) dès que parX franchissait un multiple
         // de buildingSpacing, ce qui donnait cet effet de fond qui se recharge.
-        const buildingSpacing = 260;
+        const buildingSpacing = CITY_BUILDING_SPACING;
         const parX = cameraX * 0.25;
         const buildingStartIdx = Math.floor((parX - 220) / buildingSpacing);
         const buildingEndIdx = Math.ceil((parX + w + 40) / buildingSpacing);
         for (let i = buildingStartIdx; i <= buildingEndIdx; i++) {
             const bx = i * buildingSpacing - parX;
             if (bx < -220 || bx > w + 40) continue;
+            // Dessiné AVANT le bâtiment (mur semi-transparent, voir drawBuilding)
+            // pour qu'il se fonde dans le mur au lieu de flotter par-dessus.
+            if (i === POOP_EGG_BUILDING_INDEX && poopEggVisible()) drawPoopEgg();
             drawBuilding(bx, groundScreenY, i);
         }
 
@@ -5501,8 +5565,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.1.0";
+    const VERSION_NUMBER = "5.2.0";
     const CHANGELOG = [
+        {
+            version: "5.2.0",
+            major: [],
+            minor: [
+                { fr: "Un succès secret se cache quelque part dans le décor... à toi de le trouver 👀", en: "A secret achievement is hiding somewhere in the scenery... find it 👀" },
+            ],
+        },
         {
             version: "5.1.0",
             major: [],
