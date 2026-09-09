@@ -1103,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.0.0</div>
+                <div class="version-tag" id="version-tag">v5.0.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1503,7 +1503,7 @@
         achvModalTitle: { fr: "🏆 Succès", en: "🏆 Achievements" },
         challengesCardName: { fr: "Défis", en: "Challenges" },
         challengesModalTitle: { fr: "📅 Défis quotidiens", en: "📅 Daily challenges" },
-        challengesResetInfo: { fr: "Se renouvellent chaque jour à minuit.", en: "Refresh every day at midnight." },
+        challengesResetInfo: { fr: "Prochain renouvellement dans {time}", en: "Next refresh in {time}" },
         challengeClaimed: { fr: "✅ Réclamé", en: "✅ Claimed" },
         challengeThrowsDesc: { fr: "Lance ta trousse {target} fois", en: "Throw your pencil case {target} times" },
         challengeDistanceDesc: { fr: "Atteins {target} m en un seul lancer", en: "Reach {target} m in a single throw" },
@@ -2339,16 +2339,51 @@
         card.innerHTML = '<div class="emoji">📅</div><div class="name">' + tr("challengesCardName") + '</div>' +
             '<div class="achv-badge">' + doneCount + "/" + save.dailyChallenges.length + "</div>";
         card.addEventListener("click", () => {
-            renderDailyChallenges();
+            // "show" doit être ajouté AVANT renderDailyChallenges() : le minuteur
+            // (voir updateChallengesCountdown) s'auto-arrête si la modale n'est
+            // pas visible, pour ne pas tourner en arrière-plan après fermeture.
             document.getElementById("challenges-modal").classList.add("show");
+            renderDailyChallenges();
         });
         return card;
+    }
+
+    // Compte à rebours jusqu'au renouvellement (minuit local) affiché dans la
+    // modale : démarré à l'ouverture (voir buildChallengesCard), arrêté à la
+    // fermeture (voir closeChallengesModal) pour ne pas tourner en arrière-plan.
+    let challengesCountdownInterval = null;
+    function updateChallengesCountdown() {
+        // Filet de sécurité : si la modale a été fermée par un chemin qui n'appelle
+        // pas closeChallengesModal() (ex: navigation imprévue), le minuteur s'arrête
+        // de lui-même plutôt que de tourner indéfiniment en arrière-plan.
+        if (!document.getElementById("challenges-modal").classList.contains("show")) {
+            clearInterval(challengesCountdownInterval);
+            challengesCountdownInterval = null;
+            return;
+        }
+        const now = new Date();
+        const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+        const remainingMs = nextMidnight - now;
+        const h = Math.floor(remainingMs / 3600000);
+        const m = Math.floor((remainingMs % 3600000) / 60000);
+        const s = Math.floor((remainingMs % 60000) / 1000);
+        const pad = (n) => String(n).padStart(2, "0");
+        const time = pad(h) + ":" + pad(m) + ":" + pad(s);
+        document.getElementById("challenges-reset-info").textContent = tr("challengesResetInfo").replace("{time}", time);
+    }
+
+    function closeChallengesModal() {
+        document.getElementById("challenges-modal").classList.remove("show");
+        clearInterval(challengesCountdownInterval);
+        challengesCountdownInterval = null;
     }
 
     // Reconstruit la liste des défis du jour dans la modale.
     function renderDailyChallenges() {
         ensureDailyChallenges();
-        document.getElementById("challenges-reset-info").textContent = tr("challengesResetInfo");
+        clearInterval(challengesCountdownInterval);
+        updateChallengesCountdown();
+        challengesCountdownInterval = setInterval(updateChallengesCountdown, 1000);
         const list = document.getElementById("challenges-list");
         list.innerHTML = save.dailyChallenges.map((c, i) => {
             const def = CHALLENGE_POOL.find((p) => p.kind === c.kind);
@@ -5463,8 +5498,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.0.0";
+    const VERSION_NUMBER = "5.0.1";
     const CHANGELOG = [
+        {
+            version: "5.0.1",
+            major: [],
+            minor: [
+                { fr: "La modale des défis quotidiens affiche maintenant un compte à rebours en direct jusqu'au prochain renouvellement (minuit)", en: "The daily challenges modal now shows a live countdown until the next refresh (midnight)" },
+            ],
+        },
         {
             version: "5.0.0",
             major: [
@@ -5660,9 +5702,7 @@
         document.getElementById("achv-modal").classList.remove("show");
     });
 
-    document.getElementById("btn-challenges-close").addEventListener("click", () => {
-        document.getElementById("challenges-modal").classList.remove("show");
-    });
+    document.getElementById("btn-challenges-close").addEventListener("click", closeChallengesModal);
 
     document.getElementById("btn-links").addEventListener("click", () => {
         document.getElementById("links-modal").classList.add("show");
@@ -5676,9 +5716,13 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "challenges-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
+    });
+    // À part des autres : doit aussi arrêter le compte à rebours (voir closeChallengesModal).
+    document.getElementById("challenges-modal").addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeChallengesModal();
     });
 
     /* ============ 14. TRICHES (console navigateur) ============ */
