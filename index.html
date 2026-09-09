@@ -1078,7 +1078,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v4.3.0</div>
+                <div class="version-tag" id="version-tag">v4.3.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -5272,8 +5272,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "4.3.0";
+    const VERSION_NUMBER = "4.3.1";
     const CHANGELOG = [
+        {
+            version: "4.3.1",
+            major: [],
+            minor: [
+                { fr: "Correctif : changer de pseudo dans les paramètres le met maintenant à jour tout de suite dans le classement mondial (avant, il fallait battre un nouveau record)", en: "Fix: changing your pseudo in settings now updates it right away on the global leaderboard (previously it only updated on your next record)" },
+            ],
+        },
         {
             version: "4.3.0",
             major: [],
