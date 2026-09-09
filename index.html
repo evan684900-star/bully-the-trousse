@@ -933,7 +933,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.5.4</div>
+                <div class="version-tag" id="version-tag">v3.5.5</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1202,9 +1202,9 @@
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
         upgradePuissanceName: { fr: "Puissance", en: "Power" },
-        upgradePuissanceDesc: { fr: "Augmente la force maximale de ton lancer.", en: "Increases the maximum force of your throw." },
+        upgradePuissanceDesc: { fr: "Augmente la force maximale de ton lancer, et l'argent gagné à chaque lancer (+1%/niveau).", en: "Increases the maximum force of your throw, and the money earned per throw (+1%/level)." },
         upgradeVitesseName: { fr: "Vitesse", en: "Speed" },
-        upgradeVitesseDesc: { fr: "Réduit la résistance : la trousse vole plus loin.", en: "Reduces drag: the pencil case flies further." },
+        upgradeVitesseDesc: { fr: "Réduit la résistance (vole plus loin), et augmente l'argent gagné à chaque lancer (+1%/niveau).", en: "Reduces drag (flies further), and increases the money earned per throw (+1%/level)." },
         levelShort: { fr: "Niv. ", en: "Lvl " },
         equip: { fr: "Équiper", en: "Equip" },
         equipped: { fr: "Équipée", en: "Equipped" },
@@ -1296,6 +1296,8 @@
         achvAllTrailsDesc: { fr: "Possède toutes les traînées.", en: "Own every trail." },
         achvSpaceEggName: { fr: "Vers l'infini...", en: "To infinity..." },
         achvSpaceEggDesc: { fr: "???", en: "???" },
+        achvPerfectQteName: { fr: "Réflexes parfaits", en: "Perfect reflexes" },
+        achvPerfectQteDesc: { fr: "Réussis les 5 anneaux du QTE en apesanteur d'affilée.", en: "Land all 5 rings of the zero-G QTE in a row." },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
             en: "Not enough active players yet for reliable stats ("
@@ -1375,6 +1377,14 @@
     const SPACE_BOOST_VX = 2600;           // vitesse folle horizontale si tous les anneaux sont réussis
     const SPACE_BOOST_VY = 150;
 
+    // Rééquilibrage : la distance (donc l'argent) augmente déjà avec la
+    // Puissance/Vitesse, mais de moins en moins vite à haut niveau (la formule
+    // de distance est en (1+0.12P)² × (1+0.09V), donc chaque niveau compte de
+    // moins en moins alors qu'il coûte de plus en plus cher). Ce bonus linéaire
+    // sur l'argent gagné compense ça : chaque niveau de Puissance/Vitesse acheté
+    // (boutique + bonus de skin) reste rentable même en fin de partie.
+    const UPGRADE_EARN_BONUS_PER_LEVEL = 0.01; // +1% d'argent par niveau cumulé (Puissance + Vitesse)
+
     // Skin "Trousse Pièce" : à chaque lancer, COIN_BONUS_CHANCE de déclencher
     // un bonus, puis le multiplicateur exact est tiré parmi COIN_MULTIPLIERS
     // (sous-probabilités qui s'appliquent SI le bonus s'est déclenché).
@@ -1419,6 +1429,7 @@
         { id: "cinquanteLancers", emoji: "💪", nameKey: "achv50ThrowsName", descKey: "achv50ThrowsDesc", check: (s) => s.totalThrows >= 50 },
         { id: "toutesTrainees", emoji: "🌈", nameKey: "achvAllTrailsName", descKey: "achvAllTrailsDesc", check: (s) => s.ownedTrails.length >= TRAILS.length },
         { id: "easterEggEspace", emoji: "🛸", nameKey: "achvSpaceEggName", descKey: "achvSpaceEggDesc", check: (s) => s.hasTriggeredSpaceEgg },
+        { id: "qteParfait", emoji: "🎯", nameKey: "achvPerfectQteName", descKey: "achvPerfectQteDesc", check: (s) => s.hasPerfectQte },
     ];
 
     // Chaque skin réutilise la même image (trousse-skin-1.png) mais applique
@@ -1506,6 +1517,7 @@
             hasBrokenDurability: false,// la trousse est déjà tombée à 0 de durabilité
             hasJackpot: false,         // multiplicateur x5 de la Trousse Pièce déjà obtenu
             hasTriggeredSpaceEgg: false, // easter egg "vers l'espace" déjà déclenché une fois
+            hasPerfectQte: false,      // les 5 anneaux du QTE en apesanteur déjà réussis d'affilée
         };
     }
 
@@ -2288,7 +2300,10 @@
         const boostFactor = 0.3 + 0.7 * (hits / QTE_RING_COUNT);
         vx = SPACE_BOOST_VX * boostFactor;
         vy = SPACE_BOOST_VY;
-        if (hits === QTE_RING_COUNT) sfxRecord(); // combo parfait
+        if (hits === QTE_RING_COUNT) {
+            sfxRecord(); // combo parfait
+            save.hasPerfectQte = true;
+        }
         state = "flying";
     }
 
@@ -2349,6 +2364,8 @@
 
         let earn = Math.max(1, Math.round(distanceMeters * 2));
         if (isPerfect) earn = Math.round(earn * 1.3); // bonus de 30% sur un lancer parfait
+        // Bonus lié aux améliorations : voir UPGRADE_EARN_BONUS_PER_LEVEL plus haut
+        earn = Math.round(earn * (1 + (totalPuissance() + totalVitesse()) * UPGRADE_EARN_BONUS_PER_LEVEL));
 
         // Skin "Trousse Pièce" : jet à COIN_BONUS_CHANCE de déclencher un
         // multiplicateur sur le score de CE lancer (voir COIN_MULTIPLIERS).
@@ -4221,8 +4238,16 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.5.4";
+    const VERSION_NUMBER = "3.5.5";
     const CHANGELOG = [
+        {
+            version: "3.5.5",
+            major: [],
+            minor: [
+                { fr: "Nouveau succès \"Réflexes parfaits\" : réussir les 5 anneaux du QTE en apesanteur d'affilée", en: "New achievement \"Perfect reflexes\": land all 5 rings of the zero-G QTE in a row" },
+                { fr: "Rééquilibrage : chaque niveau de Puissance/Vitesse acheté augmente aussi l'argent gagné par lancer (+1%/niveau), pour que les améliorations restent rentables même à haut niveau", en: "Rebalance: each Power/Speed level purchased also increases money earned per throw (+1%/level), so upgrades stay worthwhile even at high levels" },
+            ],
+        },
         {
             version: "3.5.4",
             major: [],
