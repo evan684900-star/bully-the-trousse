@@ -933,7 +933,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.5.5</div>
+                <div class="version-tag" id="version-tag">v3.5.6</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1029,8 +1029,10 @@
         <button class="btn secondary small back-btn" id="btn-shop-back" data-i18n="btnBackMenu">← Menu</button>
         <!-- Permet de reprendre directement le jeu sans repasser par le menu -->
         <button class="btn small forward-btn" id="btn-shop-play" data-i18n="btnBackGame">🎮 Retour au jeu</button>
-        <div class="shop-header" style="justify-content:center; padding-top:16px;">
+        <div class="shop-header" style="justify-content:center; padding-top:calc(54px + env(safe-area-inset-top)); flex-wrap: wrap; gap: 8px;">
             <div class="money-pill">💰 <span id="shop-money">0</span> $</div>
+            <!-- Bonus cumulé des niveaux de Puissance/Vitesse sur l'argent gagné (voir UPGRADE_EARN_BONUS_PER_LEVEL) -->
+            <div class="money-pill" style="font-size:13px; padding:6px 14px;" id="shop-earn-bonus-pill">📈 <span id="shop-earn-bonus">+0%</span></div>
         </div>
         <div class="tabs">
             <button class="tab-btn active" id="tab-upgrades" data-i18n="shopTabUpgrades">⚙️ Améliorations</button>
@@ -1202,9 +1204,10 @@
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
         upgradePuissanceName: { fr: "Puissance", en: "Power" },
-        upgradePuissanceDesc: { fr: "Augmente la force maximale de ton lancer, et l'argent gagné à chaque lancer (+1%/niveau).", en: "Increases the maximum force of your throw, and the money earned per throw (+1%/level)." },
+        upgradePuissanceDesc: { fr: "Augmente la force maximale de ton lancer, et l'argent gagné à chaque lancer (+3%/niveau).", en: "Increases the maximum force of your throw, and the money earned per throw (+3%/level)." },
         upgradeVitesseName: { fr: "Vitesse", en: "Speed" },
-        upgradeVitesseDesc: { fr: "Réduit la résistance (vole plus loin), et augmente l'argent gagné à chaque lancer (+1%/niveau).", en: "Reduces drag (flies further), and increases the money earned per throw (+1%/level)." },
+        upgradeVitesseDesc: { fr: "Réduit la résistance (vole plus loin), et augmente l'argent gagné à chaque lancer (+3%/niveau).", en: "Reduces drag (flies further), and increases the money earned per throw (+3%/level)." },
+        shopEarnBonusTooltip: { fr: "Bonus d'argent gagné par lancer, grâce à tes niveaux de Puissance/Vitesse", en: "Bonus money earned per throw, thanks to your Power/Speed levels" },
         levelShort: { fr: "Niv. ", en: "Lvl " },
         equip: { fr: "Équiper", en: "Equip" },
         equipped: { fr: "Équipée", en: "Equipped" },
@@ -1383,7 +1386,7 @@
     // moins en moins alors qu'il coûte de plus en plus cher). Ce bonus linéaire
     // sur l'argent gagné compense ça : chaque niveau de Puissance/Vitesse acheté
     // (boutique + bonus de skin) reste rentable même en fin de partie.
-    const UPGRADE_EARN_BONUS_PER_LEVEL = 0.01; // +1% d'argent par niveau cumulé (Puissance + Vitesse)
+    const UPGRADE_EARN_BONUS_PER_LEVEL = 0.03; // +3% d'argent par niveau cumulé (Puissance + Vitesse)
 
     // Skin "Trousse Pièce" : à chaque lancer, COIN_BONUS_CHANCE de déclencher
     // un bonus, puis le multiplicateur exact est tiré parmi COIN_MULTIPLIERS
@@ -1824,6 +1827,9 @@
 
     function refreshShop() {
         document.getElementById("shop-money").textContent = save.money;
+        const bonusPct = Math.round((totalPuissance() + totalVitesse()) * UPGRADE_EARN_BONUS_PER_LEVEL * 100);
+        document.getElementById("shop-earn-bonus").textContent = "+" + bonusPct + "%";
+        document.getElementById("shop-earn-bonus-pill").title = tr("shopEarnBonusTooltip");
         renderShopTab();
     }
 
@@ -4238,8 +4244,16 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.5.5";
+    const VERSION_NUMBER = "3.5.6";
     const CHANGELOG = [
+        {
+            version: "3.5.6",
+            major: [],
+            minor: [
+                { fr: "Bonus d'argent des niveaux de Puissance/Vitesse monté de +1%/niveau à +3%/niveau : le coût des améliorations grimpe vite, ce bonus doit se sentir davantage en fin de partie", en: "Power/Speed levels' money bonus raised from +1%/level to +3%/level: upgrade costs climb fast, this bonus needed to matter more late-game" },
+                { fr: "Ajout d'une pastille dans la boutique qui affiche ce bonus en direct (📈 +X%)", en: "Added a live indicator in the shop showing this bonus (📈 +X%)" },
+            ],
+        },
         {
             version: "3.5.5",
             major: [],
