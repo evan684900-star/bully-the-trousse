@@ -41,5 +41,28 @@ service cloud.firestore {
       allow read: if true;
       allow write: if request.auth != null && request.auth.uid == uid;
     }
+
+    // Profil public (écran Profil, système de comptes) : sous-ensemble
+    // volontairement public de la sauvegarde (pseudo, avatar, skin équipé,
+    // stats affichées), jamais le contenu complet de "users". "isPrivate"
+    // reste lisible par tout le monde (nécessaire pour savoir s'il faut
+    // afficher la banderole "compte privé" côté client) : la confidentialité
+    // porte sur l'affichage du profil, pas sur ce champ lui-même.
+    match /profiles/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Abonnés / abonnements : un doc par relation, id "<abonné>_<suivi>".
+    // Lecture publique (comptage des abonnés/abonnements de n'importe qui),
+    // chacun ne peut créer/supprimer que ses propres relations de suivi.
+    match /follows/{docId} {
+      allow read: if true;
+      allow create: if request.auth != null
+                    && request.resource.data.follower == request.auth.uid
+                    && request.resource.data.following is string
+                    && request.resource.data.following != request.auth.uid;
+      allow delete: if request.auth != null && resource.data.follower == request.auth.uid;
+    }
   }
 }

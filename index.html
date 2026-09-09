@@ -570,7 +570,11 @@
             cursor: pointer;
         }
         .tab-btn.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
-        .shop-body { flex: 1; overflow-y: auto; padding: 0 16px 20px; }
+        /* margin-bottom (pas juste du padding) réduit la boîte elle-même :
+           comme pour .menu-wrap, ça garantit que le contenu qui défile
+           s'arrête AVANT la zone des icônes flottantes (musique/réglages/
+           liens), au lieu de finir caché derrière une fois scrollé en bas. */
+        .shop-body { flex: 1; overflow-y: auto; padding: 0 16px 20px; margin-bottom: calc(64px + env(safe-area-inset-bottom)); }
         .upgrade-card, .skin-card {
             background: var(--card-bg);
             border: 2px solid var(--panel-border);
@@ -627,6 +631,62 @@
         .leaderboard-row .pseudo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .leaderboard-row .dist { color: var(--money); font-weight: 800; }
         .leaderboard-row.you { border-color: var(--accent); }
+        .leaderboard-row.clickable { cursor: pointer; }
+
+        /* ---------- ÉCRAN PROFIL ---------- */
+        #screen-profile { background: var(--shop-bg); flex-direction: column; }
+        #screen-profile.active { display: flex; }
+        .profile-body { padding-top: calc(54px + env(safe-area-inset-top)); }
+        .profile-header { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 16px; }
+        .profile-avatar-lg {
+            width: 84px; height: 84px; border-radius: 50%; object-fit: cover;
+            border: 3px solid var(--accent); background: var(--card-bg);
+            display: flex; align-items: center; justify-content: center; font-size: 40px;
+        }
+        .profile-avatar-lg[hidden] { display: none; }
+        .profile-pseudo { margin: 4px 0 0; font-size: 18px; }
+        .profile-top-row { display: flex; gap: 10px; margin-bottom: 18px; }
+        .profile-card {
+            flex: 1; background: var(--card-bg); border: 2px solid var(--panel-border);
+            border-radius: 14px; padding: 10px 6px; text-align: center;
+        }
+        .profile-skin-card { position: relative; display: flex; align-items: center; justify-content: center; }
+        .profile-skin-img { width: 40px; height: 40px; object-fit: contain; }
+        .profile-skin-count {
+            position: absolute; top: 4px; right: 8px; background: var(--accent); color: #1a1a1a;
+            font-size: 10px; font-weight: 800; border-radius: 999px; padding: 2px 6px;
+        }
+        .profile-card-value { font-size: 20px; font-weight: 900; color: var(--text); }
+        .profile-card-label { font-size: 11px; color: var(--text-dim); font-weight: 700; margin-top: 2px; }
+        .profile-private-banner {
+            background: var(--panel-border); color: var(--text); text-align: center;
+            font-weight: 800; padding: 24px 16px; border-radius: 14px; margin: 10px 0;
+        }
+        .profile-section-title { margin: 4px 0 10px; font-size: 15px; color: var(--accent); }
+        .weekly-chart {
+            display: flex; align-items: flex-end; gap: 6px; height: 110px;
+            background: var(--card-bg); border: 2px solid var(--panel-border);
+            border-radius: 14px; padding: 10px 10px 6px; margin-bottom: 18px;
+        }
+        .weekly-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 4px; }
+        .weekly-bar { width: 100%; max-width: 26px; border-radius: 6px 6px 2px 2px; background: var(--panel-border); min-height: 3px; }
+        .weekly-bar-col.today .weekly-bar { background: var(--accent); }
+        .weekly-bar-label { font-size: 10px; color: var(--text-dim); font-weight: 700; }
+        .profile-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 18px; }
+        .profile-stat-tile {
+            background: var(--card-bg); border: 2px solid var(--panel-border); border-radius: 14px;
+            padding: 12px 10px; text-align: center;
+        }
+        .profile-stat-tile .icon { font-size: 22px; }
+        .profile-stat-tile b { display: block; font-size: 17px; margin: 4px 0 2px; }
+        .profile-stat-tile span { font-size: 11px; color: var(--text-dim); font-weight: 700; }
+        .profile-achv-header { display: flex; align-items: center; justify-content: space-between; }
+        .profile-achv-preview { display: flex; gap: 10px; margin: 10px 0 6px; flex-wrap: wrap; }
+        .profile-achv-preview .icon-badge {
+            width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 22px; background: var(--card-bg); border: 2px solid var(--panel-border);
+        }
+        .profile-achv-count { text-align: center; color: var(--text-dim); font-size: 13px; font-weight: 700; margin-top: 6px; }
 
         .modal-overlay {
             position: absolute;
@@ -785,6 +845,45 @@
             text-align: left;
         }
         .links-list a span { display: block; font-size: 12px; font-weight: 500; color: var(--text-dim); margin-top: 2px; }
+
+        /* ---------- MODALE RÉGLAGES ---------- */
+        .settings-box { text-align: left; max-height: 85vh; overflow-y: auto; }
+        .settings-box h2 { text-align: center; }
+        .settings-section-title { margin: 18px 0 4px; font-size: 14px; color: var(--accent); }
+        .settings-row {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 0; border-bottom: 1px solid var(--panel-border);
+            font-size: 14px; font-weight: 700;
+        }
+        .settings-hint { margin: 6px 0 0; font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+        /* Plus spécifique que ".info-box .btn" (qui met tous les boutons en
+           pleine largeur) : ici on veut un petit bouton aligné à droite de la
+           ligne, pas un pavé qui prend toute la largeur de la modale. */
+        .settings-box .settings-row .btn { width: auto; margin-top: 0; padding: 8px 16px; font-size: 13px; }
+        /* Interrupteur à bascule (compte privé) */
+        .switch { position: relative; display: inline-block; width: 46px; height: 26px; flex: none; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .switch-track {
+            position: absolute; inset: 0; border-radius: 999px; cursor: pointer;
+            background: var(--panel-border); transition: background 0.2s ease;
+        }
+        .switch-track::before {
+            content: ""; position: absolute; width: 20px; height: 20px; left: 3px; top: 3px;
+            border-radius: 50%; background: #fff; transition: transform 0.2s ease;
+        }
+        .switch input:checked + .switch-track { background: var(--accent); }
+        .switch input:checked + .switch-track::before { transform: translateX(20px); }
+        .settings-avatar-row { display: flex; align-items: center; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+        .avatar-preview {
+            width: 56px; height: 56px; border-radius: 50%; object-fit: cover;
+            border: 2px solid var(--panel-border); background: var(--card-bg);
+            display: flex; align-items: center; justify-content: center; font-size: 26px; flex: none;
+        }
+        /* "display:flex" ci-dessus l'emporterait sur le "display:none" par
+           défaut de l'attribut [hidden] (un style d'auteur bat toujours un
+           style de user-agent, quelle que soit la spécificité) : sans ça,
+           l'aperçu vide et le placeholder s'affichent en même temps. */
+        .avatar-preview[hidden] { display: none; }
 
         /* ---------- CINÉMATIQUE DU MONDE VOLCAN ---------- */
         /* La cinématique réutilise le canvas et les décors du jeu : on masque
@@ -945,7 +1044,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.6.9</div>
+                <div class="version-tag" id="version-tag">v4.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -960,6 +1059,7 @@
                 <button class="btn" id="btn-play" data-i18n="btnPlay">🚀 Jouer</button>
                 <button class="btn secondary" id="btn-shop" data-i18n="btnShop">🛒 Boutique</button>
                 <button class="btn secondary" id="btn-leaderboard" data-i18n="btnLeaderboard">🏆 Classement</button>
+                <button class="btn secondary" id="btn-profile" data-i18n="btnProfile">👤 Profil</button>
             </div>
             <!-- Rempli dynamiquement par buildWorldsRow() -->
             <div class="worlds-row" id="worlds-row"></div>
@@ -1069,6 +1169,13 @@
         <div class="shop-body" id="leaderboard-body"></div>
     </section>
 
+    <!-- ÉCRAN PROFIL -->
+    <section id="screen-profile" class="screen">
+        <button class="btn secondary small back-btn" id="btn-profile-back" data-i18n="btnBackMenu">← Menu</button>
+        <!-- Rempli dynamiquement par renderProfile() -->
+        <div class="shop-body profile-body" id="profile-body"></div>
+    </section>
+
     <!-- Tutoriel affiché une seule fois, au tout premier lancement (voir showTutorialIfNeeded) -->
     <div class="modal-overlay" id="tutorial-overlay">
         <div class="tutorial-box">
@@ -1169,10 +1276,46 @@
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
     <div class="corner-icons-right">
         <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
-        <button id="btn-theme" class="theme-btn" title="Thème clair / sombre">🌙</button>
-        <button id="btn-lang" class="lang-btn" title="Changer de langue">FR</button>
+        <button id="btn-settings" class="theme-btn" title="Réglages">⚙️</button>
     </div>
     <button id="btn-links" class="links-btn" data-i18n="linksButton">🔗 Mes liens</button>
+
+    <!-- Réglages : thème, langue, paramètres du compte, photo de profil -->
+    <div class="modal-overlay" id="settings-modal">
+        <div class="info-box settings-box">
+            <h2 data-i18n="settingsTitle">⚙️ Réglages</h2>
+
+            <div class="settings-row">
+                <span data-i18n="settingsThemeLabel">Thème</span>
+                <button class="btn small secondary" id="btn-theme-toggle">🌙</button>
+            </div>
+            <div class="settings-row">
+                <span data-i18n="settingsLangLabel">Langue</span>
+                <button class="btn small secondary" id="btn-lang-toggle">FR</button>
+            </div>
+
+            <h3 class="settings-section-title" data-i18n="settingsAccountTitle">👤 Paramètres du compte</h3>
+            <div class="settings-row">
+                <span data-i18n="settingsPrivateLabel">Compte privé</span>
+                <label class="switch">
+                    <input type="checkbox" id="chk-private-account">
+                    <span class="switch-track"></span>
+                </label>
+            </div>
+            <p class="settings-hint" data-i18n="settingsPrivateHint">Les autres joueurs verront une banderole "Ce compte est privé" au lieu de ton profil. Ton score reste visible dans le classement.</p>
+
+            <h3 class="settings-section-title" data-i18n="settingsAvatarTitle">🖼️ Photo de profil</h3>
+            <div class="settings-avatar-row">
+                <img id="settings-avatar-preview" class="avatar-preview" src="" alt="" hidden>
+                <div id="settings-avatar-placeholder" class="avatar-preview avatar-placeholder">🎒</div>
+                <button class="btn small secondary" id="btn-change-avatar" data-i18n="settingsChangeAvatar">Changer la photo</button>
+                <input type="file" id="input-avatar-file" accept="image/*" style="display:none;">
+            </div>
+            <p class="settings-hint" id="settings-avatar-status"></p>
+
+            <button class="btn" id="btn-settings-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
 </div>
 
 <!-- SDK Firebase (compat, sans étape de build) : auth anonyme + Firestore.
@@ -1181,6 +1324,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 
 <script>
 (function () {
@@ -1329,6 +1473,40 @@
         linksSiteDesc: { fr: "Mon site", en: "My site" },
         linksWhatsappLabel: { fr: "Chaîne WhatsApp", en: "WhatsApp channel" },
         linksWhatsappDesc: { fr: "Actus de ce jeu", en: "Updates about this game" },
+        settingsTitle: { fr: "⚙️ Réglages", en: "⚙️ Settings" },
+        settingsThemeLabel: { fr: "Thème", en: "Theme" },
+        settingsLangLabel: { fr: "Langue", en: "Language" },
+        settingsAccountTitle: { fr: "👤 Paramètres du compte", en: "👤 Account settings" },
+        settingsPrivateLabel: { fr: "Compte privé", en: "Private account" },
+        settingsPrivateHint: {
+            fr: "Les autres joueurs verront une banderole \"Ce compte est privé\" au lieu de ton profil. Ton score reste visible dans le classement.",
+            en: "Other players will see a \"This account is private\" banner instead of your profile. Your score stays visible on the leaderboard."
+        },
+        settingsPrivateOn: { fr: "🔒 Compte passé en privé", en: "🔒 Account set to private" },
+        settingsPrivateOff: { fr: "🔓 Compte passé en public", en: "🔓 Account set to public" },
+        settingsAvatarTitle: { fr: "🖼️ Photo de profil", en: "🖼️ Profile picture" },
+        settingsChangeAvatar: { fr: "Changer la photo", en: "Change picture" },
+        settingsAvatarUploading: { fr: "Envoi en cours...", en: "Uploading..." },
+        settingsAvatarDone: { fr: "✅ Photo mise à jour !", en: "✅ Picture updated!" },
+        settingsAvatarError: { fr: "❌ Envoi impossible (fichier invalide, hors ligne...)", en: "❌ Upload failed (invalid file, offline...)" },
+        btnProfile: { fr: "👤 Profil", en: "👤 Profile" },
+        profileFollowing: { fr: "Abonnements", en: "Following" },
+        profileFollowers: { fr: "Abonnés", en: "Followers" },
+        profileWeeklyTitle: { fr: "Progression hebdomadaire", en: "Weekly progress" },
+        profileWeeklyBest: { fr: "Meilleur lancer (semaine)", en: "Best throw (week)" },
+        profileTotalEarned: { fr: "Argent total gagné", en: "Total money earned" },
+        profileRank: { fr: "Rang mondial", en: "Global rank" },
+        profileLevel: { fr: "Niveau total", en: "Total level" },
+        profileAchvTitle: { fr: "Succès", en: "Achievements" },
+        profileViewAll: { fr: "Tout voir", en: "View all" },
+        profileLoading: { fr: "Chargement du profil...", en: "Loading profile..." },
+        profileNotFound: { fr: "Profil introuvable.", en: "Profile not found." },
+        profilePrivateBanner: { fr: "Ce compte est privé", en: "This account is private" },
+        profileFollow: { fr: "➕ Suivre", en: "➕ Follow" },
+        profileUnfollow: { fr: "✅ Abonné(e)", en: "✅ Following" },
+        profileFollowLoading: { fr: "...", en: "..." },
+        profileFollowUnavailable: { fr: "Indisponible hors ligne", en: "Unavailable offline" },
+        profileFollowError: { fr: "Action impossible, réessaie plus tard", en: "Action failed, try again later" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -1340,6 +1518,37 @@
         return entry ? (entry[save.lang] || entry.fr) : key;
     }
 
+    // Échappe le texte avant de l'insérer via innerHTML : les pseudos viennent
+    // d'autres joueurs (classement, profils) et ne doivent jamais pouvoir
+    // injecter du HTML/script dans la page de qui les affiche.
+    function escapeHtml(str) {
+        const map = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+        return String(str).replace(/[&<>"']/g, (c) => map[c]);
+    }
+
+    // Le profil public d'un joueur (profiles/{uid}) n'est pas validé côté
+    // serveur (contrairement à "scores") : un compte techniquement compromis
+    // pourrait y écrire n'importe quoi directement via l'API Firestore. Comme
+    // avatarUrl/equippedSkinFilter finissent dans des attributs HTML (src,
+    // style) en consultant le profil D'UN AUTRE joueur, on les valide/échappe
+    // avant affichage plutôt que de faire confiance au contenu du document.
+    function safeAvatarUrl(url) {
+        if (typeof url !== "string" || !/^https:\/\/firebasestorage\.googleapis\.com\//.test(url)) return "";
+        return escapeHtml(url);
+    }
+    function safeSkinFilter(filterStr) {
+        if (typeof filterStr !== "string") return "none";
+        const known = SKINS.map((s) => s.filter).filter((f) => f !== "rainbow");
+        if (known.includes(filterStr)) return filterStr;
+        if (/^hue-rotate\(\d+deg\) saturate\(2\.2\) brightness\(1\.1\)$/.test(filterStr)) return filterStr;
+        return "none";
+    }
+    // Force une valeur numérique (0 si absente/invalide) avant de l'insérer via
+    // innerHTML : les champs numériques d'un profil public (profiles/{uid})
+    // ne sont pas non plus validés côté serveur, un texte malveillant pourrait
+    // sinon s'y glisser à la place d'un nombre.
+    function num(v) { const n = Number(v); return isFinite(n) ? n : 0; }
+
     // Met à jour tout le texte statique du HTML (attribut data-i18n) ainsi que
     // le bouton de langue. Les textes générés en JS se retraduisent tout
     // seuls la prochaine fois qu'ils sont (re)dessinés (hints, cartes boutique...).
@@ -1347,7 +1556,7 @@
         document.querySelectorAll("[data-i18n]").forEach((el) => {
             el.textContent = tr(el.getAttribute("data-i18n"));
         });
-        document.getElementById("btn-lang").textContent = save.lang === "en" ? "EN" : "FR";
+        document.getElementById("btn-lang-toggle").textContent = save.lang === "en" ? "EN" : "FR";
     }
 
     /* =========================================================
@@ -1533,6 +1742,12 @@
             hasJackpot: false,         // multiplicateur x5 de la Trousse Pièce déjà obtenu
             hasTriggeredSpaceEgg: false, // easter egg "vers l'espace" déjà déclenché une fois
             hasPerfectQte: false,      // les 5 anneaux du QTE en apesanteur déjà réussis d'affilée
+            // --- Compte / profil ---
+            totalMoneyEarned: 0,       // argent gagné depuis le début (ne diminue jamais, contrairement à "money")
+            dailyEarnings: {},         // { "AAAA-MM-JJ": montant } sur les 7 derniers jours (voir pruneDailyMap)
+            dailyBestDistance: {},     // { "AAAA-MM-JJ": mètres } meilleur lancer du jour, sur 7 jours
+            isPrivate: false,          // compte privé : les autres voient une banderole au lieu du profil
+            avatarUrl: "",             // photo de profil (Firebase Storage), vide = avatar par défaut
         };
     }
 
@@ -1572,6 +1787,57 @@
         localStorage.setItem(SAVE_KEY, JSON.stringify(save));
         pushCloudSave(); // best-effort, ne fait rien si Firebase n'est pas connecté
         checkAchievements();
+        pushPublicProfile(); // best-effort, alimente le profil public (voir section 12)
+    }
+
+    // Date du jour au format "AAAA-MM-JJ", utilisée comme clé dans save.dailyEarnings.
+    function todayKey() {
+        const d = new Date();
+        return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+    }
+
+    // Ajoute un gain au total cumulé (jamais décrémenté, contrairement à
+    // save.money) et au compteur du jour, pour le graphique "progression
+    // hebdo" du profil (voir buildWeeklyChart).
+    function recordDailyEarning(amount) {
+        if (amount <= 0) return;
+        save.totalMoneyEarned += amount;
+        const key = todayKey();
+        save.dailyEarnings[key] = (save.dailyEarnings[key] || 0) + amount;
+        pruneDailyMap(save.dailyEarnings);
+    }
+
+    // Retient le meilleur lancer du jour, pour la tuile "Meilleur lancer de
+    // la semaine" du profil (max sur les entrées encore présentes après purge).
+    function recordDailyDistance(distanceMeters) {
+        const key = todayKey();
+        if (!save.dailyBestDistance[key] || distanceMeters > save.dailyBestDistance[key]) {
+            save.dailyBestDistance[key] = distanceMeters;
+        }
+        pruneDailyMap(save.dailyBestDistance);
+    }
+
+    // Ne garde que les 7 derniers jours d'une map { "AAAA-MM-JJ": ... }, pour
+    // que la sauvegarde ne grossisse pas indéfiniment (utilisé par
+    // dailyEarnings et dailyBestDistance).
+    function pruneDailyMap(map) {
+        const cutoff = Date.now() - 7 * 24 * 3600 * 1000;
+        Object.keys(map).forEach((key) => {
+            const t = new Date(key + "T00:00:00").getTime();
+            if (isNaN(t) || t < cutoff) delete map[key];
+        });
+    }
+
+    // Renvoie les 7 dernières clés de date (AAAA-MM-JJ), de la plus ancienne à
+    // aujourd'hui, pour un affichage chronologique du graphique hebdo même les
+    // jours sans lancer (valeur 0).
+    function last7DayKeys() {
+        const keys = [];
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date(Date.now() - i * 24 * 3600 * 1000);
+            keys.push(d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"));
+        }
+        return keys;
     }
 
     // Vérifie tous les succès pas encore débloqués contre l'état courant de la
@@ -1692,7 +1958,7 @@
     // Thème clair/sombre : ne change que l'interface (menus, boutique...), le
     // décor du jeu lui-même garde toujours ses propres couleurs (voir la note
     // au-dessus de :root dans le CSS).
-    const themeBtn = document.getElementById("btn-theme");
+    const themeBtn = document.getElementById("btn-theme-toggle");
     function applyTheme() {
         document.documentElement.setAttribute("data-theme", save.theme);
         themeBtn.textContent = save.theme === "light" ? "☀️" : "🌙";
@@ -1717,6 +1983,7 @@
         game: document.getElementById("screen-game"),
         shop: document.getElementById("screen-shop"),
         leaderboard: document.getElementById("screen-leaderboard"),
+        profile: document.getElementById("screen-profile"),
     };
     // Ajoute/retire simplement la classe "active" (voir le CSS plus haut) et
     // rafraîchit le contenu de l'écran qu'on vient d'afficher.
@@ -1727,6 +1994,7 @@
         if (name === "shop") refreshShop();
         if (name === "game") resetThrow();
         if (name === "leaderboard") refreshLeaderboardScreen();
+        if (name === "profile") renderProfile(null); // null = mon propre profil
     }
 
     /* ============ 7. ÉCRAN MENU ============ */
@@ -2409,6 +2677,8 @@
         }
 
         save.money += earn;
+        recordDailyEarning(earn);
+        recordDailyDistance(distanceMeters);
 
         // Récompense de palier (100m, 200m, ...) : ne se déclenche qu'une seule
         // fois par palier, même si un lancer (ex: boost spatial) en franchit
@@ -2419,6 +2689,7 @@
             const milestoneBonus = 50 * newMilestones;
             save.milestoneReached = milestone;
             save.money += milestoneBonus;
+            recordDailyEarning(milestoneBonus);
             showToast("🎉 Palier des " + (milestone * 100) + "m atteint ! +" + milestoneBonus + "$");
         }
 
@@ -3896,6 +4167,7 @@
     const FIREBASE_ENABLED = typeof firebase !== "undefined" && !firebaseConfig.apiKey.startsWith("VOTRE_");
 
     let db = null;
+    let storage = null;
     let currentUser = null;
 
     function updateOnlineStatus(text) {
@@ -3910,6 +4182,7 @@
         }
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
+        storage = firebase.storage();
         updateOnlineStatus(tr("onlineConnecting"));
         firebase.auth().onAuthStateChanged((user) => {
             if (!user) return;
@@ -3945,6 +4218,7 @@
             }
             document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
             syncAchievementStats(); // rattrape les succès déjà débloqués avant l'ajout de ce système
+            pushPublicProfile();
         }).catch((err) => console.error("Lecture de la sauvegarde cloud impossible :", err));
     }
 
@@ -4025,6 +4299,113 @@
         });
     }
 
+    // --- Photo de profil (Firebase Storage) ---
+    const AVATAR_MAX_SIZE = 256;                 // px, image carrée envoyée
+    const AVATAR_MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 Mo max avant redimensionnement
+
+    // Recadre l'image au centre en carré puis la redimensionne à
+    // AVATAR_MAX_SIZE×AVATAR_MAX_SIZE via un <canvas>, pour ne jamais envoyer
+    // une photo originale énorme vers Storage.
+    function resizeImageToSquareJpeg(file, maxSize) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            const objectUrl = URL.createObjectURL(file);
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                const side = Math.min(img.width, img.height);
+                const sx = (img.width - side) / 2;
+                const sy = (img.height - side) / 2;
+                const canvas = document.createElement("canvas");
+                canvas.width = maxSize;
+                canvas.height = maxSize;
+                canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
+                canvas.toBlob((blob) => {
+                    if (blob) resolve(blob); else reject(new Error("Conversion de l'image impossible"));
+                }, "image/jpeg", 0.85);
+            };
+            img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Image invalide")); };
+            img.src = objectUrl;
+        });
+    }
+
+    // Redimensionne puis envoie la photo vers Storage (avatars/{uid}/photo.jpg,
+    // toujours le même chemin : chaque nouvel envoi remplace le précédent),
+    // met à jour save.avatarUrl et le profil public. Rejette la promesse en
+    // cas d'échec (fichier invalide, hors ligne...) pour que l'appelant
+    // affiche un message d'erreur.
+    function uploadAvatar(file) {
+        if (!storage || !currentUser) return Promise.reject(new Error("Firebase non connecté"));
+        if (!file.type.startsWith("image/")) return Promise.reject(new Error("Ce fichier n'est pas une image"));
+        if (file.size > AVATAR_MAX_FILE_BYTES) return Promise.reject(new Error("Image trop lourde (8 Mo max)"));
+        return resizeImageToSquareJpeg(file, AVATAR_MAX_SIZE).then((blob) => {
+            const ref = storage.ref("avatars/" + currentUser.uid + "/photo.jpg");
+            return ref.put(blob, { contentType: "image/jpeg" }).then(() => ref.getDownloadURL());
+        }).then((url) => {
+            save.avatarUrl = url;
+            persist();
+            return url;
+        });
+    }
+
+    // --- Profil public (écran Profil, voir section 15) ---
+    // Sous-ensemble de la sauvegarde qu'on accepte de rendre public, pour que
+    // n'importe qui puisse voir le profil d'un autre joueur (depuis le
+    // classement) sans jamais exposer le document "users" complet (privé).
+    function pushPublicProfile() {
+        if (!db || !currentUser) return;
+        db.collection("profiles").doc(currentUser.uid).set({
+            pseudo: save.pseudo || "Anonyme",
+            avatarUrl: save.avatarUrl || "",
+            isPrivate: !!save.isPrivate,
+            equippedSkin: save.equippedSkin,
+            equippedSkinFilter: rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now()),
+            ownedSkinsCount: save.ownedSkins.length,
+            totalMoneyEarned: save.totalMoneyEarned,
+            dailyEarnings: save.dailyEarnings,
+            dailyBestDistance: save.dailyBestDistance,
+            bestDistance: save.bestDistance,
+            statLevel: totalPuissance() + totalVitesse(),
+            achievementsCount: save.unlockedAchievements.length,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }).catch((err) => console.error("Mise à jour du profil public impossible :", err));
+    }
+
+    // --- Abonnés / abonnements ---
+    // Une seule collection plate "follows", un doc par relation (id
+    // "<abonné>_<suivi>") : évite les doublons et permet un get() direct pour
+    // savoir si on suit déjà quelqu'un, sans requête.
+    function followDocId(targetUid) { return currentUser.uid + "_" + targetUid; }
+
+    function isFollowing(targetUid) {
+        if (!db || !currentUser) return Promise.resolve(false);
+        return db.collection("follows").doc(followDocId(targetUid)).get().then((doc) => doc.exists);
+    }
+
+    function followUser(targetUid) {
+        if (!db || !currentUser || targetUid === currentUser.uid) return Promise.reject(new Error("invalid follow"));
+        return db.collection("follows").doc(followDocId(targetUid)).set({
+            follower: currentUser.uid,
+            following: targetUid,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+    }
+
+    function unfollowUser(targetUid) {
+        if (!db || !currentUser) return Promise.reject(new Error("no user"));
+        return db.collection("follows").doc(followDocId(targetUid)).delete();
+    }
+
+    function countFollowers(uid) { return countDocs(db.collection("follows").where("following", "==", uid)); }
+    function countFollowing(uid) { return countDocs(db.collection("follows").where("follower", "==", uid)); }
+
+    // Rang dans le classement mondial : nombre de joueurs avec un meilleur
+    // record + 1. Simple requête d'inégalité sur un seul champ, pas besoin
+    // d'index composite.
+    function computeRank(bestDistance) {
+        if (!db) return Promise.resolve(null);
+        return countDocs(db.collection("scores").where("bestDistance", ">", bestDistance)).then((n) => n + 1);
+    }
+
     // Met à jour l'entrée du classement (un seul document par joueur, écrasé
     // à chaque nouveau record, jamais à chaque lancer pour limiter les écritures)
     function pushScoreIfRecord(distanceMeters) {
@@ -4057,11 +4438,22 @@
                 rank++;
                 const data = doc.data();
                 const row = document.createElement("div");
-                row.className = "leaderboard-row" + (currentUser && doc.id === currentUser.uid ? " you" : "");
+                row.className = "leaderboard-row clickable" + (currentUser && doc.id === currentUser.uid ? " you" : "");
                 row.innerHTML =
                     '<span class="rank">#' + rank + '</span>' +
-                    '<span class="pseudo">' + (data.pseudo || "???") + '</span>' +
+                    '<span class="pseudo">' + escapeHtml(data.pseudo || "???") + '</span>' +
                     '<span class="dist">' + (data.bestDistance || 0).toFixed(1) + ' m</span>';
+                // Ouvre le profil de ce joueur (voir renderProfile) ; le score
+                // reste affiché ici même si son compte est privé (voir la
+                // section 15, seul l'écran Profil masque alors le détail).
+                row.addEventListener("click", () => {
+                    // N'utilise pas showScreen("profile") : elle affiche mon propre
+                    // profil par défaut, ce qui ferait clignoter le contenu avant
+                    // que le profil de ce joueur ne se charge.
+                    Object.values(screens).forEach((s) => s.classList.remove("active"));
+                    screens.profile.classList.add("active");
+                    renderProfile(doc.id);
+                });
                 body.appendChild(row);
             });
             if (rank === 0) {
@@ -4072,6 +4464,197 @@
             body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardError") + '</p>';
         });
     }
+
+    /* ============ 15. ÉCRAN PROFIL (compte, abonnés, progression) ============ */
+    // Lettre du jour de la semaine (index Date.getDay() : 0 = dimanche).
+    function weekdayLetter(dayIndex) {
+        const fr = ["D", "L", "M", "M", "J", "V", "S"];
+        const en = ["S", "M", "T", "W", "T", "F", "S"];
+        return (save.lang === "en" ? en : fr)[dayIndex];
+    }
+
+    // Sous-ensemble utilisé pour afficher MON PROPRE profil : mêmes champs que
+    // pushPublicProfile(), mais lu directement depuis "save" (dispo hors ligne,
+    // pas besoin d'attendre une lecture Firestore de mon propre document).
+    function buildOwnProfileData() {
+        return {
+            pseudo: save.pseudo || "?",
+            avatarUrl: save.avatarUrl || "",
+            isPrivate: !!save.isPrivate,
+            equippedSkin: save.equippedSkin,
+            equippedSkinFilter: rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now()),
+            ownedSkinsCount: save.ownedSkins.length,
+            totalMoneyEarned: save.totalMoneyEarned,
+            dailyEarnings: save.dailyEarnings,
+            dailyBestDistance: save.dailyBestDistance,
+            bestDistance: save.bestDistance,
+            statLevel: totalPuissance() + totalVitesse(),
+            achievementsCount: save.unlockedAchievements.length,
+        };
+    }
+
+    // Affiche le profil demandé : le mien (uid vide/absent) depuis "save"
+    // directement, ou celui d'un autre joueur (depuis le classement) en lisant
+    // le document public profiles/{uid}.
+    function renderProfile(uid) {
+        const body = document.getElementById("profile-body");
+        const isOwn = !uid || (currentUser && uid === currentUser.uid);
+        if (isOwn) {
+            paintProfile(buildOwnProfileData(), true, currentUser ? currentUser.uid : null);
+            return;
+        }
+        body.innerHTML = '<p style="text-align:center; color: var(--text-dim); padding-top:20px;">' + tr("profileLoading") + '</p>';
+        if (!FIREBASE_ENABLED || !db) {
+            body.innerHTML = '<p style="text-align:center; color: var(--text-dim); padding-top:20px;">' + tr("leaderboardUnavailable") + '</p>';
+            return;
+        }
+        db.collection("profiles").doc(uid).get().then((doc) => {
+            if (!doc.exists) {
+                body.innerHTML = '<p style="text-align:center; color: var(--text-dim); padding-top:20px;">' + tr("profileNotFound") + '</p>';
+                return;
+            }
+            paintProfile(doc.data(), false, uid);
+        }).catch((err) => {
+            console.error("Chargement du profil impossible :", err);
+            body.innerHTML = '<p style="text-align:center; color: var(--text-dim); padding-top:20px;">' + tr("leaderboardError") + '</p>';
+        });
+    }
+
+    // Construit le HTML du profil à partir des données (locales ou lues sur
+    // Firestore) : bandeau "compte privé" si ce n'est pas mon profil et qu'il
+    // est marqué privé (le score, lui, reste visible dans le classement, voir
+    // firestore.rules), sinon toutes les statistiques + graphique hebdo.
+    function paintProfile(data, isOwn, uid) {
+        const body = document.getElementById("profile-body");
+        const safeAvatar = safeAvatarUrl(data.avatarUrl);
+        const avatarHtml = safeAvatar
+            ? '<img class="profile-avatar-lg" src="' + safeAvatar + '" alt="">'
+            : '<div class="profile-avatar-lg">🎒</div>';
+
+        let html = '<div class="profile-header">' + avatarHtml +
+            '<h2 class="profile-pseudo">' + escapeHtml(data.pseudo || "?") + '</h2>';
+        if (!isOwn && uid) {
+            html += '<button class="btn small" id="btn-profile-follow">' + tr("profileFollowLoading") + '</button>';
+        }
+        html += '</div>';
+
+        html += '<div class="profile-top-row">' +
+                '<div class="profile-card profile-skin-card">' +
+                    '<img class="profile-skin-img" src="trousse-skin-1.png" style="filter:' + safeSkinFilter(data.equippedSkinFilter) + '">' +
+                    '<span class="profile-skin-count">+' + num(data.ownedSkinsCount) + '</span>' +
+                '</div>' +
+                '<div class="profile-card"><div class="profile-card-value" id="profile-following-count">—</div><div class="profile-card-label">' + tr("profileFollowing") + '</div></div>' +
+                '<div class="profile-card"><div class="profile-card-value" id="profile-followers-count">—</div><div class="profile-card-label">' + tr("profileFollowers") + '</div></div>' +
+            '</div>';
+
+        const showPrivateBanner = !isOwn && data.isPrivate;
+        if (showPrivateBanner) {
+            html += '<div class="profile-private-banner">🔒 ' + tr("profilePrivateBanner") + '</div>';
+            body.innerHTML = html;
+            loadFollowCounts(uid);
+            if (!isOwn && uid) wireFollowButton(uid);
+            return;
+        }
+
+        const weekKeys = last7DayKeys();
+        const dailyEarnings = data.dailyEarnings || {};
+        const dailyBest = data.dailyBestDistance || {};
+        const maxEarn = Math.max(1, ...weekKeys.map((k) => num(dailyEarnings[k])));
+        const weeklyBest = Math.max(0, ...weekKeys.map((k) => num(dailyBest[k])));
+        const todayK = todayKey();
+
+        html += '<h3 class="profile-section-title">' + tr("profileWeeklyTitle") + '</h3><div class="weekly-chart">';
+        weekKeys.forEach((k) => {
+            const val = num(dailyEarnings[k]);
+            const pct = Math.max(4, Math.round((val / maxEarn) * 100));
+            const letter = weekdayLetter(new Date(k + "T00:00:00").getDay());
+            html += '<div class="weekly-bar-col' + (k === todayK ? " today" : "") + '">' +
+                '<div class="weekly-bar" style="height:' + pct + '%" title="' + val + ' $"></div>' +
+                '<div class="weekly-bar-label">' + letter + '</div>' +
+            '</div>';
+        });
+        html += '</div>';
+
+        html += '<div class="profile-stats-grid">' +
+            '<div class="profile-stat-tile"><div class="icon">🚀</div><b>' + weeklyBest.toFixed(1) + ' m</b><span>' + tr("profileWeeklyBest") + '</span></div>' +
+            '<div class="profile-stat-tile"><div class="icon">💰</div><b>' + Math.round(num(data.totalMoneyEarned)) + ' $</b><span>' + tr("profileTotalEarned") + '</span></div>' +
+            '<div class="profile-stat-tile"><div class="icon">🏅</div><b id="profile-rank">—</b><span>' + tr("profileRank") + '</span></div>' +
+            '<div class="profile-stat-tile"><div class="icon">💪</div><b>' + num(data.statLevel) + '</b><span>' + tr("profileLevel") + '</span></div>' +
+        '</div>';
+
+        html += '<div class="profile-achv-header"><h3 class="profile-section-title" style="margin:0;">' + tr("profileAchvTitle") + '</h3>';
+        if (isOwn) html += '<button class="btn small secondary" id="btn-profile-achv-viewall">' + tr("profileViewAll") + '</button>';
+        html += '</div>';
+        if (isOwn) {
+            const unlocked = ACHIEVEMENTS.filter((a) => save.unlockedAchievements.includes(a.id));
+            html += '<div class="profile-achv-preview">' + unlocked.map((a) =>
+                '<div class="icon-badge" title="' + escapeHtml(tr(a.nameKey)) + '">' + a.emoji + '</div>'
+            ).join("") + '</div>';
+            html += '<div class="profile-achv-count">' + save.unlockedAchievements.length + ' / ' + ACHIEVEMENTS.length + '</div>';
+        } else {
+            html += '<div class="profile-achv-count">' + num(data.achievementsCount) + ' / ' + ACHIEVEMENTS.length + '</div>';
+        }
+
+        body.innerHTML = html;
+
+        if (isOwn) {
+            document.getElementById("btn-profile-achv-viewall").addEventListener("click", () => {
+                renderAchievements();
+                document.getElementById("achv-modal").classList.add("show");
+            });
+        }
+
+        loadFollowCounts(uid);
+        if (!isOwn && uid) wireFollowButton(uid);
+
+        if (FIREBASE_ENABLED && db) {
+            computeRank(num(data.bestDistance)).then((rank) => {
+                const el = document.getElementById("profile-rank");
+                if (el) el.textContent = rank ? "#" + rank : "—";
+            }).catch(() => {});
+        }
+    }
+
+    // Remplit les compteurs abonnés/abonnements ; tirets si hors ligne ou
+    // avant la toute première connexion Firebase.
+    function loadFollowCounts(uid) {
+        const followingEl = document.getElementById("profile-following-count");
+        const followersEl = document.getElementById("profile-followers-count");
+        if (!uid || !FIREBASE_ENABLED || !db) return;
+        countFollowing(uid).then((n) => { if (followingEl) followingEl.textContent = n; }).catch(() => {});
+        countFollowers(uid).then((n) => { if (followersEl) followersEl.textContent = n; }).catch(() => {});
+    }
+
+    // Branche le bouton "Suivre" / "Abonné(e)" du profil d'un autre joueur.
+    function wireFollowButton(targetUid) {
+        const btn = document.getElementById("btn-profile-follow");
+        if (!btn) return;
+        if (!FIREBASE_ENABLED || !db || !currentUser) {
+            btn.disabled = true;
+            btn.textContent = tr("profileFollowUnavailable");
+            return;
+        }
+        isFollowing(targetUid).then((following) => {
+            btn.textContent = following ? tr("profileUnfollow") : tr("profileFollow");
+            btn.classList.toggle("secondary", following);
+        });
+        btn.addEventListener("click", () => {
+            btn.disabled = true;
+            isFollowing(targetUid).then((following) => {
+                return (following ? unfollowUser(targetUid) : followUser(targetUid)).then(() => {
+                    btn.textContent = following ? tr("profileFollow") : tr("profileUnfollow");
+                    btn.classList.toggle("secondary", !following);
+                    loadFollowCounts(targetUid);
+                });
+            }).catch((err) => {
+                console.error("Suivre/ne plus suivre impossible :", err);
+                showToast(tr("profileFollowError"));
+            }).finally(() => { btn.disabled = false; });
+        });
+    }
+
+    document.getElementById("btn-profile").addEventListener("click", () => showScreen("profile"));
+    document.getElementById("btn-profile-back").addEventListener("click", () => showScreen("menu"));
 
     // Change le pseudo utilisé sur le classement (prompt natif : action rare,
     // pas besoin d'une fenêtre stylée pour ça)
@@ -4202,11 +4785,68 @@
     document.getElementById("btn-tutorial-skip").addEventListener("click", closeTutorial);
 
     // Bouton de langue : bascule FR <-> EN et retraduit toute l'interface visible
-    document.getElementById("btn-lang").addEventListener("click", () => {
+    document.getElementById("btn-lang-toggle").addEventListener("click", () => {
         save.lang = save.lang === "en" ? "fr" : "en";
         persist();
         applyLanguage();
         renderTutorialSlide(); // au cas où le tutoriel serait affiché
+    });
+
+    /* ============ 16. RÉGLAGES (thème/langue regroupés, compte, avatar) ============ */
+    // Remplit l'état actuel des contrôles à chaque ouverture de la modale
+    // (thème/langue sont déjà à jour vu qu'ils s'appliquent immédiatement,
+    // mais le compte privé et l'avatar peuvent avoir changé ailleurs).
+    function refreshSettingsModal() {
+        document.getElementById("chk-private-account").checked = !!save.isPrivate;
+        const preview = document.getElementById("settings-avatar-preview");
+        const placeholder = document.getElementById("settings-avatar-placeholder");
+        if (save.avatarUrl) {
+            preview.src = save.avatarUrl;
+            preview.hidden = false;
+            placeholder.hidden = true;
+        } else {
+            preview.hidden = true;
+            placeholder.hidden = false;
+        }
+        document.getElementById("settings-avatar-status").textContent = "";
+    }
+
+    document.getElementById("btn-settings").addEventListener("click", () => {
+        refreshSettingsModal();
+        document.getElementById("settings-modal").classList.add("show");
+    });
+    document.getElementById("btn-settings-close").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+    });
+
+    // Compte privé : les autres joueurs verront une banderole à la place du
+    // profil (voir renderProfile), mais le score reste dans le classement.
+    document.getElementById("chk-private-account").addEventListener("change", (e) => {
+        save.isPrivate = e.target.checked;
+        persist(); // pushPublicProfile() est appelé depuis persist()
+        showToast(save.isPrivate ? tr("settingsPrivateOn") : tr("settingsPrivateOff"));
+    });
+
+    // Photo de profil : ouvre le sélecteur de fichier, puis upload + resize
+    // (voir uploadAvatar). Best-effort comme le reste du cloud : un échec
+    // (hors ligne, fichier invalide...) affiche juste un message, sans
+    // bloquer le jeu.
+    document.getElementById("btn-change-avatar").addEventListener("click", () => {
+        document.getElementById("input-avatar-file").click();
+    });
+    document.getElementById("input-avatar-file").addEventListener("change", (e) => {
+        const file = e.target.files && e.target.files[0];
+        e.target.value = ""; // permet de re-sélectionner le même fichier plus tard
+        if (!file) return;
+        const statusEl = document.getElementById("settings-avatar-status");
+        statusEl.textContent = tr("settingsAvatarUploading");
+        uploadAvatar(file).then(() => {
+            statusEl.textContent = tr("settingsAvatarDone");
+            refreshSettingsModal();
+        }).catch((err) => {
+            console.error("Envoi de la photo de profil impossible :", err);
+            statusEl.textContent = tr("settingsAvatarError");
+        });
     });
 
     /* ============ 13bis. FICHE TROUSSE ET AIDE ============ */
@@ -4263,8 +4903,18 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "3.6.9";
+    const VERSION_NUMBER = "4.0.0";
     const CHANGELOG = [
+        {
+            version: "4.0.0",
+            major: [
+                { fr: "Ajout d'un système de comptes complet : écran Profil (photo, trousse équipée, abonnés/abonnements, progression hebdomadaire, argent total gagné, rang mondial, niveau, succès), possibilité de suivre les autres joueurs depuis le classement, compte privé (paramètres), et photo de profil personnalisable", en: "Added a full account system: Profile screen (picture, equipped pencil case, followers/following, weekly progress, total money earned, global rank, level, achievements), the ability to follow other players from the leaderboard, private accounts (settings), and a customizable profile picture" },
+            ],
+            minor: [
+                { fr: "Les boutons thème et langue sont regroupés dans une nouvelle icône réglages (⚙️)", en: "Theme and language buttons are now grouped in a new settings icon (⚙️)" },
+                { fr: "Correction d'une faille de sécurité : un pseudo malveillant pouvait injecter du code dans le classement (jamais exploitée à notre connaissance)", en: "Fixed a security issue: a malicious nickname could inject code into the leaderboard (never exploited as far as we know)" },
+            ],
+        },
         {
             version: "3.6.9",
             major: [],
@@ -4416,7 +5066,7 @@
     });
 
     // Clic en dehors de la boîte = fermeture
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
