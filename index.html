@@ -1103,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.2.0</div>
+                <div class="version-tag" id="version-tag">v5.2.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2790,17 +2790,19 @@
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
     let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
 
-    // Easter egg 💩 : caché derrière un bâtiment de la Cour d'école, visible
-    // seulement pendant la préparation du lancer (avant le décollage), donc
-    // à une position d'écran fixe puisque la caméra ne bouge pas encore (voir
-    // poopEggScreenPos, drawPoopEgg, et le hit-test dans pointerdown).
-    const CITY_BUILDING_SPACING = 260; // doit rester identique à drawBackground()
-    const POOP_EGG_BUILDING_INDEX = 1;
-    // Décalage depuis le coin bas-gauche du bâtiment (voir drawBuilding) :
-    // dans l'interstice entre 2 fenêtres, à l'écart de la porte et de l'arbre
-    // planté juste devant ce bâtiment (positions figées par seededRand, donc
-    // vérifiées une fois pour toutes plutôt que laissées au hasard).
-    const POOP_EGG_OFFSET_X = 126, POOP_EGG_OFFSET_Y = -10;
+    // Easter egg 💩 : caché derrière un arbre de la Cour d'école (dessiné
+    // AVANT lui, voir drawBackground, donc entièrement recouvert par son
+    // feuillage opaque), visible seulement pendant la préparation du lancer
+    // (avant le décollage), donc à une position d'écran fixe puisque la
+    // caméra ne bouge pas encore (voir poopEggScreenPos, drawPoopEgg, et le
+    // hit-test dans pointerdown).
+    const CITY_TREE_SPACING = 300; // doit rester identique à drawBackground()
+    const POOP_EGG_TREE_INDEX = 1;
+    // Même formule que la position de l'arbre dans drawBackground (position
+    // "aléatoire" mais figée par seededRand) : le feuillage retombe pile
+    // dessus. Décalage vertical pour viser le centre du feuillage plutôt
+    // que le pied du tronc (voir drawTree).
+    const POOP_EGG_OFFSET_X = 0, POOP_EGG_OFFSET_Y = -55;
     const POOP_EGG_SIZE = 15;
     const POOP_EGG_HIT_RADIUS = 16;
 
@@ -2809,8 +2811,9 @@
     }
 
     function poopEggScreenPos() {
-        const bx = POOP_EGG_BUILDING_INDEX * CITY_BUILDING_SPACING - cameraX * 0.25;
-        return { x: bx + POOP_EGG_OFFSET_X, y: groundScreenY + POOP_EGG_OFFSET_Y };
+        const treeWorldX = POOP_EGG_TREE_INDEX * CITY_TREE_SPACING + (seededRand(POOP_EGG_TREE_INDEX + 0.7) - 0.5) * 80;
+        const sx = treeWorldX - cameraX;
+        return { x: sx + POOP_EGG_OFFSET_X, y: groundScreenY + POOP_EGG_OFFSET_Y };
     }
 
     function drawPoopEgg() {
@@ -3336,16 +3339,13 @@
         // dans le calcul de position : un modulo là-dedans faisait "sauter" les
         // bâtiments de tout un cran (~260px) dès que parX franchissait un multiple
         // de buildingSpacing, ce qui donnait cet effet de fond qui se recharge.
-        const buildingSpacing = CITY_BUILDING_SPACING;
+        const buildingSpacing = 260;
         const parX = cameraX * 0.25;
         const buildingStartIdx = Math.floor((parX - 220) / buildingSpacing);
         const buildingEndIdx = Math.ceil((parX + w + 40) / buildingSpacing);
         for (let i = buildingStartIdx; i <= buildingEndIdx; i++) {
             const bx = i * buildingSpacing - parX;
             if (bx < -220 || bx > w + 40) continue;
-            // Dessiné AVANT le bâtiment (mur semi-transparent, voir drawBuilding)
-            // pour qu'il se fonde dans le mur au lieu de flotter par-dessus.
-            if (i === POOP_EGG_BUILDING_INDEX && poopEggVisible()) drawPoopEgg();
             drawBuilding(bx, groundScreenY, i);
         }
 
@@ -3367,12 +3367,15 @@
         }
 
         // arbres plantés sur la ligne d'horizon (défilent à la même vitesse que le sol)
-        const treeSpacing = 300;
+        const treeSpacing = CITY_TREE_SPACING;
         const treeStartIdx = Math.floor(cameraX / treeSpacing) - 1;
         for (let i = treeStartIdx; i < treeStartIdx + Math.ceil(w / treeSpacing) + 2; i++) {
             const worldPos = i * treeSpacing + (seededRand(i + 0.7) - 0.5) * 80;
             const sx = worldPos - cameraX;
             if (sx < -40 || sx > w + 40) continue;
+            // Dessiné juste AVANT CET arbre précis pour que son feuillage (plein,
+            // pas semi-transparent comme les bâtiments) le recouvre complètement.
+            if (i === POOP_EGG_TREE_INDEX && poopEggVisible()) drawPoopEgg();
             drawTree(sx, groundScreenY + 6, i);
         }
 
@@ -5565,8 +5568,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.2.0";
+    const VERSION_NUMBER = "5.2.1";
     const CHANGELOG = [
+        {
+            version: "5.2.1",
+            major: [],
+            minor: [
+                { fr: "Le succès secret est maintenant vraiment bien caché", en: "The secret achievement is now properly hidden" },
+            ],
+        },
         {
             version: "5.2.0",
             major: [],
