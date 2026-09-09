@@ -673,7 +673,12 @@
             max-width: min(90vw, 380px);
             text-align: center;
             background: rgba(20,24,36,0.95);
-            border: 2px solid var(--panel-border);
+            /* Fond toujours sombre, quel que soit le thème (contrairement aux
+               autres pastilles) : le texte doit donc rester clair en dur plutôt
+               que d'utiliser var(--text), qui devient sombre en thème clair et
+               se fond dans ce fond sombre (noir sur noir illisible). */
+            color: #fff;
+            border: 2px solid rgba(255,255,255,0.25);
             padding: 10px 18px;
             border-radius: 10px;
             font-size: 14px;
@@ -940,7 +945,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.6.8</div>
+                <div class="version-tag" id="version-tag">v3.6.9</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -4258,8 +4263,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "3.6.8";
+    const VERSION_NUMBER = "3.6.9";
     const CHANGELOG = [
+        {
+            version: "3.6.9",
+            major: [],
+            minor: [
+                { fr: "Correction du vrai problème derrière les messages \"Plage arrive bientôt !\"/\"Ville arrive bientôt !\" illisibles en thème clair : le texte du message (couleur sombre en mode jour) se fondait dans son fond toujours sombre. Texte forcé en blanc, quel que soit le thème", en: "Fixed the real issue behind unreadable \"Plage is coming soon!\"/\"Ville is coming soon!\" messages in light theme: the message text (dark in light theme) blended into its always-dark background. Text forced to white regardless of theme" },
+            ],
+        },
         {
             version: "3.6.8",
             major: [],
