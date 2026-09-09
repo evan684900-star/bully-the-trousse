@@ -933,7 +933,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.5.6</div>
+                <div class="version-tag" id="version-tag">v3.5.7</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1596,7 +1596,7 @@
     // Coût d'amélioration : croissance exponentielle pour garder une
     // progression satisfaisante sans que ça devienne gratuit trop vite
     function upgradeCost(level) {
-        return Math.round(50 * Math.pow(1.55, level));
+        return Math.round(25 * Math.pow(1.55, level));
     }
 
     /* ============ 4. NOTIFICATION "TOAST" ============ */
@@ -4244,8 +4244,15 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.5.6";
+    const VERSION_NUMBER = "3.5.7";
     const CHANGELOG = [
+        {
+            version: "3.5.7",
+            major: [],
+            minor: [
+                { fr: "Coût des améliorations Puissance/Vitesse divisé par 2 (même courbe de progression, juste deux fois moins cher à chaque niveau)", en: "Power/Speed upgrade cost cut in half (same progression curve, just twice as cheap at every level)" },
+            ],
+        },
         {
             version: "3.5.6",
             major: [],
