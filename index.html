@@ -649,6 +649,13 @@
             flex: 1; background: var(--card-bg); border: 2px solid var(--panel-border);
             border-radius: 14px; padding: 10px 6px; text-align: center;
         }
+        /* .profile-skin-card et .profile-stat-tile "Niveau" sont des <button>
+           cliquables (détail des skins / Puissance-Vitesse) : on annule les
+           styles par défaut du navigateur pour qu'ils gardent le même look
+           que les autres cartes non cliquables. */
+        button.profile-card, button.profile-stat-tile {
+            font: inherit; color: inherit; cursor: pointer; width: 100%;
+        }
         .profile-skin-card { position: relative; display: flex; align-items: center; justify-content: center; }
         .profile-skin-img { width: 40px; height: 40px; object-fit: contain; }
         .profile-skin-count {
@@ -686,6 +693,22 @@
             font-size: 22px; background: var(--card-bg); border: 2px solid var(--panel-border);
         }
         .profile-achv-count { text-align: center; color: var(--text-dim); font-size: 13px; font-weight: 700; margin-top: 6px; }
+        /* Détail "skins possédés" (modale ouverte depuis la pastille trousse) */
+        .skin-list { display: flex; flex-direction: column; gap: 8px; margin: 10px 0; max-height: 50vh; overflow-y: auto; }
+        .skin-list-row {
+            display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+            border-radius: 10px; border: 2px solid var(--panel-border); background: var(--card-bg);
+        }
+        .skin-list-row.locked { opacity: 0.45; }
+        .skin-list-row img { width: 32px; height: 32px; object-fit: contain; flex: none; }
+        .skin-list-row .name { flex: 1; font-weight: 700; font-size: 13px; }
+        .skin-list-row .equipped-tag { font-size: 11px; color: var(--accent); font-weight: 800; }
+        /* Détail "Puissance / Vitesse" (modale ouverte depuis la tuile Niveau) */
+        .level-detail-row {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px 0; border-bottom: 1px solid var(--panel-border); font-weight: 700;
+        }
+        .level-detail-row:last-child { border-bottom: none; }
 
         .modal-overlay {
             position: absolute;
@@ -1047,7 +1070,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v4.0.1</div>
+                <div class="version-tag" id="version-tag">v4.1.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1249,6 +1272,16 @@
             <h2 data-i18n="changelogTitle">📋 Journal des changements</h2>
             <div id="changelog-list"></div>
             <button class="btn" id="btn-changelog-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+
+    <!-- Détail réutilisable depuis l'écran Profil (collection de skins, ou
+         détail Puissance/Vitesse au lieu du niveau cumulé) -->
+    <div class="modal-overlay" id="profile-detail-modal">
+        <div class="info-box">
+            <h2 id="profile-detail-title"></h2>
+            <div id="profile-detail-body"></div>
+            <button class="btn" id="btn-profile-detail-close" data-i18n="btnOk">OK</button>
         </div>
     </div>
 
@@ -1495,6 +1528,8 @@
         profileTotalEarned: { fr: "Argent total gagné", en: "Total money earned" },
         profileRank: { fr: "Rang mondial", en: "Global rank" },
         profileLevel: { fr: "Niveau total", en: "Total level" },
+        profileSkinsTitle: { fr: "🎒 Trousses possédées", en: "🎒 Owned pencil cases" },
+        profileEquippedTag: { fr: "Équipée", en: "Equipped" },
         profileAchvTitle: { fr: "Succès", en: "Achievements" },
         profileViewAll: { fr: "Tout voir", en: "View all" },
         profileLoading: { fr: "Chargement du profil...", en: "Loading profile..." },
@@ -1540,6 +1575,12 @@
         if (known.includes(filterStr)) return filterStr;
         if (/^hue-rotate\(\d+deg\) saturate\(2\.2\) brightness\(1\.1\)$/.test(filterStr)) return filterStr;
         return "none";
+    }
+    // Même logique de whitelist pour la liste de skins possédés d'un profil.
+    function safeOwnedSkins(arr) {
+        if (!Array.isArray(arr)) return [];
+        const known = SKINS.map((s) => s.id);
+        return arr.filter((id) => known.includes(id));
     }
     // Force une valeur numérique (0 si absente/invalide) avant de l'insérer via
     // innerHTML : les champs numériques d'un profil public (profiles/{uid})
@@ -4324,12 +4365,13 @@
             isPrivate: !!save.isPrivate,
             equippedSkin: save.equippedSkin,
             equippedSkinFilter: rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now()),
-            ownedSkinsCount: save.ownedSkins.length,
+            ownedSkins: save.ownedSkins,
             totalMoneyEarned: save.totalMoneyEarned,
             dailyEarnings: save.dailyEarnings,
             dailyBestDistance: save.dailyBestDistance,
             bestDistance: save.bestDistance,
-            statLevel: totalPuissance() + totalVitesse(),
+            puissance: totalPuissance(),
+            vitesse: totalVitesse(),
             achievementsCount: save.unlockedAchievements.length,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         }, { merge: true }).catch((err) => console.error("Mise à jour du profil public impossible :", err));
@@ -4448,12 +4490,13 @@
             isPrivate: !!save.isPrivate,
             equippedSkin: save.equippedSkin,
             equippedSkinFilter: rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now()),
-            ownedSkinsCount: save.ownedSkins.length,
+            ownedSkins: save.ownedSkins,
             totalMoneyEarned: save.totalMoneyEarned,
             dailyEarnings: save.dailyEarnings,
             dailyBestDistance: save.dailyBestDistance,
             bestDistance: save.bestDistance,
-            statLevel: totalPuissance() + totalVitesse(),
+            puissance: totalPuissance(),
+            vitesse: totalVitesse(),
             achievementsCount: save.unlockedAchievements.length,
         };
     }
@@ -4485,6 +4528,34 @@
         });
     }
 
+    // Modale générique réutilisée pour le détail des skins et le détail
+    // Puissance/Vitesse (voir wireSkinsButton et le clic sur #btn-profile-level).
+    function showProfileDetailModal(title, bodyHtml) {
+        document.getElementById("profile-detail-title").textContent = title;
+        document.getElementById("profile-detail-body").innerHTML = bodyHtml;
+        document.getElementById("profile-detail-modal").classList.add("show");
+    }
+
+    // Liste complète des trousses (SKINS), avec un cadenas sur celles que ce
+    // joueur ne possède pas encore et un badge sur celle actuellement équipée.
+    function buildSkinsListHtml(ownedSkins, equippedSkin) {
+        return '<div class="skin-list">' + SKINS.map((s) => {
+            const owned = ownedSkins.includes(s.id);
+            const isEquipped = owned && s.id === equippedSkin;
+            return '<div class="skin-list-row' + (owned ? "" : " locked") + '">' +
+                '<img src="trousse-skin-1.png" style="filter:' + (owned ? rainbowOrFilter(s.filter, performance.now()) : "grayscale(1)") + '">' +
+                '<span class="name">' + s.name + '</span>' +
+                (isEquipped ? '<span class="equipped-tag">' + tr("profileEquippedTag") + '</span>' : (owned ? '' : '🔒')) +
+                '</div>';
+        }).join('') + '</div>';
+    }
+
+    function wireSkinsButton(ownedSkins, equippedSkin) {
+        document.getElementById("btn-profile-skins").addEventListener("click", () => {
+            showProfileDetailModal(tr("profileSkinsTitle"), buildSkinsListHtml(ownedSkins, equippedSkin));
+        });
+    }
+
     // Construit le HTML du profil à partir des données (locales ou lues sur
     // Firestore) : bandeau "compte privé" si ce n'est pas mon profil et qu'il
     // est marqué privé (le score, lui, reste visible dans le classement, voir
@@ -4501,11 +4572,13 @@
         }
         html += '</div>';
 
+        const ownedSkins = safeOwnedSkins(data.ownedSkins);
+
         html += '<div class="profile-top-row">' +
-                '<div class="profile-card profile-skin-card">' +
+                '<button type="button" class="profile-card profile-skin-card" id="btn-profile-skins">' +
                     '<img class="profile-skin-img" src="trousse-skin-1.png" style="filter:' + safeSkinFilter(data.equippedSkinFilter) + '">' +
-                    '<span class="profile-skin-count">+' + num(data.ownedSkinsCount) + '</span>' +
-                '</div>' +
+                    '<span class="profile-skin-count">+' + ownedSkins.length + '</span>' +
+                '</button>' +
                 '<div class="profile-card"><div class="profile-card-value" id="profile-following-count">—</div><div class="profile-card-label">' + tr("profileFollowing") + '</div></div>' +
                 '<div class="profile-card"><div class="profile-card-value" id="profile-followers-count">—</div><div class="profile-card-label">' + tr("profileFollowers") + '</div></div>' +
             '</div>';
@@ -4516,6 +4589,7 @@
             body.innerHTML = html;
             loadFollowCounts(uid);
             if (!isOwn && uid) wireFollowButton(uid);
+            wireSkinsButton(ownedSkins, data.equippedSkin);
             return;
         }
 
@@ -4542,7 +4616,7 @@
             '<div class="profile-stat-tile"><div class="icon">🚀</div><b>' + weeklyBest.toFixed(1) + ' m</b><span>' + tr("profileWeeklyBest") + '</span></div>' +
             '<div class="profile-stat-tile"><div class="icon">💰</div><b>' + Math.round(num(data.totalMoneyEarned)) + ' $</b><span>' + tr("profileTotalEarned") + '</span></div>' +
             '<div class="profile-stat-tile"><div class="icon">🏅</div><b id="profile-rank">—</b><span>' + tr("profileRank") + '</span></div>' +
-            '<div class="profile-stat-tile"><div class="icon">💪</div><b>' + num(data.statLevel) + '</b><span>' + tr("profileLevel") + '</span></div>' +
+            '<button type="button" class="profile-stat-tile" id="btn-profile-level"><div class="icon">💪</div><b>' + (num(data.puissance) + num(data.vitesse)) + '</b><span>' + tr("profileLevel") + '</span></button>' +
         '</div>';
 
         html += '<div class="profile-achv-header"><h3 class="profile-section-title" style="margin:0;">' + tr("profileAchvTitle") + '</h3>';
@@ -4566,6 +4640,14 @@
                 document.getElementById("achv-modal").classList.add("show");
             });
         }
+
+        document.getElementById("btn-profile-level").addEventListener("click", () => {
+            showProfileDetailModal(tr("profileLevel"),
+                '<div class="level-detail-row"><span>💪 ' + tr("statPuissance") + '</span><b>' + num(data.puissance) + '</b></div>' +
+                '<div class="level-detail-row"><span>⚡ ' + tr("statVitesse") + '</span><b>' + num(data.vitesse) + '</b></div>'
+            );
+        });
+        wireSkinsButton(ownedSkins, data.equippedSkin);
 
         loadFollowCounts(uid);
         if (!isOwn && uid) wireFollowButton(uid);
@@ -4852,8 +4934,16 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "4.0.1";
+    const VERSION_NUMBER = "4.1.0";
     const CHANGELOG = [
+        {
+            version: "4.1.0",
+            major: [],
+            minor: [
+                { fr: "Cliquer sur la trousse d'un profil affiche maintenant toutes les trousses possédées (et celles qui manquent encore)", en: "Clicking a profile's pencil case now shows every pencil case owned (and the ones still missing)" },
+                { fr: "Cliquer sur \"Niveau total\" d'un profil détaille maintenant Puissance et Vitesse séparément", en: "Clicking a profile's \"Total level\" now breaks down Power and Speed separately" },
+            ],
+        },
         {
             version: "4.0.1",
             major: [],
@@ -5021,7 +5111,11 @@
     });
 
     // Clic en dehors de la boîte = fermeture
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal"].forEach((id) => {
+    document.getElementById("btn-profile-detail-close").addEventListener("click", () => {
+        document.getElementById("profile-detail-modal").classList.remove("show");
+    });
+
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
