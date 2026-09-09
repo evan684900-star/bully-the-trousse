@@ -226,8 +226,11 @@
             display: inline-block;
             font-size: 12px;
             font-weight: 800;
-            color: #000;
-            text-shadow: none;
+            /* Texte noir fixe : invisible ("noir sur noir") une fois le voile
+               nocturne du thème sombre posé par-dessus le ciel animé. var(--text)
+               s'adapte : sombre sur le ciel clair, clair sur le ciel assombri. */
+            color: var(--text);
+            text-shadow: 0 1px 3px rgba(0,0,0,0.35);
             cursor: pointer;
             text-decoration: underline;
             margin-bottom: 2px;
@@ -937,7 +940,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.6.7</div>
+                <div class="version-tag" id="version-tag">v3.6.8</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -977,7 +980,7 @@
         <button class="btn secondary small back-btn" id="btn-game-back" data-i18n="btnBackMenu">← Menu</button>
         <div class="hud-top">
             <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
-            <div class="money-pill" style="font-size:14px; padding:6px 14px; color:#fff;">📏 <span id="game-distance">0</span> m</div>
+            <div class="money-pill" style="font-size:14px; padding:6px 14px; color:var(--text);">📏 <span id="game-distance">0</span> m</div>
         </div>
         <div class="hint-text" id="hint-text" data-i18n="hintCharge">Clique / appuie pour charger la puissance !</div>
         <div id="qte-wrap">
@@ -4248,8 +4251,15 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.6.7";
+    const VERSION_NUMBER = "3.6.8";
     const CHANGELOG = [
+        {
+            version: "3.6.8",
+            major: [],
+            minor: [
+                { fr: "Correction de deux textes illisibles selon le thème : la distance en jeu (blanc fixe, invisible sur le fond clair du mode jour) et le numéro de version (noir fixe, invisible sous le voile nocturne du mode sombre). Les deux s'adaptent maintenant au thème actif", en: "Fixed two hard-to-read texts depending on theme: the in-game distance (fixed white, invisible on the light theme's background) and the version number (fixed black, invisible under dark theme's night veil). Both now adapt to the active theme" },
+            ],
+        },
         {
             version: "3.6.7",
             major: [],
