@@ -643,7 +643,6 @@
             border: 3px solid var(--accent); background: var(--card-bg);
             display: flex; align-items: center; justify-content: center; font-size: 40px;
         }
-        .profile-avatar-lg[hidden] { display: none; }
         .profile-pseudo { margin: 4px 0 0; font-size: 18px; }
         .profile-top-row { display: flex; gap: 10px; margin-bottom: 18px; }
         .profile-card {
@@ -879,11 +878,15 @@
             border: 2px solid var(--panel-border); background: var(--card-bg);
             display: flex; align-items: center; justify-content: center; font-size: 26px; flex: none;
         }
-        /* "display:flex" ci-dessus l'emporterait sur le "display:none" par
-           défaut de l'attribut [hidden] (un style d'auteur bat toujours un
-           style de user-agent, quelle que soit la spécificité) : sans ça,
-           l'aperçu vide et le placeholder s'affichent en même temps. */
-        .avatar-preview[hidden] { display: none; }
+        .avatar-grid {
+            display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 10px 0 4px;
+        }
+        .avatar-grid button {
+            width: 100%; aspect-ratio: 1; border-radius: 12px; font-size: 20px;
+            border: 2px solid var(--panel-border); background: var(--card-bg); cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .avatar-grid button.selected { border-color: var(--accent); background: rgba(255,210,63,0.15); }
 
         /* ---------- CINÉMATIQUE DU MONDE VOLCAN ---------- */
         /* La cinématique réutilise le canvas et les décors du jeu : on masque
@@ -1044,7 +1047,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v4.0.0</div>
+                <div class="version-tag" id="version-tag">v4.0.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1306,12 +1309,11 @@
 
             <h3 class="settings-section-title" data-i18n="settingsAvatarTitle">🖼️ Photo de profil</h3>
             <div class="settings-avatar-row">
-                <img id="settings-avatar-preview" class="avatar-preview" src="" alt="" hidden>
                 <div id="settings-avatar-placeholder" class="avatar-preview avatar-placeholder">🎒</div>
-                <button class="btn small secondary" id="btn-change-avatar" data-i18n="settingsChangeAvatar">Changer la photo</button>
-                <input type="file" id="input-avatar-file" accept="image/*" style="display:none;">
+                <span class="settings-hint" data-i18n="settingsAvatarPickHint" style="margin:0;">Choisis une icône :</span>
             </div>
-            <p class="settings-hint" id="settings-avatar-status"></p>
+            <!-- Rempli dynamiquement par refreshSettingsModal() à partir de AVATAR_EMOJIS -->
+            <div class="avatar-grid" id="avatar-grid"></div>
 
             <button class="btn" id="btn-settings-close" data-i18n="btnOk">OK</button>
         </div>
@@ -1324,7 +1326,6 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 
 <script>
 (function () {
@@ -1485,10 +1486,7 @@
         settingsPrivateOn: { fr: "🔒 Compte passé en privé", en: "🔒 Account set to private" },
         settingsPrivateOff: { fr: "🔓 Compte passé en public", en: "🔓 Account set to public" },
         settingsAvatarTitle: { fr: "🖼️ Photo de profil", en: "🖼️ Profile picture" },
-        settingsChangeAvatar: { fr: "Changer la photo", en: "Change picture" },
-        settingsAvatarUploading: { fr: "Envoi en cours...", en: "Uploading..." },
-        settingsAvatarDone: { fr: "✅ Photo mise à jour !", en: "✅ Picture updated!" },
-        settingsAvatarError: { fr: "❌ Envoi impossible (fichier invalide, hors ligne...)", en: "❌ Upload failed (invalid file, offline...)" },
+        settingsAvatarPickHint: { fr: "Choisis une icône :", en: "Pick an icon:" },
         btnProfile: { fr: "👤 Profil", en: "👤 Profile" },
         profileFollowing: { fr: "Abonnements", en: "Following" },
         profileFollowers: { fr: "Abonnés", en: "Followers" },
@@ -1529,12 +1527,12 @@
     // Le profil public d'un joueur (profiles/{uid}) n'est pas validé côté
     // serveur (contrairement à "scores") : un compte techniquement compromis
     // pourrait y écrire n'importe quoi directement via l'API Firestore. Comme
-    // avatarUrl/equippedSkinFilter finissent dans des attributs HTML (src,
-    // style) en consultant le profil D'UN AUTRE joueur, on les valide/échappe
-    // avant affichage plutôt que de faire confiance au contenu du document.
-    function safeAvatarUrl(url) {
-        if (typeof url !== "string" || !/^https:\/\/firebasestorage\.googleapis\.com\//.test(url)) return "";
-        return escapeHtml(url);
+    // avatarEmoji/equippedSkinFilter finissent dans le HTML en consultant le
+    // profil D'UN AUTRE joueur, on les valide avant affichage plutôt que de
+    // faire confiance au contenu du document (whitelist, pas d'échappement à
+    // faire puisqu'on rejette tout ce qui n'est pas un des emojis connus).
+    function safeAvatarEmoji(emoji) {
+        return AVATAR_EMOJIS.includes(emoji) ? emoji : "";
     }
     function safeSkinFilter(filterStr) {
         if (typeof filterStr !== "string") return "none";
@@ -1709,6 +1707,16 @@
     ];
     function getTrail(id) { return TRAILS.find(t => t.id === id) || TRAILS[0]; }
 
+    // Icônes de profil au choix (réglages > Photo de profil). Pas d'upload
+    // libre : Firebase Storage demande maintenant le forfait payant Blaze,
+    // et une liste fermée évite en plus tout souci de modération.
+    const AVATAR_EMOJIS = [
+        "🎒", "🚀", "🌋", "🏖️", "🏙️", "🏫",
+        "💰", "🏆", "🥇", "🎯", "🔥", "❄️",
+        "⚡", "💪", "🎨", "🌈", "🪙", "🛸",
+        "🌠", "✨", "🎮", "😎", "🦄", "🐉",
+    ];
+
     /* ============ 3. SAUVEGARDE (localStorage) ============ */
     function defaultSave() {
         return {
@@ -1747,7 +1755,7 @@
             dailyEarnings: {},         // { "AAAA-MM-JJ": montant } sur les 7 derniers jours (voir pruneDailyMap)
             dailyBestDistance: {},     // { "AAAA-MM-JJ": mètres } meilleur lancer du jour, sur 7 jours
             isPrivate: false,          // compte privé : les autres voient une banderole au lieu du profil
-            avatarUrl: "",             // photo de profil (Firebase Storage), vide = avatar par défaut
+            avatarEmoji: "",           // icône de profil choisie dans AVATAR_EMOJIS, vide = avatar par défaut
         };
     }
 
@@ -4167,7 +4175,6 @@
     const FIREBASE_ENABLED = typeof firebase !== "undefined" && !firebaseConfig.apiKey.startsWith("VOTRE_");
 
     let db = null;
-    let storage = null;
     let currentUser = null;
 
     function updateOnlineStatus(text) {
@@ -4182,7 +4189,6 @@
         }
         firebase.initializeApp(firebaseConfig);
         db = firebase.firestore();
-        storage = firebase.storage();
         updateOnlineStatus(tr("onlineConnecting"));
         firebase.auth().onAuthStateChanged((user) => {
             if (!user) return;
@@ -4299,52 +4305,11 @@
         });
     }
 
-    // --- Photo de profil (Firebase Storage) ---
-    const AVATAR_MAX_SIZE = 256;                 // px, image carrée envoyée
-    const AVATAR_MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 Mo max avant redimensionnement
-
-    // Recadre l'image au centre en carré puis la redimensionne à
-    // AVATAR_MAX_SIZE×AVATAR_MAX_SIZE via un <canvas>, pour ne jamais envoyer
-    // une photo originale énorme vers Storage.
-    function resizeImageToSquareJpeg(file, maxSize) {
-        return new Promise((resolve, reject) => {
-            const img = new Image();
-            const objectUrl = URL.createObjectURL(file);
-            img.onload = () => {
-                URL.revokeObjectURL(objectUrl);
-                const side = Math.min(img.width, img.height);
-                const sx = (img.width - side) / 2;
-                const sy = (img.height - side) / 2;
-                const canvas = document.createElement("canvas");
-                canvas.width = maxSize;
-                canvas.height = maxSize;
-                canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, maxSize, maxSize);
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob); else reject(new Error("Conversion de l'image impossible"));
-                }, "image/jpeg", 0.85);
-            };
-            img.onerror = () => { URL.revokeObjectURL(objectUrl); reject(new Error("Image invalide")); };
-            img.src = objectUrl;
-        });
-    }
-
-    // Redimensionne puis envoie la photo vers Storage (avatars/{uid}/photo.jpg,
-    // toujours le même chemin : chaque nouvel envoi remplace le précédent),
-    // met à jour save.avatarUrl et le profil public. Rejette la promesse en
-    // cas d'échec (fichier invalide, hors ligne...) pour que l'appelant
-    // affiche un message d'erreur.
-    function uploadAvatar(file) {
-        if (!storage || !currentUser) return Promise.reject(new Error("Firebase non connecté"));
-        if (!file.type.startsWith("image/")) return Promise.reject(new Error("Ce fichier n'est pas une image"));
-        if (file.size > AVATAR_MAX_FILE_BYTES) return Promise.reject(new Error("Image trop lourde (8 Mo max)"));
-        return resizeImageToSquareJpeg(file, AVATAR_MAX_SIZE).then((blob) => {
-            const ref = storage.ref("avatars/" + currentUser.uid + "/photo.jpg");
-            return ref.put(blob, { contentType: "image/jpeg" }).then(() => ref.getDownloadURL());
-        }).then((url) => {
-            save.avatarUrl = url;
-            persist();
-            return url;
-        });
+    // --- Photo de profil (icône choisie dans AVATAR_EMOJIS) ---
+    function setAvatarEmoji(emoji) {
+        if (!AVATAR_EMOJIS.includes(emoji)) return;
+        save.avatarEmoji = emoji;
+        persist(); // envoie aussi le profil public (pushPublicProfile, via persist())
     }
 
     // --- Profil public (écran Profil, voir section 15) ---
@@ -4355,7 +4320,7 @@
         if (!db || !currentUser) return;
         db.collection("profiles").doc(currentUser.uid).set({
             pseudo: save.pseudo || "Anonyme",
-            avatarUrl: save.avatarUrl || "",
+            avatarEmoji: save.avatarEmoji || "",
             isPrivate: !!save.isPrivate,
             equippedSkin: save.equippedSkin,
             equippedSkinFilter: rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now()),
@@ -4479,7 +4444,7 @@
     function buildOwnProfileData() {
         return {
             pseudo: save.pseudo || "?",
-            avatarUrl: save.avatarUrl || "",
+            avatarEmoji: save.avatarEmoji || "",
             isPrivate: !!save.isPrivate,
             equippedSkin: save.equippedSkin,
             equippedSkinFilter: rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now()),
@@ -4526,10 +4491,8 @@
     // firestore.rules), sinon toutes les statistiques + graphique hebdo.
     function paintProfile(data, isOwn, uid) {
         const body = document.getElementById("profile-body");
-        const safeAvatar = safeAvatarUrl(data.avatarUrl);
-        const avatarHtml = safeAvatar
-            ? '<img class="profile-avatar-lg" src="' + safeAvatar + '" alt="">'
-            : '<div class="profile-avatar-lg">🎒</div>';
+        const safeAvatar = safeAvatarEmoji(data.avatarEmoji);
+        const avatarHtml = '<div class="profile-avatar-lg">' + (safeAvatar || "🎒") + '</div>';
 
         let html = '<div class="profile-header">' + avatarHtml +
             '<h2 class="profile-pseudo">' + escapeHtml(data.pseudo || "?") + '</h2>';
@@ -4798,17 +4761,25 @@
     // mais le compte privé et l'avatar peuvent avoir changé ailleurs).
     function refreshSettingsModal() {
         document.getElementById("chk-private-account").checked = !!save.isPrivate;
-        const preview = document.getElementById("settings-avatar-preview");
-        const placeholder = document.getElementById("settings-avatar-placeholder");
-        if (save.avatarUrl) {
-            preview.src = save.avatarUrl;
-            preview.hidden = false;
-            placeholder.hidden = true;
-        } else {
-            preview.hidden = true;
-            placeholder.hidden = false;
-        }
-        document.getElementById("settings-avatar-status").textContent = "";
+        document.getElementById("settings-avatar-placeholder").textContent = save.avatarEmoji || "🎒";
+        renderAvatarGrid();
+    }
+
+    // Construit la grille d'icônes au choix (voir AVATAR_EMOJIS) ; celle
+    // actuellement équipée reste visuellement marquée (bordure accent).
+    function renderAvatarGrid() {
+        const grid = document.getElementById("avatar-grid");
+        grid.innerHTML = AVATAR_EMOJIS.map((emoji) =>
+            '<button type="button" class="' + (save.avatarEmoji === emoji ? "selected" : "") + '" data-emoji="' + emoji + '">' + emoji + '</button>'
+        ).join("");
+        grid.querySelectorAll("button").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                setAvatarEmoji(btn.getAttribute("data-emoji"));
+                document.getElementById("settings-avatar-placeholder").textContent = save.avatarEmoji;
+                grid.querySelectorAll("button").forEach((b) => b.classList.remove("selected"));
+                btn.classList.add("selected");
+            });
+        });
     }
 
     document.getElementById("btn-settings").addEventListener("click", () => {
@@ -4825,28 +4796,6 @@
         save.isPrivate = e.target.checked;
         persist(); // pushPublicProfile() est appelé depuis persist()
         showToast(save.isPrivate ? tr("settingsPrivateOn") : tr("settingsPrivateOff"));
-    });
-
-    // Photo de profil : ouvre le sélecteur de fichier, puis upload + resize
-    // (voir uploadAvatar). Best-effort comme le reste du cloud : un échec
-    // (hors ligne, fichier invalide...) affiche juste un message, sans
-    // bloquer le jeu.
-    document.getElementById("btn-change-avatar").addEventListener("click", () => {
-        document.getElementById("input-avatar-file").click();
-    });
-    document.getElementById("input-avatar-file").addEventListener("change", (e) => {
-        const file = e.target.files && e.target.files[0];
-        e.target.value = ""; // permet de re-sélectionner le même fichier plus tard
-        if (!file) return;
-        const statusEl = document.getElementById("settings-avatar-status");
-        statusEl.textContent = tr("settingsAvatarUploading");
-        uploadAvatar(file).then(() => {
-            statusEl.textContent = tr("settingsAvatarDone");
-            refreshSettingsModal();
-        }).catch((err) => {
-            console.error("Envoi de la photo de profil impossible :", err);
-            statusEl.textContent = tr("settingsAvatarError");
-        });
     });
 
     /* ============ 13bis. FICHE TROUSSE ET AIDE ============ */
@@ -4903,8 +4852,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "4.0.0";
+    const VERSION_NUMBER = "4.0.1";
     const CHANGELOG = [
+        {
+            version: "4.0.1",
+            major: [],
+            minor: [
+                { fr: "Photo de profil : remplacée par une liste de 24 icônes au choix (Firebase Storage demande maintenant un forfait payant, une liste fermée évite aussi tout souci de modération)", en: "Profile picture: replaced with a list of 24 icons to choose from (Firebase Storage now requires a paid plan, and a closed list also avoids any moderation concerns)" },
+            ],
+        },
         {
             version: "4.0.0",
             major: [
