@@ -703,6 +703,9 @@
         .skin-list-row img { width: 32px; height: 32px; object-fit: contain; flex: none; }
         .skin-list-row .name { flex: 1; font-weight: 700; font-size: 13px; }
         .skin-list-row .equipped-tag { font-size: 11px; color: var(--accent); font-weight: 800; }
+        /* .follow-list-row réutilise .skin-list-row (même ligne cliquable) */
+        .follow-list-row { width: 100%; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+        .follow-avatar { font-size: 22px; flex: none; }
         /* Détail "Puissance / Vitesse" (modale ouverte depuis la tuile Niveau) */
         .level-detail-row {
             display: flex; justify-content: space-between; align-items: center;
@@ -1070,7 +1073,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v4.1.0</div>
+                <div class="version-tag" id="version-tag">v4.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1534,6 +1537,7 @@
         profileViewAll: { fr: "Tout voir", en: "View all" },
         profileLoading: { fr: "Chargement du profil...", en: "Loading profile..." },
         profileNotFound: { fr: "Profil introuvable.", en: "Profile not found." },
+        profileFollowListEmpty: { fr: "Personne pour l'instant.", en: "Nobody yet." },
         profilePrivateBanner: { fr: "Ce compte est privé", en: "This account is private" },
         profileFollow: { fr: "➕ Suivre", en: "➕ Follow" },
         profileUnfollow: { fr: "✅ Abonné(e)", en: "✅ Following" },
@@ -4579,8 +4583,8 @@
                     '<img class="profile-skin-img" src="trousse-skin-1.png" style="filter:' + safeSkinFilter(data.equippedSkinFilter) + '">' +
                     '<span class="profile-skin-count">+' + ownedSkins.length + '</span>' +
                 '</button>' +
-                '<div class="profile-card"><div class="profile-card-value" id="profile-following-count">—</div><div class="profile-card-label">' + tr("profileFollowing") + '</div></div>' +
-                '<div class="profile-card"><div class="profile-card-value" id="profile-followers-count">—</div><div class="profile-card-label">' + tr("profileFollowers") + '</div></div>' +
+                '<button type="button" class="profile-card" id="btn-profile-following"><div class="profile-card-value" id="profile-following-count">—</div><div class="profile-card-label">' + tr("profileFollowing") + '</div></button>' +
+                '<button type="button" class="profile-card" id="btn-profile-followers"><div class="profile-card-value" id="profile-followers-count">—</div><div class="profile-card-label">' + tr("profileFollowers") + '</div></button>' +
             '</div>';
 
         const showPrivateBanner = !isOwn && data.isPrivate;
@@ -4660,14 +4664,60 @@
         }
     }
 
-    // Remplit les compteurs abonnés/abonnements ; tirets si hors ligne ou
-    // avant la toute première connexion Firebase.
+    // Remplit les compteurs abonnés/abonnements (tirets si hors ligne ou avant
+    // la toute première connexion Firebase) et branche le clic sur les deux
+    // cartes pour ouvrir la liste correspondante (voir openFollowListModal).
     function loadFollowCounts(uid) {
         const followingEl = document.getElementById("profile-following-count");
         const followersEl = document.getElementById("profile-followers-count");
+        document.getElementById("btn-profile-following").addEventListener("click", () => openFollowListModal(uid, "following"));
+        document.getElementById("btn-profile-followers").addEventListener("click", () => openFollowListModal(uid, "followers"));
         if (!uid || !FIREBASE_ENABLED || !db) return;
         countFollowing(uid).then((n) => { if (followingEl) followingEl.textContent = n; }).catch(() => {});
         countFollowers(uid).then((n) => { if (followersEl) followersEl.textContent = n; }).catch(() => {});
+    }
+
+    // Liste des comptes suivis ("following") ou abonnés ("followers") de uid,
+    // avec pseudo + avatar (lus depuis profiles/{autreUid}) ; cliquer une ligne
+    // ouvre le profil de cette personne.
+    function openFollowListModal(uid, type) {
+        const title = type === "following" ? tr("profileFollowing") : tr("profileFollowers");
+        showProfileDetailModal(title, '<p style="text-align:center; color: var(--text-dim);">' + tr("profileLoading") + '</p>');
+        if (!uid || !FIREBASE_ENABLED || !db) {
+            document.getElementById("profile-detail-body").innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardUnavailable") + '</p>';
+            return;
+        }
+        const matchField = type === "following" ? "follower" : "following";
+        const otherField = type === "following" ? "following" : "follower";
+        db.collection("follows").where(matchField, "==", uid).limit(50).get().then((snap) => {
+            const otherUids = [];
+            snap.forEach((doc) => otherUids.push(doc.data()[otherField]));
+            if (!otherUids.length) {
+                document.getElementById("profile-detail-body").innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("profileFollowListEmpty") + '</p>';
+                return;
+            }
+            return Promise.all(otherUids.map((otherUid) =>
+                db.collection("profiles").doc(otherUid).get().then((doc) => ({ uid: otherUid, data: doc.exists ? doc.data() : {} }))
+            )).then((rows) => {
+                document.getElementById("profile-detail-body").innerHTML = '<div class="skin-list">' + rows.map((r) =>
+                    '<button type="button" class="skin-list-row follow-list-row" data-uid="' + escapeHtml(r.uid) + '">' +
+                        '<span class="follow-avatar">' + (safeAvatarEmoji(r.data.avatarEmoji) || "🎒") + '</span>' +
+                        '<span class="name">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
+                    '</button>'
+                ).join("") + '</div>';
+                document.querySelectorAll(".follow-list-row").forEach((btn) => {
+                    btn.addEventListener("click", () => {
+                        document.getElementById("profile-detail-modal").classList.remove("show");
+                        Object.values(screens).forEach((s) => s.classList.remove("active"));
+                        screens.profile.classList.add("active");
+                        renderProfile(btn.getAttribute("data-uid"));
+                    });
+                });
+            });
+        }).catch((err) => {
+            console.error("Chargement de la liste impossible :", err);
+            document.getElementById("profile-detail-body").innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardError") + '</p>';
+        });
     }
 
     // Branche le bouton "Suivre" / "Abonné(e)" du profil d'un autre joueur.
@@ -4934,8 +4984,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "4.1.0";
+    const VERSION_NUMBER = "4.2.0";
     const CHANGELOG = [
+        {
+            version: "4.2.0",
+            major: [],
+            minor: [
+                { fr: "Cliquer sur \"Abonnements\"/\"Abonnés\" d'un profil affiche la liste des comptes en question, avec un clic dessus pour aller voir leur profil", en: "Clicking a profile's \"Following\"/\"Followers\" now shows the list of accounts, clickable to open their profile" },
+            ],
+        },
         {
             version: "4.1.0",
             major: [],
