@@ -1103,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.0.2</div>
+                <div class="version-tag" id="version-tag">v5.1.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1540,6 +1540,8 @@
         achvDedicatedDesc: { fr: "Cumule 1 heure de jeu.", en: "Reach 1 hour of cumulative playtime." },
         achv50ThrowsName: { fr: "Bras rodé", en: "Well-oiled arm" },
         achv50ThrowsDesc: { fr: "Effectue 50 lancers.", en: "Make 50 throws." },
+        achv100ThrowsName: { fr: "J'ai des courbatures", en: "I'm sore all over" },
+        achv100ThrowsDesc: { fr: "Effectue 100 lancers.", en: "Make 100 throws." },
         achvAllTrailsName: { fr: "Sillage complet", en: "Full trail set" },
         achvAllTrailsDesc: { fr: "Possède toutes les traînées.", en: "Own every trail." },
         achvSpaceEggName: { fr: "Vers l'infini...", en: "To infinity..." },
@@ -1746,6 +1748,7 @@
         { id: "jackpotX5", emoji: "🪙", nameKey: "achvJackpotName", descKey: "achvJackpotDesc", check: (s) => s.hasJackpot },
         { id: "joueurAssidu", emoji: "⏱️", nameKey: "achvDedicatedName", descKey: "achvDedicatedDesc", check: (s) => s.playTime >= 3600 },
         { id: "cinquanteLancers", emoji: "💪", nameKey: "achv50ThrowsName", descKey: "achv50ThrowsDesc", check: (s) => s.totalThrows >= 50 },
+        { id: "centLancers", emoji: "🦵", nameKey: "achv100ThrowsName", descKey: "achv100ThrowsDesc", check: (s) => s.totalThrows >= 100 },
         { id: "toutesTrainees", emoji: "🌈", nameKey: "achvAllTrailsName", descKey: "achvAllTrailsDesc", check: (s) => s.ownedTrails.length >= TRAILS.length },
         { id: "easterEggEspace", emoji: "🛸", nameKey: "achvSpaceEggName", descKey: "achvSpaceEggDesc", check: (s) => s.hasTriggeredSpaceEgg },
         { id: "qteParfait", emoji: "🎯", nameKey: "achvPerfectQteName", descKey: "achvPerfectQteDesc", check: (s) => s.hasPerfectQte },
@@ -5498,8 +5501,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.0.2";
+    const VERSION_NUMBER = "5.1.0";
     const CHANGELOG = [
+        {
+            version: "5.1.0",
+            major: [],
+            minor: [
+                { fr: "Nouveau succès : 🦵 \"J'ai des courbatures\" (effectue 100 lancers)", en: "New achievement: 🦵 \"I'm sore all over\" (make 100 throws)" },
+            ],
+        },
         {
             version: "5.0.2",
             major: [],
