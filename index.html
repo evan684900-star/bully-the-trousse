@@ -662,9 +662,13 @@
         /* Petit message temporaire en bas de l'écran (ex: "Pas assez d'argent !") */
         .toast {
             position: absolute;
-            bottom: 24px;
+            /* Assez haut pour ne jamais passer derrière/sur les icônes flottantes
+               (musique/thème/langue/liens), qui montent jusqu'à ~52px du bas. */
+            bottom: calc(70px + env(safe-area-inset-bottom));
             left: 50%;
             transform: translateX(-50%);
+            max-width: min(90vw, 380px);
+            text-align: center;
             background: rgba(20,24,36,0.95);
             border: 2px solid var(--panel-border);
             padding: 10px 18px;
@@ -933,7 +937,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v3.6.6</div>
+                <div class="version-tag" id="version-tag">v3.6.7</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -4244,8 +4248,15 @@
     // et mineurs. Ajouter une entrée ici à chaque nouvelle mise à jour visible
     // par les joueurs (garder VERSION_NUMBER ci-dessous et le texte du bouton
     // #version-tag synchronisés avec le numéro le plus récent).
-    const VERSION_NUMBER = "3.6.6";
+    const VERSION_NUMBER = "3.6.7";
     const CHANGELOG = [
+        {
+            version: "3.6.7",
+            major: [],
+            minor: [
+                { fr: "Correction du petit message (ex: \"Plage arrive bientôt !\") qui passait derrière/sur les icônes musique/thème/langue/liens en bas de l'écran", en: "Fixed the small toast message (e.g. \"Plage is coming soon!\") overlapping the music/theme/language/links icons at the bottom of the screen" },
+            ],
+        },
         {
             version: "3.6.6",
             major: [],
