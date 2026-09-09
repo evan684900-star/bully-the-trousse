@@ -603,6 +603,11 @@
         .skin-card img {
             width: 46px; height: 46px; object-fit: contain;
         }
+        /* Superpose un canvas (baskets/cratères) par-dessus l'image de base
+           pour les skins qui ajoutent un détail dessiné sans remplacer tout le sprite. */
+        .skin-icon-wrap { position: relative; width: 46px; height: 46px; flex: none; }
+        .skin-icon-wrap img { position: absolute; top: 0; left: 0; }
+        .skin-icon-wrap canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
         .level-badge {
             font-size: 11px;
             color: var(--accent);
@@ -1073,7 +1078,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v4.2.0</div>
+                <div class="version-tag" id="version-tag">v4.3.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1387,6 +1392,8 @@
         hintLockPower: { fr: "Clique pour verrouiller la PUISSANCE !", en: "Click to lock in POWER!" },
         hintLockAccuracy: { fr: "Reclique pour verrouiller la PRÉCISION !", en: "Click again to lock in ACCURACY!" },
         hintZeroG: { fr: "🛸 En apesanteur...", en: "🛸 Weightless..." },
+        hintBasketBounce: { fr: "👟 Rebond ! Reclique pour verrouiller la PUISSANCE !", en: "👟 Bounce! Click again to lock in POWER!" },
+        basketBounceToast: { fr: "👟 Rebond sur les baskets !", en: "👟 Bounced off the sneakers!" },
         qtePrompt: { fr: "🚀 CLIQUE QUAND ÇA S'ALIGNE !", en: "🚀 CLICK WHEN IT LINES UP!" },
         resultDistanceTitle: { fr: "Distance parcourue", en: "Distance travelled" },
         resultRecord: { fr: "🏆 NOUVEAU RECORD !", en: "🏆 NEW RECORD!" },
@@ -1738,6 +1745,41 @@
             desc: "Aucun bonus de stats, mais 40% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3, x5... voire x10) !",
             bonusPuissance: 0, bonusVitesse: 0, filter: "none", isCoin: true
         },
+        {
+            // Trousse "sport" : des baskets dessinées à la main (voir drawSneakers)
+            // lui donnent une chance de rebondir au lieu d'atterrir, relançant
+            // aussitôt la charge de puissance + précision comme un tout nouveau
+            // lancer (voir tryBasketBounce). Ne se déclenche jamais en apesanteur.
+            id: "basket", name: "Trousse à Baskets", cost: 36000,
+            desc: "+3 Puissance, +6 Vitesse. 20% de chance à l'atterrissage de rebondir sur ses baskets pour un lancer bonus (jusqu'à 2 rebonds d'affilée, 5% de chance pour le second) ; ne fonctionne pas en apesanteur.",
+            bonusPuissance: 3, bonusVitesse: 6, filter: "none", isBasket: true
+        },
+        {
+            // Cratères peints à la main (voir drawCraters). Simplifie le QTE de
+            // l'easter egg spatial (3 anneaux de taille moyenne au lieu de 5
+            // aléatoires) et bonifie l'argent gagné UNIQUEMENT sur les lancers
+            // qui passent par cette séquence (voir onLanded, inSpaceMode).
+            id: "lunaire", name: "Trousse Lunaire", cost: 25000,
+            desc: "QTE en apesanteur simplifié (3 anneaux de taille moyenne au lieu de 5) et +25% d'argent gagné sur les lancers qui passent par la séquence spatiale. Aucun effet dans le monde normal ou au Volcan.",
+            bonusPuissance: 0, bonusVitesse: 0, filter: "grayscale(1) brightness(1.7) contrast(0.85)", isLunar: true
+        },
+        {
+            // Dessinée à part comme un lingot (voir drawIronIngot), pas de
+            // filtre sur l'image de la trousse. maxDurability est lu par
+            // maxDurability() à la place du 100 par défaut.
+            id: "fer", name: "Trousse de Fer", cost: 5000,
+            desc: "300 de durabilité au lieu de 100, mais -1 Puissance et -1 Vitesse. Increvable, mais pas franchement agile.",
+            bonusPuissance: -1, bonusVitesse: -1, filter: "none", isIron: true, maxDurability: 300
+        },
+        {
+            // Clin d'œil : c'est "moi" (l'IA qui a codé tout ce système). Un
+            // p'tit coup de main plutôt qu'un bonus de stats brut : élargit la
+            // fenêtre du lancer parfait de 75% (voir isPerfect dans
+            // lockAccuracyAndLaunch), donc plus facile à viser légitimement.
+            id: "claude", name: "Trousse Claude", cost: 4500,
+            desc: "Aucun bonus de stats, mais un coup de main de l'IA : la fenêtre du lancer parfait est élargie de 75%, donc bien plus facile à viser.",
+            bonusPuissance: 0, bonusVitesse: 0, filter: "sepia(0.5) saturate(1.8) hue-rotate(-15deg) brightness(0.95)", isClaude: true
+        },
     ];
 
     // Traînée dessinée derrière la trousse pendant le vol (voir drawTrail).
@@ -1915,6 +1957,19 @@
     }
 
     function getSkin(id) { return SKINS.find(s => s.id === id) || SKINS[0]; }
+
+    // Durabilité max du skin équipé (100 par défaut, 300 pour la Trousse de
+    // Fer). Voir equipSkin() pour le plafonnage quand on change de skin.
+    function maxDurability() { return getSkin(save.equippedSkin).maxDurability || 100; }
+
+    // Change le skin équipé et plafonne la durabilité au max du nouveau skin
+    // (ex: 250/300 avec la Trousse de Fer devient 100/100 en rééquipant une
+    // trousse normale) : centralisé ici pour ne pas l'oublier à chaque endroit
+    // où on équipe un skin (achat, équiper, triche console).
+    function equipSkin(id) {
+        save.equippedSkin = id;
+        save.durability = Math.min(save.durability, maxDurability());
+    }
 
     // Stat totale = niveau acheté en boutique + bonus du skin équipé
     function totalPuissance() {
@@ -2247,7 +2302,7 @@
 
     // Coût de la réparation : 500 $ par tranche de 10 de durabilité manquante
     function repairCost() {
-        return Math.ceil((100 - save.durability) / 10) * 500;
+        return Math.ceil((maxDurability() - save.durability) / 10) * 500;
     }
 
     // Carte "Réparer la trousse" (onglet Améliorations, monde Volcan débloqué)
@@ -2257,7 +2312,7 @@
         card.className = "upgrade-card";
         card.innerHTML =
             '<div class="icon">🔧</div>' +
-            '<div class="info"><h3>' + tr("repairName") + ' <span class="level-badge">' + save.durability + ' / 100</span></h3>' +
+            '<div class="info"><h3>' + tr("repairName") + ' <span class="level-badge">' + save.durability + ' / ' + maxDurability() + '</span></h3>' +
             '<p>' + tr("repairDesc") + '</p></div>';
         const btn = document.createElement("button");
         btn.className = "btn small" + (cost === 0 ? " secondary" : "");
@@ -2269,7 +2324,7 @@
             btn.addEventListener("click", () => {
                 if (save.money >= cost) {
                     save.money -= cost;
-                    save.durability = 100;
+                    save.durability = maxDurability();
                     persist();
                     sfxBuy();
                     showToast(tr("repairDone"));
@@ -2279,7 +2334,7 @@
                     // Pas assez pour une réparation complète : on répare avec
                     // tout l'argent dispo (50 $ par point de durabilité).
                     const pointsBought = Math.floor(save.money / 50);
-                    save.durability = Math.min(100, save.durability + pointsBought);
+                    save.durability = Math.min(maxDurability(), save.durability + pointsBought);
                     save.money -= pointsBought * 50;
                     persist();
                     sfxBuy();
@@ -2311,6 +2366,31 @@
             iconCanvas.height = 46;
             drawPixelCoin(iconCanvas.getContext("2d"), 46);
             card.appendChild(iconCanvas);
+        } else if (skin.isIron) {
+            // Trousse de Fer : sprite dédié (un lingot), comme la Trousse Pièce.
+            const iconCanvas = document.createElement("canvas");
+            iconCanvas.width = 46;
+            iconCanvas.height = 46;
+            drawIronIngot(iconCanvas.getContext("2d"), 46);
+            card.appendChild(iconCanvas);
+        } else if (skin.isBasket || skin.isLunar) {
+            // Baskets/cratères : superposées sur l'image de base via un canvas
+            // transparent par-dessus (voir drawTrousse, même logique en jeu).
+            const wrap = document.createElement("div");
+            wrap.className = "skin-icon-wrap";
+            const img = document.createElement("img");
+            img.src = "trousse-skin-1.png";
+            img.style.filter = skin.filter;
+            wrap.appendChild(img);
+            const overlay = document.createElement("canvas");
+            overlay.width = 46;
+            overlay.height = 46;
+            const octx = overlay.getContext("2d");
+            octx.translate(23, 23); // drawSneakers/drawCraters dessinent depuis le centre
+            if (skin.isBasket) drawSneakers(octx, 46);
+            if (skin.isLunar) drawCraters(octx, 46);
+            wrap.appendChild(overlay);
+            card.appendChild(wrap);
         } else {
             const img = document.createElement("img");
             img.src = "trousse-skin-1.png";
@@ -2334,7 +2414,7 @@
         } else if (owned) {
             btn.textContent = tr("equip");
             btn.addEventListener("click", () => {
-                save.equippedSkin = skin.id;
+                equipSkin(skin.id);
                 persist();
                 sfxBuy();
                 showToast("✅ " + skin.name + " équipée !");
@@ -2347,7 +2427,7 @@
                 if (save.money >= skin.cost) {
                     save.money -= skin.cost;
                     save.ownedSkins.push(skin.id);
-                    save.equippedSkin = skin.id;
+                    equipSkin(skin.id);
                     persist();
                     sfxBuy();
                     showToast("✅ " + skin.name + " achetée !");
@@ -2496,6 +2576,12 @@
     let skidTargetX = 0;   // position (world space) où la glissade s'arrête
     let didSkid = false;   // ce lancer s'est-il terminé par un dérapage ?
 
+    // Trousse à Baskets : rebond à l'atterrissage au lieu de finir le lancer
+    // (voir tryBasketBounce). 20% de chance pour le 1er rebond, 5% pour le
+    // 2nd, jamais de 3e (2 rebonds bonus max, donc 3 segments de vol au total).
+    const BASKET_BOUNCE_CHANCES = [0.20, 0.05];
+    let basketBounceCount = 0; // nombre de rebonds déjà utilisés sur ce lancer
+
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
         state = "idle";
@@ -2512,6 +2598,7 @@
         craterWorldX = null;
         trailPoints = [];
         didSkid = false;
+        basketBounceCount = 0;
         document.getElementById("result-skid").style.display = "none";
         document.getElementById("result-coin").style.display = "none";
         document.getElementById("qte-wrap").classList.remove("show");
@@ -2549,7 +2636,9 @@
         const t = (performance.now() - t0) / 1000;
         const value = Math.sin(t * 3.4); // -1..1, 0 = visée parfaite (angle optimal)
         lockedAccuracy = value;
-        isPerfect = Math.abs(value) < 0.08;
+        // Trousse Claude : fenêtre du lancer parfait élargie de 75% (0.08 -> 0.14)
+        const perfectWindow = getSkin(save.equippedSkin).isClaude ? 0.14 : 0.08;
+        isPerfect = Math.abs(value) < perfectWindow;
 
         // Easter egg : puissance quasi max + précision verrouillée tout au
         // début de la barre (zone verte) = décollage vers l'espace à l'apogée
@@ -2611,12 +2700,12 @@
     // Résout l'anneau en cours (touché ou raté), met à jour les petits points
     // de progression, puis passe au suivant ou termine la séquence.
     function advanceQteRing(hit) {
-        if (state !== "qte" || qteResults.length >= QTE_RING_COUNT) return;
+        if (state !== "qte" || qteResults.length >= currentQteRingCount()) return;
         qteResults.push(hit);
         if (hit) sfxCharge(); else sfxError();
         renderQteDots();
 
-        if (qteResults.length >= QTE_RING_COUNT) {
+        if (qteResults.length >= currentQteRingCount()) {
             finishQte();
         } else {
             phaseTimer = 0; // relance un nouvel anneau
@@ -2624,22 +2713,30 @@
         }
     }
 
+    // Trousse Lunaire : QTE simplifié à 3 anneaux au lieu de 5 (voir aussi
+    // pickQteTargetRadius, qui force en plus une cible de taille moyenne).
+    function currentQteRingCount() {
+        return getSkin(save.equippedSkin).isLunar ? 3 : QTE_RING_COUNT;
+    }
+
     // Tire une taille de cible au hasard (petit/moyen/grand, voir QTE_RING_SIZES)
-    // pour empêcher de mémoriser le timing d'un round sur l'autre.
+    // pour empêcher de mémoriser le timing d'un round sur l'autre. Toujours
+    // moyenne avec la Trousse Lunaire (QTE simplifié).
     function pickQteTargetRadius() {
+        if (getSkin(save.equippedSkin).isLunar) return QTE_RING_SIZES[1]; // moyen
         return QTE_RING_SIZES[Math.floor(Math.random() * QTE_RING_SIZES.length)];
     }
 
-    // Une fois les QTE_RING_COUNT anneaux résolus : le boost final dépend du
-    // nombre de réussites. Même un échec complet donne un petit boost (30%),
-    // pour que le joueur "aille juste moins loin" plutôt que de tout perdre.
+    // Une fois tous les anneaux résolus : le boost final dépend du nombre de
+    // réussites. Même un échec complet donne un petit boost (30%), pour que
+    // le joueur "aille juste moins loin" plutôt que de tout perdre.
     function finishQte() {
         document.getElementById("qte-wrap").classList.remove("show");
         const hits = qteResults.filter(Boolean).length;
-        const boostFactor = 0.3 + 0.7 * (hits / QTE_RING_COUNT);
+        const boostFactor = 0.3 + 0.7 * (hits / currentQteRingCount());
         vx = SPACE_BOOST_VX * boostFactor;
         vy = SPACE_BOOST_VY;
-        if (hits === QTE_RING_COUNT) {
+        if (hits === currentQteRingCount()) {
             sfxRecord(); // combo parfait
             save.hasPerfectQte = true;
         }
@@ -2650,7 +2747,7 @@
     function renderQteDots() {
         const wrap = document.getElementById("qte-dots");
         wrap.innerHTML = "";
-        for (let i = 0; i < QTE_RING_COUNT; i++) {
+        for (let i = 0; i < currentQteRingCount(); i++) {
             const dot = document.createElement("div");
             dot.className = "qte-dot" + (i < qteResults.length ? (qteResults[i] ? " hit" : " miss") : "");
             wrap.appendChild(dot);
@@ -2705,6 +2802,11 @@
         if (isPerfect) earn = Math.round(earn * 1.3); // bonus de 30% sur un lancer parfait
         // Bonus lié aux améliorations : voir UPGRADE_EARN_BONUS_PER_LEVEL plus haut
         earn = Math.round(earn * (1 + (totalPuissance() + totalVitesse()) * UPGRADE_EARN_BONUS_PER_LEVEL));
+        // Trousse Lunaire : +25% uniquement sur un atterrissage qui a suivi la
+        // séquence spatiale (rien dans le monde normal ni au Volcan).
+        if (getSkin(save.equippedSkin).isLunar && inSpaceMode) {
+            earn = Math.round(earn * 1.25);
+        }
 
         // Skin "Trousse Pièce" : jet à COIN_BONUS_CHANCE de déclencher un
         // multiplicateur sur le score de CE lancer (voir COIN_MULTIPLIERS).
@@ -3206,6 +3308,151 @@
         }
     }
 
+    // Trousse de Fer : dessinée comme un lingot (pas de filtre sur l'image de
+    // base), même esprit "pixel-grid" que drawPixelCoin pour rester cohérent
+    // avec le reste de la DA du jeu.
+    function drawIronIngot(targetCtx, size) {
+        const w = size, h = size * 0.62;
+        const top = (size - h) / 2;
+        targetCtx.save();
+        targetCtx.translate(0, top);
+        // trapèze du lingot (plus étroit en haut qu'en bas)
+        const inset = w * 0.12;
+        targetCtx.beginPath();
+        targetCtx.moveTo(inset, 0);
+        targetCtx.lineTo(w - inset, 0);
+        targetCtx.lineTo(w, h);
+        targetCtx.lineTo(0, h);
+        targetCtx.closePath();
+        const grad = targetCtx.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, "#dfe4ea");
+        grad.addColorStop(0.45, "#aab2bd");
+        grad.addColorStop(1, "#6b7280");
+        targetCtx.fillStyle = grad;
+        targetCtx.fill();
+        // reflet supérieur
+        targetCtx.beginPath();
+        targetCtx.moveTo(inset + 2, 2);
+        targetCtx.lineTo(w - inset - 2, 2);
+        targetCtx.lineTo(w * 0.62, h * 0.32);
+        targetCtx.lineTo(w * 0.32, h * 0.32);
+        targetCtx.closePath();
+        targetCtx.fillStyle = "rgba(255,255,255,0.55)";
+        targetCtx.fill();
+        // contour + petites rayures pour l'aspect métal moulé
+        targetCtx.strokeStyle = "#4b5058";
+        targetCtx.lineWidth = Math.max(1, size * 0.02);
+        targetCtx.stroke();
+        targetCtx.strokeStyle = "rgba(75,80,88,0.35)";
+        targetCtx.lineWidth = Math.max(1, size * 0.012);
+        for (let i = 1; i <= 3; i++) {
+            const y = h * (0.55 + i * 0.1);
+            targetCtx.beginPath();
+            targetCtx.moveTo(w * 0.08, y);
+            targetCtx.lineTo(w * 0.92, y);
+            targetCtx.stroke();
+        }
+        targetCtx.restore();
+    }
+
+    // Trousse Lunaire : petits cratères peints sur la trousse (blanchie via le
+    // filtre grayscale/brightness du skin) pour évoquer la surface de la Lune.
+    function drawCraters(targetCtx, size) {
+        const craters = [
+            { x: 0.28, y: 0.30, r: 0.10 },
+            { x: 0.62, y: 0.22, r: 0.07 },
+            { x: 0.70, y: 0.58, r: 0.12 },
+            { x: 0.35, y: 0.68, r: 0.08 },
+            { x: 0.50, y: 0.46, r: 0.055 },
+        ];
+        targetCtx.save();
+        craters.forEach(c => {
+            // drawTrousse dessine l'image centrée en (0,0) (de -size/2 à +size/2),
+            // donc on recentre les coordonnées 0..1 en -0.5..0.5 avant de les mettre à l'échelle.
+            const cx = (c.x - 0.5) * size, cy = (c.y - 0.5) * size, r = c.r * size;
+            targetCtx.beginPath();
+            targetCtx.arc(cx, cy, r, 0, Math.PI * 2);
+            targetCtx.fillStyle = "rgba(120,120,130,0.45)";
+            targetCtx.fill();
+            // ombre portée en croissant (lumière venant d'en haut à gauche)
+            targetCtx.beginPath();
+            targetCtx.arc(cx + r * 0.28, cy + r * 0.28, r * 0.8, 0, Math.PI * 2);
+            targetCtx.fillStyle = "rgba(90,90,100,0.5)";
+            targetCtx.fill();
+            // liseré clair sur le bord haut-gauche (relief du cratère)
+            targetCtx.beginPath();
+            targetCtx.arc(cx, cy, r, Math.PI * 0.9, Math.PI * 1.6);
+            targetCtx.strokeStyle = "rgba(255,255,255,0.35)";
+            targetCtx.lineWidth = Math.max(1, r * 0.25);
+            targetCtx.stroke();
+        });
+        targetCtx.restore();
+    }
+
+    // Trousse à Baskets : deux baskets dessinées à la main, une de chaque côté
+    // de la trousse, comme si elle avait "des pieds". Semelle épaisse blanche,
+    // corps orange assorti à la trousse, lacets croisés + virgule (mais PAS le
+    // logo Nike : on garde le clin d'œil sans utiliser la marque).
+    function drawSneakers(targetCtx, size) {
+        function shoe(flip) {
+            targetCtx.save();
+            if (flip) targetCtx.scale(-1, 1);
+            // corps de la chaussure (empeigne)
+            targetCtx.beginPath();
+            targetCtx.moveTo(-size * 0.02, size * 0.02);
+            targetCtx.quadraticCurveTo(size * 0.20, -size * 0.06, size * 0.34, 0.02 * size);
+            targetCtx.quadraticCurveTo(size * 0.40, size * 0.06, size * 0.40, size * 0.12);
+            targetCtx.lineTo(-size * 0.10, size * 0.12);
+            targetCtx.closePath();
+            targetCtx.fillStyle = "#e8641f";
+            targetCtx.fill();
+            targetCtx.strokeStyle = "#a8420f";
+            targetCtx.lineWidth = Math.max(1, size * 0.015);
+            targetCtx.stroke();
+            // semelle épaisse blanche
+            targetCtx.beginPath();
+            targetCtx.moveTo(-size * 0.12, size * 0.12);
+            targetCtx.lineTo(size * 0.42, size * 0.12);
+            targetCtx.quadraticCurveTo(size * 0.44, size * 0.20, size * 0.36, size * 0.21);
+            targetCtx.lineTo(-size * 0.12, size * 0.21);
+            targetCtx.closePath();
+            targetCtx.fillStyle = "#f4f4f4";
+            targetCtx.fill();
+            targetCtx.strokeStyle = "#c9c9c9";
+            targetCtx.lineWidth = Math.max(1, size * 0.012);
+            targetCtx.stroke();
+            // lacets croisés
+            targetCtx.strokeStyle = "#fff";
+            targetCtx.lineWidth = Math.max(1, size * 0.014);
+            for (let i = 0; i < 3; i++) {
+                const lx = size * (0.06 + i * 0.07);
+                targetCtx.beginPath();
+                targetCtx.moveTo(lx, size * 0.015);
+                targetCtx.lineTo(lx + size * 0.05, size * 0.06);
+                targetCtx.moveTo(lx + size * 0.05, size * 0.015);
+                targetCtx.lineTo(lx, size * 0.06);
+                targetCtx.stroke();
+            }
+            // virgule décorative (pas le swoosh, une forme perso pour éviter la marque)
+            targetCtx.beginPath();
+            targetCtx.moveTo(size * 0.10, size * 0.10);
+            targetCtx.quadraticCurveTo(size * 0.24, size * 0.02, size * 0.36, size * 0.07);
+            targetCtx.quadraticCurveTo(size * 0.22, size * 0.075, size * 0.12, size * 0.13);
+            targetCtx.closePath();
+            targetCtx.fillStyle = "rgba(255,255,255,0.85)";
+            targetCtx.fill();
+            targetCtx.restore();
+        }
+        targetCtx.save();
+        targetCtx.translate(-size * 0.40, size * 0.30);
+        shoe(false);
+        targetCtx.restore();
+        targetCtx.save();
+        targetCtx.translate(size * 0.40, size * 0.30);
+        shoe(true);
+        targetCtx.restore();
+    }
+
     function drawTrousse() {
         // petit flottement vertical purement visuel pendant la séquence spatiale
         let floatBob = 0;
@@ -3221,6 +3468,9 @@
         if (skin.isCoin) {
             ctx.translate(-size / 2, -size / 2); // drawPixelCoin dessine depuis (0,0)
             drawPixelCoin(ctx, size);
+        } else if (skin.isIron) {
+            ctx.translate(-size / 2, -size / 2); // drawIronIngot dessine depuis (0,0)
+            drawIronIngot(ctx, size);
         } else {
             ctx.filter = rainbowOrFilter(skin.filter, performance.now());
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
@@ -3231,6 +3481,8 @@
                 ctx.fillRect(-size / 2, -size / 2, size, size);
             }
             ctx.filter = "none";
+            if (skin.isBasket) drawSneakers(ctx, size);
+            if (skin.isLunar) drawCraters(ctx, size);
         }
         ctx.restore();
     }
@@ -3273,8 +3525,10 @@
             } else if (worldY <= 0 && vy < 0) {
                 // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
                 worldY = 0;
-                // Monde Volcan : la poussière rouge rend le sol glissant
-                if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
+                if (tryBasketBounce()) {
+                    // le rebond a déjà remis l'état à "charging_power", rien d'autre à faire
+                } else if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
+                    // Monde Volcan : la poussière rouge rend le sol glissant
                     startSkid();
                 } else {
                     onLanded();
@@ -3411,6 +3665,30 @@
         skidTargetX = worldX + (SKID_MIN_M + Math.random() * (SKID_MAX_M - SKID_MIN_M)) * SCALE;
         rotSpeed = 10;
         sfxCrash();
+    }
+
+    /* ---- Rebond de la Trousse à Baskets ---- */
+    // Appelée à chaque contact avec le sol, avant de décider dérapage/atterrissage
+    // classique. Si elle se déclenche, relance directement la charge de
+    // puissance + précision depuis la position actuelle (comme un nouveau
+    // lancer) au lieu de conclure ce lancer : worldX continue donc de
+    // s'accumuler sur tous les segments, et l'argent/le score ne sont calculés
+    // qu'au tout dernier atterrissage (voir onLanded).
+    function tryBasketBounce() {
+        if (inSpaceMode) return false; // ne fonctionne pas en apesanteur
+        if (!getSkin(save.equippedSkin).isBasket) return false;
+        if (basketBounceCount >= BASKET_BOUNCE_CHANCES.length) return false;
+        if (Math.random() >= BASKET_BOUNCE_CHANCES[basketBounceCount]) return false;
+        basketBounceCount++;
+        vx = 0; vy = 0; rotation = 0; rotSpeed = 0;
+        state = "charging_power";
+        t0 = performance.now();
+        meterWrap.style.display = "block";
+        hintText.style.display = "block";
+        hintText.textContent = tr("hintBasketBounce");
+        sfxRecord();
+        showToast(tr("basketBounceToast"));
+        return true;
     }
 
     /* ---- Décor du monde Volcan ---- */
@@ -4176,6 +4454,9 @@
         if (skin.isCoin) {
             c.translate(-size / 2, -size / 2);
             drawPixelCoin(c, size);
+        } else if (skin.isIron) {
+            c.translate(-size / 2, -size / 2);
+            drawIronIngot(c, size);
         } else {
             c.filter = rainbowOrFilter(skin.filter, performance.now());
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
@@ -4185,6 +4466,8 @@
                 c.fillRect(-size / 2, -size / 2, size, size);
             }
             c.filter = "none";
+            if (skin.isBasket) drawSneakers(c, size);
+            if (skin.isLunar) drawCraters(c, size);
         }
         c.restore();
     }
@@ -4939,8 +5222,8 @@
     }
 
     function openTrousseModal() {
-        document.getElementById("info-dura").textContent = save.durability + " / 100";
-        document.getElementById("info-dura-bar").style.width = save.durability + "%";
+        document.getElementById("info-dura").textContent = save.durability + " / " + maxDurability();
+        document.getElementById("info-dura-bar").style.width = (save.durability / maxDurability() * 100) + "%";
         document.getElementById("info-name").textContent = save.pseudo || "Trousse";
         document.getElementById("info-time").textContent = formatPlayTime(save.playTime);
         document.getElementById("info-best").textContent = save.bestDistance.toFixed(1) + " m";
@@ -4984,8 +5267,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "4.2.0";
+    const VERSION_NUMBER = "4.3.0";
     const CHANGELOG = [
+        {
+            version: "4.3.0",
+            major: [],
+            minor: [
+                { fr: "4 nouvelles trousses en boutique : Trousse à Baskets (rebonds bonus à l'atterrissage), Trousse Lunaire (QTE spatial simplifié + argent bonus en apesanteur), Trousse de Fer (300 de durabilité) et Trousse Claude (fenêtre de lancer parfait élargie)", en: "4 new pencil cases in the shop: Sneaker Case (bonus bounces on landing), Lunar Case (simplified space QTE + bonus money in zero-G), Iron Case (300 durability) and Claude Case (wider perfect-throw window)" },
+            ],
+        },
         {
             version: "4.2.0",
             major: [],
@@ -5196,7 +5486,7 @@
                 return;
             }
             if (!save.ownedSkins.includes(id)) save.ownedSkins.push(id);
-            save.equippedSkin = id;
+            equipSkin(id);
             persist();
             refreshMenu();
             console.log("🎨 Skin équipé :", id);
@@ -5248,7 +5538,7 @@
             console.log("🌋 Monde Volcan remis à zéro");
         },
         setDurability(v) {
-            save.durability = Math.max(0, Math.min(100, v));
+            save.durability = Math.max(0, Math.min(maxDurability(), v));
             persist();
             console.log("🔧 Durabilité :", save.durability);
         },
