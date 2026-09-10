@@ -1105,7 +1105,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.6.0</div>
+                <div class="version-tag" id="version-tag">v5.7.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1528,6 +1528,18 @@
         achv2000mDesc: { fr: "Atteins un record de 2000 m.", en: "Reach a record of 2000 m." },
         achv4000mName: { fr: "4000 mètres", en: "4000 meters" },
         achv4000mDesc: { fr: "Atteins un record de 4000 m.", en: "Reach a record of 4000 m." },
+        achv10000mName: { fr: "10 000 mètres", en: "10,000 meters" },
+        achv10000mDesc: { fr: "Atteins un record de 10 000 m.", en: "Reach a record of 10,000 m." },
+        achvMillionaireName: { fr: "Millionnaire", en: "Millionaire" },
+        achvMillionaireDesc: { fr: "Cumule 1 000 000 $ gagnés depuis le début.", en: "Earn a cumulative $1,000,000." },
+        achv500ThrowsName: { fr: "Bras de fer", en: "Iron arm" },
+        achv500ThrowsDesc: { fr: "Effectue 500 lancers.", en: "Make 500 throws." },
+        achvMarathonName: { fr: "Marathonien", en: "Marathoner" },
+        achvMarathonDesc: { fr: "Cumule 5 heures de jeu.", en: "Reach 5 hours of cumulative playtime." },
+        achvLevel50Name: { fr: "Niveau 50", en: "Level 50" },
+        achvLevel50Desc: { fr: "Atteins un total de 50 en Puissance + Vitesse.", en: "Reach a combined total of 50 Power + Speed." },
+        achvDailyChallengesName: { fr: "Défis accomplis", en: "Challenges cleared" },
+        achvDailyChallengesDesc: { fr: "Réclame les 3 défis quotidiens le même jour.", en: "Claim all 3 daily challenges on the same day." },
         achvPerfectName: { fr: "Lancer parfait", en: "Perfect throw" },
         achvPerfectDesc: { fr: "Réussis un lancer parfait.", en: "Land a perfect throw." },
         achvVolcanName: { fr: "Éruption maîtrisée", en: "Eruption mastered" },
@@ -1752,6 +1764,7 @@
         { id: "mille1500m", emoji: "🌌", nameKey: "achv1500mName", descKey: "achv1500mDesc", check: (s) => s.bestDistance >= 1500 },
         { id: "deuxMille2000m", emoji: "🪐", nameKey: "achv2000mName", descKey: "achv2000mDesc", check: (s) => s.bestDistance >= 2000 },
         { id: "quatreMille4000m", emoji: "🕳️", nameKey: "achv4000mName", descKey: "achv4000mDesc", check: (s) => s.bestDistance >= 4000 },
+        { id: "dixMille10000m", emoji: "🌀", nameKey: "achv10000mName", descKey: "achv10000mDesc", check: (s) => s.bestDistance >= 10000 },
         { id: "lancerParfait", emoji: "✨", nameKey: "achvPerfectName", descKey: "achvPerfectDesc", check: (s) => s.hasPerfectThrow },
         { id: "volcanDebloque", emoji: "🌋", nameKey: "achvVolcanName", descKey: "achvVolcanDesc", check: (s) => s.volcanUnlocked },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
@@ -1765,6 +1778,11 @@
         { id: "toutesTrainees", emoji: "🌈", nameKey: "achvAllTrailsName", descKey: "achvAllTrailsDesc", check: (s) => s.ownedTrails.length >= TRAILS.length },
         { id: "easterEggEspace", emoji: "🛸", nameKey: "achvSpaceEggName", descKey: "achvSpaceEggDesc", check: (s) => s.hasTriggeredSpaceEgg },
         { id: "qteParfait", emoji: "🎯", nameKey: "achvPerfectQteName", descKey: "achvPerfectQteDesc", check: (s) => s.hasPerfectQte },
+        { id: "millionnaire", emoji: "🤑", nameKey: "achvMillionaireName", descKey: "achvMillionaireDesc", check: (s) => s.totalMoneyEarned >= 1000000 },
+        { id: "cinqCentsLancers", emoji: "🏋️", nameKey: "achv500ThrowsName", descKey: "achv500ThrowsDesc", check: (s) => s.totalThrows >= 500 },
+        { id: "marathonien", emoji: "🏃", nameKey: "achvMarathonName", descKey: "achvMarathonDesc", check: (s) => s.playTime >= 18000 },
+        { id: "niveau50", emoji: "💯", nameKey: "achvLevel50Name", descKey: "achvLevel50Desc", check: (s) => s.puissanceLevel + s.vitesseLevel >= 50 },
+        { id: "defisAccomplis", emoji: "📅", nameKey: "achvDailyChallengesName", descKey: "achvDailyChallengesDesc", check: (s) => s.dailyChallenges.length >= 3 && s.dailyChallenges.every((c) => c.claimed) },
     ];
 
     // Défis quotidiens (voir ensureDailyChallenges/bumpDailyChallenge) : 3 tirés
@@ -5638,8 +5656,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.6.0";
+    const VERSION_NUMBER = "5.7.0";
     const CHANGELOG = [
+        {
+            version: "5.7.0",
+            major: [],
+            minor: [
+                { fr: "6 nouveaux succès : 🌀 record de 10 000 m, 🤑 1 000 000 $ gagnés, 🏋️ 500 lancers, 🏃 5 heures de jeu, 💯 niveau 50 (Puissance + Vitesse), 📅 les 3 défis quotidiens réclamés le même jour", en: "6 new achievements: 🌀 10,000 m record, 🤑 $1,000,000 earned, 🏋️ 500 throws, 🏃 5 hours played, 💯 level 50 (Power + Speed), 📅 all 3 daily challenges claimed the same day" },
+            ],
+        },
         {
             version: "5.6.0",
             major: [],
