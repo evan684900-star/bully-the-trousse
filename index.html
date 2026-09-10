@@ -674,6 +674,8 @@
             display: flex; align-items: center; justify-content: center; font-size: 40px;
         }
         .profile-pseudo { margin: 4px 0 0; font-size: 18px; }
+        .profile-status { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+        .profile-status.online { color: #3ddc84; font-weight: 700; }
         .profile-top-row { display: flex; gap: 10px; margin-bottom: 18px; }
         .profile-card {
             flex: 1; background: var(--card-bg); border: 2px solid var(--panel-border);
@@ -1103,7 +1105,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.3.2</div>
+                <div class="version-tag" id="version-tag">v5.4.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1602,6 +1604,11 @@
         profileFollowLoading: { fr: "...", en: "..." },
         profileFollowUnavailable: { fr: "Indisponible hors ligne", en: "Unavailable offline" },
         profileFollowError: { fr: "Action impossible, réessaie plus tard", en: "Action failed, try again later" },
+        profileOnline: { fr: "🟢 En ligne", en: "🟢 Online" },
+        profileLastSeenMinutes: { fr: "⚪ Vu il y a {n} min", en: "⚪ Last seen {n} min ago" },
+        profileLastSeenHours: { fr: "⚪ Vu il y a {n} h", en: "⚪ Last seen {n}h ago" },
+        profileLastSeenDays: { fr: "⚪ Vu il y a {n} j", en: "⚪ Last seen {n}d ago" },
+        profileLastSeenUnknown: { fr: "⚪ Statut inconnu", en: "⚪ Status unknown" },
     };
 
     // Renvoie le texte dans la langue active pour une clé du dictionnaire ci-dessus
@@ -4822,6 +4829,7 @@
             currentUser = user;
             updateOnlineStatus(tr("onlineConnected"));
             syncCloudSaveOnLogin();
+            pingPresence();
         });
         firebase.auth().signInAnonymously().catch((err) => {
             console.error("Connexion Firebase échouée :", err);
@@ -4963,6 +4971,27 @@
         }, { merge: true }).catch((err) => console.error("Mise à jour du profil public impossible :", err));
     }
 
+    // --- Présence (en ligne / vu il y a...) ---
+    // Pas de Realtime Database ici (seulement Firestore), donc pas de vraie
+    // détection de déconnexion : on approxime avec un "battement" régulier
+    // (tant que l'onglet est visible) qui met à jour updatedAt sur le profil
+    // public, déjà réutilisé comme horodatage de dernière activité (voir
+    // pushPublicProfile, appelé à chaque persist()). L'écran Profil compare
+    // ensuite cet horodatage à ONLINE_THRESHOLD_MS pour afficher "En ligne"
+    // ou "Vu il y a...".
+    const PRESENCE_PING_INTERVAL_MS = 60 * 1000;
+    const ONLINE_THRESHOLD_MS = 2 * 60 * 1000;
+    function pingPresence() {
+        if (!db || !currentUser || document.visibilityState !== "visible") return;
+        db.collection("profiles").doc(currentUser.uid).set({
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }, { merge: true }).catch(() => { /* best-effort, jamais bloquant */ });
+    }
+    document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") pingPresence();
+    });
+    setInterval(pingPresence, PRESENCE_PING_INTERVAL_MS);
+
     // --- Abonnés / abonnements ---
     // Une seule collection plate "follows", un doc par relation (id
     // "<abonné>_<suivi>") : évite les doublons et permet un get() direct pour
@@ -5087,6 +5116,26 @@
         };
     }
 
+    // Statut "en ligne" / "vu il y a..." : mon propre profil est toujours "en
+    // ligne" (je suis en train de l'utiliser), celui d'un autre joueur se
+    // déduit de data.updatedAt (Timestamp Firestore, voir pingPresence) comparé
+    // à ONLINE_THRESHOLD_MS. Pas de champ updatedAt encore reçu (profil jamais
+    // synchronisé) => statut inconnu plutôt que "hors ligne" à tort.
+    function formatPresenceHtml(data, isOwn) {
+        if (isOwn) return '<p class="profile-status online">' + tr("profileOnline") + '</p>';
+        const ts = data.updatedAt;
+        const ms = ts && typeof ts.toMillis === "function" ? ts.toMillis() : null;
+        if (ms === null) return '<p class="profile-status">' + tr("profileLastSeenUnknown") + '</p>';
+        const diffMs = Date.now() - ms;
+        if (diffMs <= ONLINE_THRESHOLD_MS) return '<p class="profile-status online">' + tr("profileOnline") + '</p>';
+        const diffMin = Math.floor(diffMs / 60000);
+        if (diffMin < 60) return '<p class="profile-status">' + tr("profileLastSeenMinutes").replace("{n}", diffMin) + '</p>';
+        const diffH = Math.floor(diffMin / 60);
+        if (diffH < 24) return '<p class="profile-status">' + tr("profileLastSeenHours").replace("{n}", diffH) + '</p>';
+        const diffD = Math.floor(diffH / 24);
+        return '<p class="profile-status">' + tr("profileLastSeenDays").replace("{n}", diffD) + '</p>';
+    }
+
     // Affiche le profil demandé : le mien (uid vide/absent) depuis "save"
     // directement, ou celui d'un autre joueur (depuis le classement) en lisant
     // le document public profiles/{uid}.
@@ -5152,7 +5201,8 @@
         const avatarHtml = '<div class="profile-avatar-lg">' + (safeAvatar || "🎒") + '</div>';
 
         let html = '<div class="profile-header">' + avatarHtml +
-            '<h2 class="profile-pseudo">' + escapeHtml(data.pseudo || "?") + '</h2>';
+            '<h2 class="profile-pseudo">' + escapeHtml(data.pseudo || "?") + '</h2>' +
+            formatPresenceHtml(data, isOwn);
         if (!isOwn && uid) {
             html += '<button class="btn small" id="btn-profile-follow">' + tr("profileFollowLoading") + '</button>';
         }
@@ -5571,8 +5621,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.3.2";
+    const VERSION_NUMBER = "5.4.0";
     const CHANGELOG = [
+        {
+            version: "5.4.0",
+            major: [],
+            minor: [
+                { fr: "L'écran Profil affiche maintenant si le joueur est en ligne, ou depuis quand il ne l'est plus", en: "The Profile screen now shows whether the player is online, or how long ago they last were" },
+            ],
+        },
         {
             version: "5.3.2",
             major: [],
