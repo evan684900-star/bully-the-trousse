@@ -1105,7 +1105,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.4.0</div>
+                <div class="version-tag" id="version-tag">v5.5.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2075,6 +2075,17 @@
         return save.vitesseLevel + getSkin(save.equippedSkin).bonusVitesse;
     }
 
+    // Multiplicateur appliqué aux récompenses des défis quotidiens (voir
+    // CHALLENGE_POOL) : reprend exactement les mêmes facteurs que la distance
+    // et l'argent gagné par lancer (voir lockAccuracyAndLaunch et onLanded),
+    // donc vaut 1 pour un joueur qui n'a encore rien acheté et suit la même
+    // courbe que les gains en jeu (sans ça, les récompenses fixes deviennent
+    // dérisoires une fois quelques niveaux de Puissance/Vitesse achetés).
+    function challengeRewardMultiplier() {
+        const p = totalPuissance(), v = totalVitesse();
+        return Math.pow(1 + p * 0.12, 2) * (1 + v * 0.09) * (1 + (p + v) * UPGRADE_EARN_BONUS_PER_LEVEL);
+    }
+
     // Coût d'amélioration : croissance exponentielle pour garder une
     // progression satisfaisante sans que ça devienne gratuit trop vite
     function upgradeCost(level) {
@@ -2306,9 +2317,10 @@
     function generateDailyChallenges() {
         const available = CHALLENGE_POOL.filter((def) => !def.requiresVolcan || save.volcanUnlocked);
         const shuffled = available.slice().sort(() => Math.random() - 0.5);
+        const mult = challengeRewardMultiplier();
         return shuffled.slice(0, 3).map((def) => {
             const tier = def.tiers[Math.floor(Math.random() * def.tiers.length)];
-            return { kind: def.kind, target: tier.target, reward: tier.reward, progress: 0, claimed: false };
+            return { kind: def.kind, target: tier.target, reward: Math.round(tier.reward * mult), progress: 0, claimed: false };
         });
     }
 
@@ -5621,8 +5633,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.4.0";
+    const VERSION_NUMBER = "5.5.0";
     const CHANGELOG = [
+        {
+            version: "5.5.0",
+            major: [],
+            minor: [
+                { fr: "Rééquilibrage : les récompenses des défis quotidiens s'adaptent maintenant à ta Puissance/Vitesse (elles ne stagnaient plus assez vite pour un joueur bien avancé)", en: "Rebalance: daily challenge rewards now scale with your Power/Speed (they used to stay flat, so they barely mattered for an advanced player)" },
+            ],
+        },
         {
             version: "5.4.0",
             major: [],
