@@ -1114,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.0.1</div>
+                <div class="version-tag" id="version-tag">v6.1.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1575,6 +1575,8 @@
         achvSpaceEggDesc: { fr: "???", en: "???" },
         achvPerfectQteName: { fr: "Réflexes parfaits", en: "Perfect reflexes" },
         achvPerfectQteDesc: { fr: "Réussis les 5 anneaux du QTE en apesanteur d'affilée.", en: "Land all 5 rings of the zero-G QTE in a row." },
+        achvGifterName: { fr: "Grand donateur", en: "Big spender" },
+        achvGifterDesc: { fr: "Envoie 1 000 000 $ en cadeaux depuis le début.", en: "Send a cumulative $1,000,000 in gifts." },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
             en: "Not enough active players yet for reliable stats ("
@@ -1802,6 +1804,7 @@
         { id: "marathonien", emoji: "🏃", nameKey: "achvMarathonName", descKey: "achvMarathonDesc", check: (s) => s.playTime >= 18000 },
         { id: "niveau50", emoji: "💯", nameKey: "achvLevel50Name", descKey: "achvLevel50Desc", check: (s) => s.puissanceLevel + s.vitesseLevel >= 50 },
         { id: "defisAccomplis", emoji: "📅", nameKey: "achvDailyChallengesName", descKey: "achvDailyChallengesDesc", check: (s) => s.dailyChallenges.length >= 3 && s.dailyChallenges.every((c) => c.claimed) },
+        { id: "grandDonateur", emoji: "🎁", nameKey: "achvGifterName", descKey: "achvGifterDesc", check: (s) => s.totalMoneyGifted >= 1000000 },
     ];
 
     // Défis quotidiens (voir ensureDailyChallenges/bumpDailyChallenge) : 3 tirés
@@ -1976,6 +1979,7 @@
             // --- Défis quotidiens (voir CHALLENGE_POOL et ensureDailyChallenges) ---
             dailyChallengeDate: "",    // "AAAA-MM-JJ" du jour où dailyChallenges a été généré
             dailyChallenges: [],       // [{ kind, target, progress, reward, claimed }, ...]
+            totalMoneyGifted: 0,       // argent envoyé en cadeaux depuis le début (voir sendGift), jamais décrémenté
         };
     }
 
@@ -5519,6 +5523,10 @@
             seen: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         }).then(() => {
+            // Compté seulement une fois le cadeau confirmé (pas à la déduction
+            // optimiste plus haut) : voir l'achievement "totalMoneyGifted".
+            save.totalMoneyGifted += amount;
+            persist();
             showToast(tr("giftSent").replace("{amount}", amount));
             inputEl.value = "";
             btnEl.textContent = "✅";
@@ -5802,8 +5810,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.0.1";
+    const VERSION_NUMBER = "6.1.0";
     const CHANGELOG = [
+        {
+            version: "6.1.0",
+            major: [],
+            minor: [
+                { fr: "Nouveau succès : 🎁 \"Grand donateur\" (envoie 1 000 000 $ en cadeaux depuis le début)", en: "New achievement: 🎁 \"Big spender\" (send a cumulative $1,000,000 in gifts)" },
+            ],
+        },
         {
             version: "6.0.1",
             major: [],
