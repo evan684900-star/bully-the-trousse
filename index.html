@@ -6158,6 +6158,16 @@
     showScreen("menu");
     initFirebase();
     showTutorialIfNeeded();
+
+    // Permet de lancer une commande de window.cheats sans console JS (utile sur
+    // mobile, ex: Chrome iOS qui n'a pas d'inspecteur) : ajouter ?cheat=nomCommande
+    // à l'URL du jeu l'exécute une fois au chargement, une fois le reste de
+    // l'init fait. Pas d'arguments possibles via l'URL, donc utile seulement
+    // pour les commandes qui n'en demandent pas (ex: ?cheat=resetChallenges).
+    const urlCheat = new URLSearchParams(location.search).get("cheat");
+    if (urlCheat && typeof window.cheats[urlCheat] === "function") {
+        window.cheats[urlCheat]();
+    }
 })();
 </script>
 </body>
