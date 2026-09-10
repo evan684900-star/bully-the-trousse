@@ -738,6 +738,15 @@
         /* .follow-list-row réutilise .skin-list-row (même ligne cliquable) */
         .follow-list-row { width: 100%; font: inherit; color: inherit; cursor: pointer; text-align: left; }
         .follow-avatar { font-size: 22px; flex: none; }
+        /* Ligne "Offrir de l'argent" (modale ouverte depuis btn-profile-gift) :
+           réutilise .skin-list-row, avec un champ montant + bouton d'envoi. */
+        .gift-amount-input {
+            width: 64px; padding: 6px 8px; border-radius: 8px; flex: none;
+            border: 2px solid var(--panel-border); background: var(--app-bg);
+            color: var(--text); font: inherit; font-size: 13px; text-align: right;
+        }
+        .gift-received-row { padding: 6px 0; font-size: 14px; }
+        .gift-received-total { margin-top: 10px; font-weight: 800; color: var(--money); text-align: center; }
         /* Détail "Puissance / Vitesse" (modale ouverte depuis la tuile Niveau) */
         .level-detail-row {
             display: flex; justify-content: space-between; align-items: center;
@@ -1105,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.7.0</div>
+                <div class="version-tag" id="version-tag">v6.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1616,6 +1625,16 @@
         profileFollowLoading: { fr: "...", en: "..." },
         profileFollowUnavailable: { fr: "Indisponible hors ligne", en: "Unavailable offline" },
         profileFollowError: { fr: "Action impossible, réessaie plus tard", en: "Action failed, try again later" },
+        profileGiftButton: { fr: "🎁 Offrir de l'argent", en: "🎁 Send money" },
+        giftModalTitle: { fr: "💸 Envoyer de l'argent", en: "💸 Send money" },
+        giftNoFollowers: { fr: "Tu n'as pas encore d'abonnés.", en: "You don't have any followers yet." },
+        giftAmountPlaceholder: { fr: "Montant", en: "Amount" },
+        giftInvalidAmount: { fr: "Entre un montant valide.", en: "Enter a valid amount." },
+        giftNotEnoughMoney: { fr: "Tu n'as pas assez d'argent.", en: "You don't have enough money." },
+        giftSent: { fr: "🎁 {amount} $ envoyés !", en: "🎁 Sent {amount}$!" },
+        giftError: { fr: "Envoi impossible, réessaie plus tard.", en: "Couldn't send, try again later." },
+        giftsReceivedTitle: { fr: "🎁 Cadeaux reçus !", en: "🎁 Gifts received!" },
+        giftsReceivedTotal: { fr: "Total : +{amount} $", en: "Total: +{amount}$" },
         profileOnline: { fr: "🟢 En ligne", en: "🟢 Online" },
         profileLastSeenMinutes: { fr: "⚪ Vu il y a {n} min", en: "⚪ Last seen {n} min ago" },
         profileLastSeenHours: { fr: "⚪ Vu il y a {n} h", en: "⚪ Last seen {n}h ago" },
@@ -4863,7 +4882,9 @@
             if (!user) return;
             currentUser = user;
             updateOnlineStatus(tr("onlineConnected"));
-            syncCloudSaveOnLogin();
+            // checkIncomingGifts() doit partir d'un save.money déjà synchronisé
+            // avec le cloud, donc seulement une fois syncCloudSaveOnLogin terminé.
+            syncCloudSaveOnLogin().then(() => checkIncomingGifts());
             pingPresence();
         });
         firebase.auth().signInAnonymously().catch((err) => {
@@ -4877,8 +4898,8 @@
     // le même appareil/navigateur). Sinon, on envoie la sauvegarde locale
     // actuelle pour créer le document et on génère un pseudo par défaut.
     function syncCloudSaveOnLogin() {
-        if (!db || !currentUser) return;
-        db.collection("users").doc(currentUser.uid).get().then((doc) => {
+        if (!db || !currentUser) return Promise.resolve();
+        return db.collection("users").doc(currentUser.uid).get().then((doc) => {
             if (doc.exists) {
                 save = migrateLegacyVolcanFields(Object.assign(defaultSave(), doc.data()), doc.data());
                 localStorage.setItem(SAVE_KEY, JSON.stringify(save));
@@ -5240,6 +5261,8 @@
             formatPresenceHtml(data, isOwn);
         if (!isOwn && uid) {
             html += '<button class="btn small" id="btn-profile-follow">' + tr("profileFollowLoading") + '</button>';
+        } else if (isOwn) {
+            html += '<button class="btn small" id="btn-profile-gift">' + tr("profileGiftButton") + '</button>';
         }
         html += '</div>';
 
@@ -5310,6 +5333,7 @@
                 renderAchievements();
                 document.getElementById("achv-modal").classList.add("show");
             });
+            wireGiftButton();
         }
 
         document.getElementById("btn-profile-level").addEventListener("click", () => {
@@ -5413,6 +5437,120 @@
                 showToast(tr("profileFollowError"));
             }).finally(() => { btn.disabled = false; });
         });
+    }
+
+    // --- Offrir de l'argent à ses abonnés (voir btn-profile-gift) ---
+    // Branche le bouton "Offrir de l'argent" du header (mon propre profil
+    // uniquement) : désactivé hors ligne, sinon ouvre la liste de mes abonnés.
+    function wireGiftButton() {
+        const btn = document.getElementById("btn-profile-gift");
+        if (!btn) return;
+        if (!FIREBASE_ENABLED || !db || !currentUser) {
+            btn.disabled = true;
+            btn.textContent = tr("profileFollowUnavailable");
+            return;
+        }
+        btn.addEventListener("click", openGiftModal);
+    }
+
+    // Modale "Offrir de l'argent" : liste mes abonnés (follows où
+    // following == mon uid, donc les gens qui ME suivent), avec un champ
+    // montant + bouton d'envoi par ligne. Réutilise la modale générique
+    // profile-detail-modal (voir showProfileDetailModal).
+    function openGiftModal() {
+        showProfileDetailModal(tr("giftModalTitle"), '<p style="text-align:center; color: var(--text-dim);">' + tr("profileLoading") + '</p>');
+        db.collection("follows").where("following", "==", currentUser.uid).limit(50).get().then((snap) => {
+            const followerUids = [];
+            snap.forEach((doc) => followerUids.push(doc.data().follower));
+            if (!followerUids.length) {
+                document.getElementById("profile-detail-body").innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("giftNoFollowers") + '</p>';
+                return;
+            }
+            return Promise.all(followerUids.map((uid) =>
+                db.collection("profiles").doc(uid).get().then((doc) => ({ uid, data: doc.exists ? doc.data() : {} }))
+            )).then((rows) => {
+                document.getElementById("profile-detail-body").innerHTML = '<div class="skin-list">' + rows.map((r) =>
+                    '<div class="skin-list-row" data-uid="' + escapeHtml(r.uid) + '">' +
+                        '<span class="follow-avatar">' + (safeAvatarEmoji(r.data.avatarEmoji) || "🎒") + '</span>' +
+                        '<span class="name">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
+                        '<input type="number" class="gift-amount-input" min="1" step="1" placeholder="' + escapeHtml(tr("giftAmountPlaceholder")) + '">' +
+                        '<button type="button" class="btn small gift-send-btn">💸</button>' +
+                    '</div>'
+                ).join("") + '</div>';
+                document.querySelectorAll("#profile-detail-body .skin-list-row").forEach((row) => {
+                    const targetUid = row.getAttribute("data-uid");
+                    const input = row.querySelector(".gift-amount-input");
+                    const btn = row.querySelector(".gift-send-btn");
+                    btn.addEventListener("click", () => sendGift(targetUid, input, btn));
+                });
+            });
+        }).catch((err) => {
+            console.error("Chargement des abonnés impossible :", err);
+            document.getElementById("profile-detail-body").innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardError") + '</p>';
+        });
+    }
+
+    // Envoie effectivement le cadeau : débite l'argent localement tout de
+    // suite (pour l'UX), puis écrit un document dans "gifts" que le
+    // destinataire ramassera à sa prochaine connexion (voir
+    // checkIncomingGifts). Si l'écriture échoue, on rembourse : l'argent ne
+    // doit jamais disparaître sans qu'un cadeau ait vraiment été envoyé.
+    function sendGift(targetUid, inputEl, btnEl) {
+        const amount = Math.floor(Number(inputEl.value));
+        if (!Number.isFinite(amount) || amount <= 0) { showToast(tr("giftInvalidAmount")); return; }
+        if (amount > save.money) { showToast(tr("giftNotEnoughMoney")); return; }
+        btnEl.disabled = true;
+        save.money -= amount;
+        persist();
+        refreshMenu();
+        db.collection("gifts").add({
+            from: currentUser.uid,
+            to: targetUid,
+            fromPseudo: save.pseudo || "Anonyme",
+            amount: amount,
+            seen: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }).then(() => {
+            showToast(tr("giftSent").replace("{amount}", amount));
+            inputEl.value = "";
+            btnEl.textContent = "✅";
+        }).catch((err) => {
+            console.error("Envoi du cadeau impossible :", err);
+            save.money += amount;
+            persist();
+            refreshMenu();
+            showToast(tr("giftError"));
+            btnEl.disabled = false;
+        });
+    }
+
+    // Ramasse les cadeaux reçus depuis la dernière connexion (voir
+    // sendGift) : ajoute leur montant à mon argent, les marque "vus" pour ne
+    // plus les afficher, et montre qui a donné quoi. Appelée une fois après
+    // syncCloudSaveOnLogin (voir initFirebase) pour partir d'un save.money
+    // déjà synchronisé avec le cloud.
+    function checkIncomingGifts() {
+        if (!db || !currentUser) return;
+        db.collection("gifts").where("to", "==", currentUser.uid).where("seen", "==", false).limit(20).get().then((snap) => {
+            if (snap.empty) return;
+            let total = 0;
+            const rows = [];
+            const batch = db.batch();
+            snap.forEach((doc) => {
+                const g = doc.data();
+                const amt = Math.max(0, Math.floor(num(g.amount)));
+                total += amt;
+                rows.push('<div class="gift-received-row">🎁 <b>' + escapeHtml(g.fromPseudo || "Anonyme") + '</b> : +' + amt + ' $</div>');
+                batch.update(doc.ref, { seen: true });
+            });
+            if (total <= 0) return;
+            save.money += total;
+            persist();
+            refreshMenu();
+            batch.commit().catch((err) => console.error("Marquage des cadeaux vus impossible :", err));
+            showProfileDetailModal(tr("giftsReceivedTitle"),
+                rows.join("") + '<p class="gift-received-total">' + tr("giftsReceivedTotal").replace("{amount}", total) + '</p>');
+        }).catch((err) => console.error("Lecture des cadeaux impossible :", err));
     }
 
     document.getElementById("btn-profile").addEventListener("click", () => showScreen("profile"));
@@ -5656,8 +5794,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.7.0";
+    const VERSION_NUMBER = "6.0.0";
     const CHANGELOG = [
+        {
+            version: "6.0.0",
+            major: [
+                { fr: "Ajout d'un système de cadeaux : depuis ton profil, tu peux offrir de l'argent à tes abonnés. À sa prochaine connexion, la personne voit qui lui a envoyé combien", en: "Added a gifting system: from your profile, you can send money to your followers. On their next login, they see who sent them what" },
+            ],
+            minor: [],
+        },
         {
             version: "5.7.0",
             major: [],

@@ -64,5 +64,35 @@ service cloud.firestore {
                     && request.resource.data.following != request.auth.uid;
       allow delete: if request.auth != null && resource.data.follower == request.auth.uid;
     }
+
+    // Cadeaux entre joueurs (bouton "Offrir de l'argent" sur son propre
+    // profil, voir openGiftModal/sendGift) : un compte ne peut envoyer QUE
+    // depuis lui-même ("from"), et seulement à un de ses abonnés (vérifié
+    // via la relation dans "follows"), avec un montant positif et plafonné.
+    // Lecture réservée à l'expéditeur et au destinataire. Une fois reçu, le
+    // destinataire marque le cadeau comme vu (seul "seen" est modifiable).
+    // Limite : rien n'empêche un client modifié d'écrire directement ce
+    // document sans avoir réellement débité "money" côté "users" (pas de
+    // transaction atomique possible sans Cloud Function) — acceptable ici,
+    // l'argent du jeu n'a aucune valeur réelle.
+    match /gifts/{giftId} {
+      allow read: if request.auth != null
+                  && (resource.data.from == request.auth.uid || resource.data.to == request.auth.uid);
+      allow create: if request.auth != null
+                    && request.resource.data.from == request.auth.uid
+                    && request.resource.data.to is string
+                    && request.resource.data.to != request.auth.uid
+                    && request.resource.data.fromPseudo is string
+                    && request.resource.data.fromPseudo.size() <= 24
+                    && request.resource.data.amount is number
+                    && request.resource.data.amount > 0
+                    && request.resource.data.amount <= 1000000
+                    && request.resource.data.seen == false
+                    && exists(/databases/$(database)/documents/follows/$(request.resource.data.to + '_' + request.auth.uid));
+      allow update: if request.auth != null
+                    && resource.data.to == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);
+      allow delete: if false;
+    }
   }
 }
