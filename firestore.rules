@@ -67,10 +67,12 @@ service cloud.firestore {
 
     // Cadeaux entre joueurs (bouton "Offrir de l'argent" sur son propre
     // profil, voir openGiftModal/sendGift) : un compte ne peut envoyer QUE
-    // depuis lui-même ("from"), et seulement à un de ses abonnés (vérifié
-    // via la relation dans "follows"), avec un montant positif et plafonné.
-    // Lecture réservée à l'expéditeur et au destinataire. Une fois reçu, le
-    // destinataire marque le cadeau comme vu (seul "seen" est modifiable).
+    // depuis lui-même ("from"), et seulement à quelqu'un avec qui il a une
+    // relation de suivi dans un sens ou l'autre — un abonné (qui le suit) OU
+    // un abonnement (qu'il suit) — vérifié via "follows", avec un montant
+    // positif et plafonné. Lecture réservée à l'expéditeur et au
+    // destinataire. Une fois reçu, le destinataire marque le cadeau comme vu
+    // (seul "seen" est modifiable).
     // Limite : rien n'empêche un client modifié d'écrire directement ce
     // document sans avoir réellement débité "money" côté "users" (pas de
     // transaction atomique possible sans Cloud Function) — acceptable ici,
@@ -88,7 +90,8 @@ service cloud.firestore {
                     && request.resource.data.amount > 0
                     && request.resource.data.amount <= 1000000
                     && request.resource.data.seen == false
-                    && exists(/databases/$(database)/documents/follows/$(request.resource.data.to + '_' + request.auth.uid));
+                    && (exists(/databases/$(database)/documents/follows/$(request.resource.data.to + '_' + request.auth.uid))
+                        || exists(/databases/$(database)/documents/follows/$(request.auth.uid + '_' + request.resource.data.to)));
       allow update: if request.auth != null
                     && resource.data.to == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['seen']);

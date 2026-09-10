@@ -1114,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.0.0</div>
+                <div class="version-tag" id="version-tag">v6.0.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1627,7 +1627,7 @@
         profileFollowError: { fr: "Action impossible, réessaie plus tard", en: "Action failed, try again later" },
         profileGiftButton: { fr: "🎁 Offrir de l'argent", en: "🎁 Send money" },
         giftModalTitle: { fr: "💸 Envoyer de l'argent", en: "💸 Send money" },
-        giftNoFollowers: { fr: "Tu n'as pas encore d'abonnés.", en: "You don't have any followers yet." },
+        giftNoFollowers: { fr: "Personne à qui offrir de l'argent pour l'instant (abonnés ou abonnements).", en: "Nobody to send money to yet (followers or people you follow)." },
         giftAmountPlaceholder: { fr: "Montant", en: "Amount" },
         giftInvalidAmount: { fr: "Entre un montant valide.", en: "Enter a valid amount." },
         giftNotEnoughMoney: { fr: "Tu n'as pas assez d'argent.", en: "You don't have enough money." },
@@ -5459,14 +5459,22 @@
     // profile-detail-modal (voir showProfileDetailModal).
     function openGiftModal() {
         showProfileDetailModal(tr("giftModalTitle"), '<p style="text-align:center; color: var(--text-dim);">' + tr("profileLoading") + '</p>');
-        db.collection("follows").where("following", "==", currentUser.uid).limit(50).get().then((snap) => {
-            const followerUids = [];
-            snap.forEach((doc) => followerUids.push(doc.data().follower));
-            if (!followerUids.length) {
+        // "Abonnés" ici couvre les deux sens du suivi : les gens qui ME suivent
+        // ET les gens que JE suis (voir firestore.rules, même logique des deux
+        // côtés pour autoriser l'écriture du cadeau).
+        Promise.all([
+            db.collection("follows").where("following", "==", currentUser.uid).limit(50).get(),
+            db.collection("follows").where("follower", "==", currentUser.uid).limit(50).get(),
+        ]).then(([followersSnap, followingSnap]) => {
+            const uids = new Set();
+            followersSnap.forEach((doc) => uids.add(doc.data().follower));
+            followingSnap.forEach((doc) => uids.add(doc.data().following));
+            const targetUids = [...uids];
+            if (!targetUids.length) {
                 document.getElementById("profile-detail-body").innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("giftNoFollowers") + '</p>';
                 return;
             }
-            return Promise.all(followerUids.map((uid) =>
+            return Promise.all(targetUids.map((uid) =>
                 db.collection("profiles").doc(uid).get().then((doc) => ({ uid, data: doc.exists ? doc.data() : {} }))
             )).then((rows) => {
                 document.getElementById("profile-detail-body").innerHTML = '<div class="skin-list">' + rows.map((r) =>
@@ -5794,8 +5802,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.0.0";
+    const VERSION_NUMBER = "6.0.1";
     const CHANGELOG = [
+        {
+            version: "6.0.1",
+            major: [],
+            minor: [
+                { fr: "Correctif : le système de cadeaux inclut maintenant les deux sens du suivi (les gens qui te suivent ET les gens que tu suis), pas seulement tes abonnés", en: "Fix: the gifting system now includes both directions of following (people who follow you AND people you follow), not just your followers" },
+            ],
+        },
         {
             version: "6.0.0",
             major: [
