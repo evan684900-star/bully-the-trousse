@@ -5998,6 +5998,15 @@
             persist();
             console.log("🔧 Durabilité :", save.durability);
         },
+        // Force la régénération des défis du jour (voir ensureDailyChallenges) :
+        // pratique pour tester une récompense/cible sans attendre minuit.
+        resetChallenges() {
+            save.dailyChallengeDate = "";
+            ensureDailyChallenges();
+            buildWorldsRow();
+            if (document.getElementById("challenges-modal").classList.contains("show")) renderDailyChallenges();
+            console.log("📅 Défis quotidiens régénérés :", save.dailyChallenges);
+        },
         resetSave() {
             localStorage.removeItem(SAVE_KEY);
             location.reload();
@@ -6060,7 +6069,8 @@
                 "  setDurability(n)         — fixe la durabilité de la trousse (0-100)\n" +
                 "  unlockSkin(id)           — débloque et équipe un skin\n" +
                 "  unlockAllSkins()         — débloque tous les skins\n" +
-                "  unlockTrail(id)          — débloque et équipe une traînée",
+                "  unlockTrail(id)          — débloque et équipe une traînée\n" +
+                "  resetChallenges()        — régénère les défis du jour tout de suite",
                 "color:#6bffb0; font-weight:bold;", "color:inherit;"
             );
             console.log(
