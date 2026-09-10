@@ -1103,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.3.1</div>
+                <div class="version-tag" id="version-tag">v5.3.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1836,7 +1836,7 @@
             // aussitôt la charge de puissance + précision comme un tout nouveau
             // lancer (voir tryBasketBounce). Ne se déclenche jamais en apesanteur.
             id: "basket", name: "Trousse à Baskets", cost: 36000,
-            desc: "+3 Puissance, +6 Vitesse. 20% de chance à l'atterrissage de rebondir sur ses baskets pour un lancer bonus (jusqu'à 2 rebonds d'affilée, 3% de chance pour le second) ; ne fonctionne pas en apesanteur.",
+            desc: "+3 Puissance, +6 Vitesse. 20% de chance à l'atterrissage de rebondir sur ses baskets pour un lancer bonus (jusqu'à 2 rebonds d'affilée, 6% de chance pour le second) ; ne fonctionne pas en apesanteur.",
             bonusPuissance: 3, bonusVitesse: 6, filter: "none", isBasket: true
         },
         {
@@ -2838,9 +2838,9 @@
     let didSkid = false;   // ce lancer s'est-il terminé par un dérapage ?
 
     // Trousse à Baskets : rebond à l'atterrissage au lieu de finir le lancer
-    // (voir tryBasketBounce). 20% de chance pour le 1er rebond, 3% pour le
+    // (voir tryBasketBounce). 20% de chance pour le 1er rebond, 6% pour le
     // 2nd, jamais de 3e (2 rebonds bonus max, donc 3 segments de vol au total).
-    const BASKET_BOUNCE_CHANCES = [0.20, 0.03];
+    const BASKET_BOUNCE_CHANCES = [0.20, 0.06];
     let basketBounceCount = 0; // nombre de rebonds déjà utilisés sur ce lancer
 
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
@@ -5571,8 +5571,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.3.1";
+    const VERSION_NUMBER = "5.3.2";
     const CHANGELOG = [
+        {
+            version: "5.3.2",
+            major: [],
+            minor: [
+                { fr: "Rééquilibrage : le second rebond de la Trousse à Baskets repasse de 3% à 6% de chance", en: "Rebalance: the Sneaker Case's second bounce chance goes back from 3% to 6%" },
+            ],
+        },
         {
             version: "5.3.1",
             major: [],
