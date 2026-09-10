@@ -1103,7 +1103,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.2.1</div>
+                <div class="version-tag" id="version-tag">v5.3.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1524,6 +1524,8 @@
         achv1500mDesc: { fr: "Atteins un record de 1500 m.", en: "Reach a record of 1500 m." },
         achv2000mName: { fr: "2000 mètres", en: "2000 meters" },
         achv2000mDesc: { fr: "Atteins un record de 2000 m.", en: "Reach a record of 2000 m." },
+        achv4000mName: { fr: "4000 mètres", en: "4000 meters" },
+        achv4000mDesc: { fr: "Atteins un record de 4000 m.", en: "Reach a record of 4000 m." },
         achvPerfectName: { fr: "Lancer parfait", en: "Perfect throw" },
         achvPerfectDesc: { fr: "Réussis un lancer parfait.", en: "Land a perfect throw." },
         achvVolcanName: { fr: "Éruption maîtrisée", en: "Eruption mastered" },
@@ -1742,6 +1744,7 @@
         { id: "mille1000m", emoji: "🌠", nameKey: "achv1000mName", descKey: "achv1000mDesc", check: (s) => s.bestDistance >= 1000 },
         { id: "mille1500m", emoji: "🌌", nameKey: "achv1500mName", descKey: "achv1500mDesc", check: (s) => s.bestDistance >= 1500 },
         { id: "deuxMille2000m", emoji: "🪐", nameKey: "achv2000mName", descKey: "achv2000mDesc", check: (s) => s.bestDistance >= 2000 },
+        { id: "quatreMille4000m", emoji: "🕳️", nameKey: "achv4000mName", descKey: "achv4000mDesc", check: (s) => s.bestDistance >= 4000 },
         { id: "lancerParfait", emoji: "✨", nameKey: "achvPerfectName", descKey: "achvPerfectDesc", check: (s) => s.hasPerfectThrow },
         { id: "volcanDebloque", emoji: "🌋", nameKey: "achvVolcanName", descKey: "achvVolcanDesc", check: (s) => s.volcanUnlocked },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
@@ -5568,8 +5571,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.2.1";
+    const VERSION_NUMBER = "5.3.0";
     const CHANGELOG = [
+        {
+            version: "5.3.0",
+            major: [],
+            minor: [
+                { fr: "Nouveau succès : 🕳️ \"4000 mètres\" (atteins un record de 4000 m)", en: "New achievement: 🕳️ \"4000 meters\" (reach a record of 4000 m)" },
+            ],
+        },
         {
             version: "5.2.1",
             major: [],
