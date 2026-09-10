@@ -1114,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.1.0</div>
+                <div class="version-tag" id="version-tag">v6.1.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -5550,13 +5550,19 @@
         db.collection("gifts").where("to", "==", currentUser.uid).where("seen", "==", false).limit(20).get().then((snap) => {
             if (snap.empty) return;
             let total = 0;
-            const rows = [];
+            // Fusionne les cadeaux par expéditeur (uid) : 3 dons de la même
+            // personne depuis la dernière connexion donnent 1 ligne avec le
+            // montant cumulé, pas 3 lignes séparées.
+            const bySender = new Map(); // uid -> { pseudo, amount }
             const batch = db.batch();
             snap.forEach((doc) => {
                 const g = doc.data();
                 const amt = Math.max(0, Math.floor(num(g.amount)));
                 total += amt;
-                rows.push('<div class="gift-received-row">🎁 <b>' + escapeHtml(g.fromPseudo || "Anonyme") + '</b> : +' + amt + ' $</div>');
+                const senderUid = g.from || doc.id;
+                const entry = bySender.get(senderUid) || { pseudo: g.fromPseudo || "Anonyme", amount: 0 };
+                entry.amount += amt;
+                bySender.set(senderUid, entry);
                 batch.update(doc.ref, { seen: true });
             });
             if (total <= 0) return;
@@ -5564,6 +5570,9 @@
             persist();
             refreshMenu();
             batch.commit().catch((err) => console.error("Marquage des cadeaux vus impossible :", err));
+            const rows = [...bySender.values()].map((entry) =>
+                '<div class="gift-received-row">🎁 <b>' + escapeHtml(entry.pseudo) + '</b> : +' + entry.amount + ' $</div>'
+            );
             showProfileDetailModal(tr("giftsReceivedTitle"),
                 rows.join("") + '<p class="gift-received-total">' + tr("giftsReceivedTotal").replace("{amount}", total) + '</p>');
         }).catch((err) => console.error("Lecture des cadeaux impossible :", err));
@@ -5810,8 +5819,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.1.0";
+    const VERSION_NUMBER = "6.1.1";
     const CHANGELOG = [
+        {
+            version: "6.1.1",
+            major: [],
+            minor: [
+                { fr: "La modale des cadeaux reçus fusionne maintenant les dons d'un même expéditeur en une seule ligne (montant cumulé) au lieu d'une ligne par don", en: "The received-gifts popup now merges gifts from the same sender into one line (combined amount) instead of one line per gift" },
+            ],
+        },
         {
             version: "6.1.0",
             major: [],
