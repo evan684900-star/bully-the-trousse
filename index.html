@@ -1105,7 +1105,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v5.5.0</div>
+                <div class="version-tag" id="version-tag">v5.6.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2087,9 +2087,14 @@
     }
 
     // Coût d'amélioration : croissance exponentielle pour garder une
-    // progression satisfaisante sans que ça devienne gratuit trop vite
+    // progression satisfaisante sans que ça devienne gratuit trop vite.
+    // Base à 1.55 : autour de 30 de Puissance/Vitesse le coût dépassait déjà
+    // les millions alors que l'argent gagné par lancer n'a que quadruplé
+    // depuis le début (le farm devenait interminable). Base à 1.40 : même
+    // forme de courbe (toujours plus cher à mesure qu'on monte), mais un
+    // niveau 30 coûte environ 20 fois moins cher.
     function upgradeCost(level) {
-        return Math.round(25 * Math.pow(1.55, level));
+        return Math.round(25 * Math.pow(1.40, level));
     }
 
     /* ============ 4. NOTIFICATION "TOAST" ============ */
@@ -5633,8 +5638,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "5.5.0";
+    const VERSION_NUMBER = "5.6.0";
     const CHANGELOG = [
+        {
+            version: "5.6.0",
+            major: [],
+            minor: [
+                { fr: "Rééquilibrage : coût des améliorations Puissance/Vitesse revu à la baisse (autour de 30, le farm devenait interminable par rapport à l'argent gagné)", en: "Rebalance: Power/Speed upgrade costs lowered (around level 30, farming took way too long compared to what you earned)" },
+            ],
+        },
         {
             version: "5.5.0",
             major: [],
