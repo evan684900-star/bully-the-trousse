@@ -757,6 +757,22 @@
         }
         .gift-received-row { padding: 6px 0; font-size: 14px; }
         .gift-received-total { margin-top: 10px; font-weight: 800; color: var(--money); text-align: center; }
+        /* Lien "Se connecter / Créer un compte" (ou email affiché une fois
+           connecté) sous le pseudo, sur son propre profil : un texte simple,
+           pas un bouton plein, pour rester discret sous les stats. */
+        .text-link {
+            background: none; border: none; padding: 0; margin: 2px 0 0;
+            font: inherit; font-size: 12.5px; color: var(--accent);
+            text-decoration: underline; cursor: pointer;
+        }
+        .auth-input {
+            width: 100%; box-sizing: border-box; padding: 10px 12px; margin-top: 10px;
+            border-radius: 10px; border: 2px solid var(--panel-border); background: var(--app-bg);
+            color: var(--text); font: inherit; font-size: 14px;
+        }
+        .auth-error { color: var(--accent-2); font-size: 12.5px; margin: 8px 0 0; min-height: 15px; }
+        .auth-connected { text-align: center; }
+        .auth-connected .email { font-weight: 800; word-break: break-all; }
         /* Détail "Puissance / Vitesse" (modale ouverte depuis la tuile Niveau) */
         .level-detail-row {
             display: flex; justify-content: space-between; align-items: center;
@@ -1124,7 +1140,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.5.0</div>
+                <div class="version-tag" id="version-tag">v7.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1415,6 +1431,18 @@
             <button class="btn" id="btn-settings-close" data-i18n="btnOk">OK</button>
         </div>
     </div>
+
+    <!-- Compte email/mot de passe (lien sous le pseudo, sur son propre profil) :
+         soit le formulaire d'inscription/connexion, soit "connecté en tant
+         que..." + déconnexion, selon currentUser.isAnonymous (voir
+         openAuthModal). -->
+    <div class="modal-overlay" id="auth-modal">
+        <div class="info-box">
+            <h2 data-i18n="authModalTitle">🔑 Compte</h2>
+            <div id="auth-modal-body"></div>
+            <button class="btn small secondary" id="btn-auth-close" data-i18n="btnCancel">Annuler</button>
+        </div>
+    </div>
 </div>
 
 <!-- SDK Firebase (compat, sans étape de build) : auth anonyme + Firestore.
@@ -1620,6 +1648,29 @@
         settingsPrivateOff: { fr: "🔓 Compte passé en public", en: "🔓 Account set to public" },
         settingsAvatarTitle: { fr: "🖼️ Photo de profil", en: "🖼️ Profile picture" },
         settingsAvatarPickHint: { fr: "Choisis une icône :", en: "Pick an icon:" },
+        btnCancel: { fr: "Annuler", en: "Cancel" },
+        accountLinkText: { fr: "🔑 Se connecter / Créer un compte", en: "🔑 Log in / Create account" },
+        authModalTitle: { fr: "🔑 Compte", en: "🔑 Account" },
+        authModalHint: { fr: "Crée un compte pour retrouver ta progression sur un autre appareil, ou connecte-toi à un compte existant.", en: "Create an account to find your progress on another device, or log into an existing one." },
+        authEmailPlaceholder: { fr: "Email", en: "Email" },
+        authPasswordPlaceholder: { fr: "Mot de passe", en: "Password" },
+        authSignupBtn: { fr: "✅ S'inscrire", en: "✅ Sign up" },
+        authLoginBtn: { fr: "🔑 Se connecter", en: "🔑 Log in" },
+        authFillBoth: { fr: "Entre un email et un mot de passe.", en: "Enter an email and a password." },
+        authWeakPassword: { fr: "Mot de passe trop court (6 caractères minimum).", en: "Password too short (6 characters minimum)." },
+        authInvalidEmail: { fr: "Adresse email invalide.", en: "Invalid email address." },
+        authEmailInUse: { fr: "Un compte existe déjà avec cet email. Essaie plutôt \"Se connecter\".", en: "An account already exists with this email. Try \"Log in\" instead." },
+        authWrongCredentials: { fr: "Email ou mot de passe incorrect.", en: "Wrong email or password." },
+        authTooManyRequests: { fr: "Trop de tentatives, réessaie plus tard.", en: "Too many attempts, try again later." },
+        authNotEnabled: { fr: "Connexion par email indisponible pour le moment.", en: "Email sign-in isn't available right now." },
+        authGenericError: { fr: "Une erreur est survenue, réessaie.", en: "Something went wrong, try again." },
+        authUnavailable: { fr: "Indisponible hors ligne.", en: "Unavailable offline." },
+        authSignupDone: { fr: "✅ Compte créé ! Tu peux maintenant te connecter sur un autre appareil.", en: "✅ Account created! You can now log in on another device." },
+        authLoginConfirm: { fr: "Se connecter à ce compte va remplacer ta progression actuelle par celle de ce compte (elle reste sauvegardée, mais tu la quittes). Continuer ?", en: "Logging into this account will replace your current progress with that account's (it stays saved, but you're leaving it). Continue?" },
+        authLoginDone: { fr: "✅ Connecté !", en: "✅ Logged in!" },
+        authConnectedAs: { fr: "Connecté en tant que :", en: "Logged in as:" },
+        authLogoutBtn: { fr: "🚪 Se déconnecter", en: "🚪 Log out" },
+        authLogoutConfirm: { fr: "Te déconnecter ? Une nouvelle session anonyme prendra le relais.", en: "Log out? A new anonymous session will take over." },
         btnProfile: { fr: "👤 Profil", en: "👤 Profile" },
         profileFollowing: { fr: "Abonnements", en: "Following" },
         profileFollowers: { fr: "Abonnés", en: "Followers" },
@@ -5184,7 +5235,13 @@
             updateOnlineStatus(tr("onlineConnected"));
             // checkIncomingGifts() doit partir d'un save.money déjà synchronisé
             // avec le cloud, donc seulement une fois syncCloudSaveOnLogin terminé.
-            syncCloudSaveOnLogin().then(() => checkIncomingGifts());
+            // Rafraîchit aussi l'écran Profil s'il est ouvert (pseudo, stats,
+            // lien "Se connecter" -> email) : utile après une connexion/
+            // déconnexion (voir doLogIn/doLogOut) qui change de compte.
+            syncCloudSaveOnLogin().then(() => {
+                checkIncomingGifts();
+                if (screens.profile.classList.contains("active")) renderProfile();
+            });
             pingPresence();
         });
         firebase.auth().signInAnonymously().catch((err) => {
@@ -5562,7 +5619,8 @@
         if (!isOwn && uid) {
             html += '<button class="btn small" id="btn-profile-follow">' + tr("profileFollowLoading") + '</button>';
         } else if (isOwn) {
-            html += '<button class="btn small" id="btn-profile-gift">' + tr("profileGiftButton") + '</button>';
+            html += '<button class="btn small" id="btn-profile-gift">' + tr("profileGiftButton") + '</button>' +
+                '<button type="button" class="text-link" id="btn-account-link">' + accountLinkText() + '</button>';
         }
         html += '</div>';
 
@@ -5634,6 +5692,7 @@
                 document.getElementById("achv-modal").classList.add("show");
             });
             wireGiftButton();
+            document.getElementById("btn-account-link").addEventListener("click", openAuthModal);
         }
 
         document.getElementById("btn-profile-level").addEventListener("click", () => {
@@ -5874,6 +5933,154 @@
                 rows.join("") + '<p class="gift-received-total">' + tr("giftsReceivedTotal").replace("{amount}", total) + '</p>');
         }).catch((err) => console.error("Lecture des cadeaux impossible :", err));
     }
+
+    // --- Compte email/mot de passe (voir btn-account-link sur son profil) ---
+    // Le jeu se connecte par défaut en anonyme (voir initFirebase) : un uid
+    // généré au hasard, sans email ni mot de passe, qui se perd si on change
+    // d'appareil ou vide son navigateur. Deux façons d'en sortir :
+    // - "S'inscrire" relie ce compte anonyme à un email/mot de passe via
+    //   linkWithCredential : MÊME uid, toute la progression est conservée.
+    // - "Se connecter" bascule vers un AUTRE compte existant via
+    //   signInWithEmailAndPassword : ça abandonne le compte anonyme courant
+    //   (il reste dans Firestore, juste plus utilisé), d'où la confirmation
+    //   avant de le faire si le joueur a déjà une progression à perdre.
+    function accountLinkText() {
+        if (currentUser && !currentUser.isAnonymous && currentUser.email) {
+            return "✅ " + escapeHtml(currentUser.email);
+        }
+        return tr("accountLinkText");
+    }
+
+    function authSetError(msg) {
+        const el = document.getElementById("auth-error");
+        if (el) el.textContent = msg || "";
+    }
+
+    // Traduit les codes d'erreur Firebase Auth les plus courants en message
+    // compréhensible ; jamais le code brut à l'écran.
+    function mapAuthError(err) {
+        switch (err && err.code) {
+            case "auth/invalid-email": return tr("authInvalidEmail");
+            case "auth/weak-password": return tr("authWeakPassword");
+            case "auth/email-already-in-use":
+            case "auth/credential-already-in-use":
+                return tr("authEmailInUse");
+            case "auth/wrong-password":
+            case "auth/user-not-found":
+            case "auth/invalid-credential":
+                return tr("authWrongCredentials");
+            case "auth/too-many-requests": return tr("authTooManyRequests");
+            case "auth/operation-not-allowed": return tr("authNotEnabled");
+            default: return tr("authGenericError");
+        }
+    }
+
+    function openAuthModal() {
+        if (!FIREBASE_ENABLED || !db || !currentUser) {
+            showToast(tr("authUnavailable"));
+            return;
+        }
+        renderAuthModalBody();
+        document.getElementById("auth-modal").classList.add("show");
+    }
+
+    // Reconstruit le contenu de la modale selon l'état du compte : formulaire
+    // email/mot de passe si anonyme, sinon "connecté en tant que..." + déconnexion.
+    function renderAuthModalBody() {
+        const body = document.getElementById("auth-modal-body");
+        if (currentUser && !currentUser.isAnonymous) {
+            body.innerHTML =
+                '<div class="auth-connected">' +
+                    '<p>' + tr("authConnectedAs") + '</p>' +
+                    '<p class="email">' + escapeHtml(currentUser.email || "") + '</p>' +
+                    '<button class="btn secondary" id="btn-auth-logout">' + tr("authLogoutBtn") + '</button>' +
+                '</div>' +
+                '<p id="auth-error" class="auth-error"></p>';
+            document.getElementById("btn-auth-logout").addEventListener("click", doLogOut);
+        } else {
+            body.innerHTML =
+                '<p class="settings-hint">' + tr("authModalHint") + '</p>' +
+                '<input type="email" id="auth-email" class="auth-input" placeholder="' + escapeHtml(tr("authEmailPlaceholder")) + '" autocomplete="email">' +
+                '<input type="password" id="auth-password" class="auth-input" placeholder="' + escapeHtml(tr("authPasswordPlaceholder")) + '" autocomplete="current-password">' +
+                '<p id="auth-error" class="auth-error"></p>' +
+                '<div class="replay-buttons">' +
+                    '<button class="btn" id="btn-auth-signup">' + tr("authSignupBtn") + '</button>' +
+                    '<button class="btn secondary" id="btn-auth-login">' + tr("authLoginBtn") + '</button>' +
+                '</div>';
+            document.getElementById("btn-auth-signup").addEventListener("click", doSignUp);
+            document.getElementById("btn-auth-login").addEventListener("click", doLogIn);
+        }
+    }
+
+    function readAuthInputs() {
+        const email = (document.getElementById("auth-email").value || "").trim();
+        const password = document.getElementById("auth-password").value || "";
+        if (!email || !password) {
+            authSetError(tr("authFillBoth"));
+            return null;
+        }
+        return { email, password };
+    }
+
+    // Relie le compte anonyme courant à un email/mot de passe : même uid,
+    // donc toute la sauvegarde (locale ET cloud) reste intacte.
+    function doSignUp() {
+        const creds = readAuthInputs();
+        if (!creds) return;
+        authSetError("");
+        const btn = document.getElementById("btn-auth-signup");
+        btn.disabled = true;
+        const cred = firebase.auth.EmailAuthProvider.credential(creds.email, creds.password);
+        currentUser.linkWithCredential(cred).then((result) => {
+            currentUser = result.user;
+            pushPublicProfile();
+            showToast(tr("authSignupDone"));
+            document.getElementById("auth-modal").classList.remove("show");
+            renderProfile();
+        }).catch((err) => {
+            console.error("Inscription impossible :", err);
+            authSetError(mapAuthError(err));
+        }).finally(() => { btn.disabled = false; });
+    }
+
+    // Bascule vers un compte email/mot de passe existant : abandonne le
+    // compte anonyme courant (confirmation si progression non liée à perdre).
+    function doLogIn() {
+        const creds = readAuthInputs();
+        if (!creds) return;
+        if (save.totalThrows > 0 && !confirm(tr("authLoginConfirm"))) return;
+        authSetError("");
+        const btn = document.getElementById("btn-auth-login");
+        btn.disabled = true;
+        firebase.auth().signInWithEmailAndPassword(creds.email, creds.password).then(() => {
+            showToast(tr("authLoginDone"));
+            document.getElementById("auth-modal").classList.remove("show");
+            // onAuthStateChanged (voir initFirebase) prend le relais : nouveau
+            // currentUser, syncCloudSaveOnLogin (remplace "save" par celui du
+            // compte) et rafraîchit l'écran Profil.
+        }).catch((err) => {
+            console.error("Connexion impossible :", err);
+            authSetError(mapAuthError(err));
+            btn.disabled = false;
+        });
+    }
+
+    // Déconnecte le compte email/mot de passe et repart sur une nouvelle
+    // session anonyme (le jeu a toujours besoin d'un compte Firebase pour
+    // sauvegarder/synchroniser).
+    function doLogOut() {
+        if (!confirm(tr("authLogoutConfirm"))) return;
+        firebase.auth().signOut().then(() => firebase.auth().signInAnonymously()).then(() => {
+            document.getElementById("auth-modal").classList.remove("show");
+        }).catch((err) => {
+            console.error("Déconnexion impossible :", err);
+            authSetError(mapAuthError(err));
+        });
+    }
+
+    document.getElementById("btn-auth-close").addEventListener("click", () => {
+        document.getElementById("auth-modal").classList.remove("show");
+    });
 
     document.getElementById("btn-profile").addEventListener("click", () => showScreen("profile"));
     document.getElementById("btn-profile-back").addEventListener("click", () => showScreen("menu"));
@@ -6116,8 +6323,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.5.0";
+    const VERSION_NUMBER = "7.0.0";
     const CHANGELOG = [
+        {
+            version: "7.0.0",
+            major: [
+                { fr: "Ajout d'un vrai système de compte : un lien \"Se connecter / Créer un compte\" sous ton pseudo (écran Profil) relie ton compte anonyme à un email + mot de passe. Toute ta progression est conservée, et tu peux ensuite te connecter au même compte depuis n'importe quel appareil", en: "Added a real account system: a \"Log in / Create account\" link under your pseudo (Profile screen) links your anonymous account to an email + password. All your progress is kept, and you can then log into the same account from any device" },
+            ],
+            minor: [],
+        },
         {
             version: "6.5.0",
             major: [],
@@ -6475,7 +6689,7 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal", "auth-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
