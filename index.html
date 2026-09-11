@@ -1743,6 +1743,26 @@
             en: "Each throw costs 5 mental health (out of 200) because of crab stress. At zero you can't throw: you need a towel found during a throw (+20) or bought in the shop (+5, single use)."
         },
         leaderboardTitlePlage: { fr: "🏖️ Classement Plage", en: "🏖️ Beach leaderboard" },
+        achvClaquettesName: { fr: "Pieds nus dans le sable", en: "Barefoot in the sand" },
+        achvClaquettesDesc: { fr: "Achète la Trousse à Claquettes.", en: "Buy the Flip-Flop Pencil Case." },
+        achvPlageThrowsName: { fr: "Habitué(e) du sable", en: "Sand regular" },
+        achvPlageThrowsDesc: { fr: "Effectue 100 lancers dans le monde Plage.", en: "Make 100 throws in the Beach world." },
+        achvPlage500Name: { fr: "Loin du bus", en: "Far from the bus" },
+        achvPlage500Desc: { fr: "Atteins un record de 500 m sur la plage.", en: "Reach a record of 500 m on the beach." },
+        achvPlage2000Name: { fr: "Jusqu'à l'horizon", en: "All the way to the horizon" },
+        achvPlage2000Desc: { fr: "Atteins un record de 2000 m sur la plage.", en: "Reach a record of 2000 m on the beach." },
+        achvPlageMoneyName: { fr: "Économies de vacances", en: "Holiday savings" },
+        achvPlageMoneyDesc: { fr: "Gagne 250 000 $ sur la plage : de quoi payer le bus du retour.", en: "Earn $250,000 on the beach: exactly the price of the bus home." },
+        achvParasolName: { fr: "Rebondi(e) mais pas vaincu(e)", en: "Bounced but not beaten" },
+        achvParasolDesc: { fr: "Rebondis 25 fois sur un parasol.", en: "Bounce off a parasol 25 times." },
+        achvTowelsName: { fr: "Ramasse-serviettes", en: "Towel collector" },
+        achvTowelsDesc: { fr: "Atterris 20 fois dans une serviette trouvée sur le sable.", en: "Land 20 times in a towel found on the sand." },
+        achvCastlesName: { fr: "Démolisseur de châteaux", en: "Castle wrecker" },
+        achvCastlesDesc: { fr: "Fais s'écrouler 15 châteaux de sable sur la trousse.", en: "Make 15 sandcastles collapse on the pencil case." },
+        achvGullsName: { fr: "Blanchi(e) de tout soupçon", en: "Squeaky clean" },
+        achvGullsDesc: { fr: "Esquive 5 nuées de mouettes sans te faire toucher une seule fois.", en: "Dodge 5 seagull flocks without being hit once." },
+        achvBurnoutName: { fr: "Burn-out balnéaire", en: "Seaside burnout" },
+        achvBurnoutDesc: { fr: "Tombe à 0 de santé mentale à cause de ces maudits crabes.", en: "Drop to 0 mental health thanks to those cursed crabs." },
         achvPlageName: { fr: "Sable entre les pages", en: "Sand between the pages" },
         achvPlageDesc: { fr: "Débloque le monde Plage.", en: "Unlock the Beach world." },
         achvBusName: { fr: "Retour de vacances", en: "Back from holiday" },
@@ -2070,8 +2090,18 @@
         { id: "dixMille10000m", emoji: "🌀", nameKey: "achv10000mName", descKey: "achv10000mDesc", check: (s) => s.bestDistance >= 10000 },
         { id: "lancerParfait", emoji: "✨", nameKey: "achvPerfectName", descKey: "achvPerfectDesc", check: (s) => s.hasPerfectThrow },
         { id: "volcanDebloque", emoji: "🌋", nameKey: "achvVolcanName", descKey: "achvVolcanDesc", check: (s) => s.volcanUnlocked },
+        { id: "claquettes", emoji: "🩴", nameKey: "achvClaquettesName", descKey: "achvClaquettesDesc", check: (s) => s.hasClaquettes },
         { id: "plageDebloquee", emoji: "🏖️", nameKey: "achvPlageName", descKey: "achvPlageDesc", check: (s) => s.plageUnlocked },
         { id: "retourDeVacances", emoji: "🚌", nameKey: "achvBusName", descKey: "achvBusDesc", check: (s) => s.hasTakenBusBack },
+        { id: "plageLancers", emoji: "🦀", nameKey: "achvPlageThrowsName", descKey: "achvPlageThrowsDesc", check: (s) => s.plageThrows >= 100 },
+        { id: "plage500m", emoji: "📏", nameKey: "achvPlage500Name", descKey: "achvPlage500Desc", check: (s) => s.plageBestDistance >= 500 },
+        { id: "plage2000m", emoji: "🌊", nameKey: "achvPlage2000Name", descKey: "achvPlage2000Desc", check: (s) => s.plageBestDistance >= 2000 },
+        { id: "plageEconomies", emoji: "💸", nameKey: "achvPlageMoneyName", descKey: "achvPlageMoneyDesc", check: (s) => s.plageMoneyEarned >= 250000 },
+        { id: "parasols25", emoji: "⛱️", nameKey: "achvParasolName", descKey: "achvParasolDesc", check: (s) => s.plageParasolBounces >= 25 },
+        { id: "serviettes20", emoji: "🧺", nameKey: "achvTowelsName", descKey: "achvTowelsDesc", check: (s) => s.plageTowelsFound >= 20 },
+        { id: "chateaux15", emoji: "🏰", nameKey: "achvCastlesName", descKey: "achvCastlesDesc", check: (s) => s.plageCastlesCrushed >= 15 },
+        { id: "mouettes5", emoji: "🐦", nameKey: "achvGullsName", descKey: "achvGullsDesc", check: (s) => s.plagePerfectGulls >= 5 },
+        { id: "burnOut", emoji: "🧠", nameKey: "achvBurnoutName", descKey: "achvBurnoutDesc", check: (s) => s.hasBurnedOut },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
         { id: "collectionneur", emoji: "🎨", nameKey: "achvCollectorName", descKey: "achvCollectorDesc", check: (s) => s.ownedSkins.length >= SKINS.length },
         { id: "riche5000", emoji: "💰", nameKey: "achvRichName", descKey: "achvRichDesc", check: (s) => s.money >= 5000 },
@@ -2274,6 +2304,17 @@
             inPlage: false,            // le joueur est "coincé" sur la plage (profil plage actif)
             hasTakenBusBack: false,    // a déjà payé le billet de bus du retour au moins une fois
             mentalHealth: MENTAL_MAX,  // santé mentale (0 à MENTAL_MAX), n'est consommée que sur la plage
+            // Compteurs de la plage : volontairement HORS du profil échangé
+            // (voir PROFILE_FIELDS) pour que les succès ne repartent pas de
+            // zéro à chaque aller-retour en bus.
+            plageThrows: 0,            // lancers effectués sur la plage
+            plageBestDistance: 0,      // meilleur lancer sur la plage (le record du profil, lui, est échangé)
+            plageMoneyEarned: 0,       // argent gagné sur la plage depuis le début
+            plageParasolBounces: 0,    // rebonds sur un parasol
+            plageTowelsFound: 0,       // serviettes trouvées pendant un lancer
+            plageCastlesCrushed: 0,    // châteaux de sable écroulés sur la trousse
+            plagePerfectGulls: 0,      // séquences de mouettes esquivées sans une seule touche
+            hasBurnedOut: false,       // santé mentale déjà tombée à 0 au moins une fois
             // Profil mis de côté pendant qu'on joue dans l'autre monde : la
             // plage a son propre argent/niveaux/skins/record (voir swapProfile).
             stashedMainProfile: null,  // profil "monde normal" pendant qu'on est sur la plage
@@ -2408,6 +2449,9 @@
     function recordDailyEarning(amount) {
         if (amount <= 0) return;
         save.totalMoneyEarned += amount;
+        // L'argent de la plage est compté à part : c'est lui qui mesure le
+        // chemin parcouru vers le billet de bus (voir le succès correspondant).
+        if (save.inPlage) save.plageMoneyEarned += amount;
         const key = todayKey();
         save.dailyEarnings[key] = (save.dailyEarnings[key] || 0) + amount;
         pruneDailyMap(save.dailyEarnings);
@@ -3668,6 +3712,8 @@
         const beachEl = document.getElementById("result-beach");
         if (save.currentWorld === "plage") {
             beachFinalizeLanding();
+            save.plageThrows++;
+            if (distanceMeters > save.plageBestDistance) save.plageBestDistance = distanceMeters;
             loseMental(MENTAL_COST_PER_THROW);
             beachEl.textContent = beachResultText();
             beachEl.style.display = "block";
@@ -4691,7 +4737,12 @@
                 beachUsed.gulls = true;
                 state = "gull";
                 gullStart(BEACH_GULL_COUNT, BEACH_GULL_LIVES, (ok) => {
-                    if (ok) beachLog.push("gullsClean");
+                    // "ok" = la séquence est allée au bout ; sans aucune touche,
+                    // c'est une esquive parfaite (voir le succès des mouettes).
+                    if (ok) {
+                        beachLog.push("gullsClean");
+                        if (gullHits === 0) save.plagePerfectGulls++;
+                    }
                     state = "flying";
                 });
             } else if (spaceEggTriggered && vy <= 0) {
@@ -6270,6 +6321,7 @@
         if (!beachEvents.parasol || beachUsed.parasol || inSpaceMode) return false;
         beachUsed.parasol = true;
         beachLog.push("parasol");
+        save.plageParasolBounces++;
         worldY = 1;
         vy = Math.max(240, Math.abs(vy) * 0.62);
         vx = vx * 0.94;
@@ -6285,10 +6337,12 @@
         if (beachEvents.towel && !beachUsed.towel) {
             beachUsed.towel = true;
             beachLog.push("towel");
+            save.plageTowelsFound++;
             healMental(BEACH_FOUND_TOWEL_HEAL);
         } else if (beachEvents.castle && !beachUsed.castle) {
             beachUsed.castle = true;
             beachLog.push("castle");
+            save.plageCastlesCrushed++;
             // le château le plus proche s'effondre sur la trousse
             let best = null, bestD = 200;
             beachProps.forEach((p) => {
@@ -6322,6 +6376,7 @@
 
     function loseMental(amount) {
         save.mentalHealth = Math.max(0, save.mentalHealth - amount);
+        if (save.mentalHealth <= 0) save.hasBurnedOut = true;
         refreshMentalHud();
     }
 
@@ -8264,7 +8319,7 @@
             minor: [
                 { fr: "La plage est regénérée à chaque lancer : parasols, serviettes et châteaux de sable ne sont jamais deux fois au même endroit", en: "The beach is regenerated on every throw: parasols, towels and sandcastles are never twice in the same place" },
                 { fr: "Quatre évènements tirés au sort à chaque lancer : rebond sur un parasol (50%), serviette (60%), château de sable (40%) et esquive des crottes de mouettes (60%)", en: "Four events rolled on every throw: parasol bounce (50%), towel (60%), sandcastle (40%) and seagull-dropping dodge (60%)" },
-                { fr: "2 nouveaux succès : débloquer la Plage, et revenir de la Plage en bus", en: "2 new achievements: unlock the Beach, and come back from the Beach by bus" },
+                { fr: "12 nouveaux succès liés à la plage : acheter les claquettes, débloquer le monde, rentrer en bus, 100 lancers sur le sable, records de 500 m et 2000 m, 250 000 $ gagnés là-bas, 25 rebonds sur parasol, 20 serviettes, 15 châteaux écroulés, 5 nuées de mouettes esquivées sans une touche, et le burn-out", en: "12 new beach achievements: buy the flip-flops, unlock the world, take the bus home, 100 throws on the sand, 500 m and 2000 m records, $250,000 earned there, 25 parasol bounces, 20 towels, 15 collapsed castles, 5 seagull flocks dodged without a hit, and the burnout" },
             ],
         },
         {
@@ -8747,6 +8802,7 @@
         },
         setMental(v) {
             save.mentalHealth = Math.max(0, Math.min(MENTAL_MAX, v));
+            if (save.mentalHealth <= 0) save.hasBurnedOut = true; // même effet qu'un vrai craquage
             persist();
             refreshMentalHud();
             console.log("🧠 Santé mentale :", save.mentalHealth);
