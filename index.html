@@ -1114,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.3.0</div>
+                <div class="version-tag" id="version-tag">v6.3.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -3656,7 +3656,7 @@
             const len = Math.hypot(dx, dy) || 1;
             // Perpendiculaire unitaire au segment = direction de la largeur du ruban
             const nx = -dy / len, ny = dx / len;
-            const alpha = 0.55 * Math.max(0, 1 - (age0 + age1) / 2);
+            const alpha = 0.65 * Math.max(0, 1 - (age0 + age1) / 2);
             if (alpha <= 0) continue;
             const rgb = trail.rgb === "rainbow" ? rainbowRgb((p0.t + p1.t) / 2) : trail.rgb;
             ctx.fillStyle = "rgba(" + rgb + "," + alpha + ")";
@@ -5868,8 +5868,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.3.0";
+    const VERSION_NUMBER = "6.3.1";
     const CHANGELOG = [
+        {
+            version: "6.3.1",
+            major: [],
+            minor: [
+                { fr: "Retouche : opacité de la traînée légèrement augmentée", en: "Tweak: slightly increased trail opacity" },
+            ],
+        },
         {
             version: "6.3.0",
             major: [],
