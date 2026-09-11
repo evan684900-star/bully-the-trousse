@@ -1014,6 +1014,10 @@
         .screen.cine-fading.cine-gone { opacity: 0; }
         body.cine-mode .hud-top,
         body.cine-mode .hint-text,
+        /* Masque le soleil/la lune (calque CSS, au-dessus du canvas) pendant
+           le fondu en diaphragme de la cinématique plage : ce fondu est peint
+           DANS le canvas, donc ce calque resterait visible par-dessus sinon. */
+        body.cine-blackout .sky-anim { display: none !important; }
         body.cine-mode #meter-wrap,
         body.cine-mode #btn-game-back,
         body.cine-mode .corner-icons-right,
@@ -1088,6 +1092,19 @@
             display: none;
         }
         #cine-lives.show { display: block; }
+        /* Consigne du QTE des mouettes (monde Plage, en jeu comme en cinématique) */
+        #gull-prompt {
+            position: absolute;
+            top: calc(40px + env(safe-area-inset-top));
+            left: 0; right: 0;
+            text-align: center;
+            font-size: clamp(15px, 4vw, 20px);
+            font-weight: 800;
+            color: #fff;
+            text-shadow: 0 2px 8px rgba(0,0,0,0.7);
+            display: none;
+        }
+        #gull-prompt.show { display: block; }
         /* QTE de clics pendant la descente */
         #cine-clickqte {
             position: absolute;
@@ -1225,7 +1242,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v8.0.0</div>
+                <div class="version-tag" id="version-tag">v8.0.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1307,6 +1324,7 @@
         <!-- Surcouche de la cinématique du monde Volcan (voir section 9bis) -->
         <div id="cine-ui">
             <div id="cine-lives"></div>
+            <div id="gull-prompt" data-i18n="gullPrompt">🐦 ESQUIVE LES CROTTES !</div>
             <div id="cine-warn"><div class="tri"></div><div class="bang">!</div></div>
             <div id="cine-sides">
                 <div class="side left">◀</div>
@@ -1527,6 +1545,21 @@
             <div class="settings-row">
                 <span data-i18n="settingsLangLabel">Langue</span>
                 <button class="btn small secondary" id="btn-lang-toggle">FR</button>
+            </div>
+
+            <h3 class="settings-section-title" data-i18n="settingsTutoTitle">📖 Revoir le tutoriel</h3>
+            <div class="settings-row">
+                <span data-i18n="settingsTutoBasics">Bases du jeu</span>
+                <button class="btn small secondary" id="btn-replay-tuto-basics" data-i18n="settingsTutoReplay">🔁 Revoir</button>
+            </div>
+            <!-- Affichés seulement si le monde correspondant est débloqué (voir refreshSettingsModal) -->
+            <div class="settings-row" id="settings-row-tuto-volcan" style="display:none;">
+                <span data-i18n="settingsTutoVolcan">Monde Volcans</span>
+                <button class="btn small secondary" id="btn-replay-tuto-volcan" data-i18n="settingsTutoReplay">🔁 Revoir</button>
+            </div>
+            <div class="settings-row" id="settings-row-tuto-plage" style="display:none;">
+                <span data-i18n="settingsTutoPlage">Monde Plage</span>
+                <button class="btn small secondary" id="btn-replay-tuto-plage" data-i18n="settingsTutoReplay">🔁 Revoir</button>
             </div>
 
             <h3 class="settings-section-title" data-i18n="settingsAccountTitle">👤 Paramètres du compte</h3>
@@ -1858,6 +1891,11 @@
         linksWhatsappLabel: { fr: "Chaîne WhatsApp", en: "WhatsApp channel" },
         linksWhatsappDesc: { fr: "Actus de ce jeu", en: "Updates about this game" },
         settingsTitle: { fr: "⚙️ Réglages", en: "⚙️ Settings" },
+        settingsTutoTitle: { fr: "📖 Revoir le tutoriel", en: "📖 Replay tutorial" },
+        settingsTutoBasics: { fr: "Bases du jeu", en: "Game basics" },
+        settingsTutoVolcan: { fr: "Monde Volcans", en: "Volcans world" },
+        settingsTutoPlage: { fr: "Monde Plage", en: "Beach world" },
+        settingsTutoReplay: { fr: "🔁 Revoir", en: "🔁 Replay" },
         settingsThemeLabel: { fr: "Thème", en: "Theme" },
         settingsLangLabel: { fr: "Langue", en: "Language" },
         settingsAccountTitle: { fr: "👤 Paramètres du compte", en: "👤 Account settings" },
@@ -5266,7 +5304,7 @@
         cineActive = false;
         cineStopQuake();
         if (gullActive) gullStop();
-        document.body.classList.remove("cine-mode", "cine-aim");
+        document.body.classList.remove("cine-mode", "cine-aim", "cine-blackout");
         document.getElementById("bcine-dialog").classList.remove("show");
         document.getElementById("bcine-aim").classList.remove("show");
         meterWrap.style.display = "none";
@@ -6410,6 +6448,7 @@
 
     function gullStart(total, lives, onDone) {
         gullActive = true;
+        document.getElementById("gull-prompt").classList.add("show");
         gullTotal = total;
         gullLives = lives;
         gullIdx = 0; gullHits = 0;
@@ -6429,6 +6468,7 @@
     function gullStop() {
         gullActive = false;
         gullDodgeX = 0;
+        document.getElementById("gull-prompt").classList.remove("show");
         document.body.classList.remove("gull-mode");
         document.getElementById("cine-sides").classList.remove("show");
         document.getElementById("cine-lives").classList.remove("show");
@@ -6458,8 +6498,12 @@
 
     function gullMove(dir) {
         if (!gullActive || gullState !== "warn") return;
-        const next = Math.max(-1, Math.min(1, gullLane + dir));
-        if (next === gullLane) return;
+        let next = Math.max(-1, Math.min(1, gullLane + dir));
+        // Déjà collée à ce bord (ex: taper "gauche" alors qu'on est déjà tout
+        // à gauche) : on esquive quand même, de l'autre côté, plutôt que de ne
+        // rien faire — sinon la trousse semble bloquée pour le reste du QTE,
+        // la crotte suivante visant toujours le couloir où elle se trouve.
+        if (next === gullLane) next = gullLane - dir;
         gullLane = next;
         gullResolve(true);
     }
@@ -6688,6 +6732,9 @@
     /* ---- Logique : enchaînement des phases ---- */
     function bcUpdate(dt) {
         const w = canvas.width / devicePixelRatio;
+        // Voir le commentaire CSS de body.cine-blackout : actif exactement
+        // pendant que le diaphragme couvre l'écran (fermeture, noir, ouverture).
+        document.body.classList.toggle("cine-blackout", bcIris < 0.999);
         if (bcMsg) bcMsg.t += dt;
         if (gullActive) {
             gullUpdate(dt, w);
@@ -8190,7 +8237,29 @@
         document.getElementById("chk-private-account").checked = !!save.isPrivate;
         document.getElementById("settings-avatar-placeholder").textContent = save.avatarEmoji || "🎒";
         renderAvatarGrid();
+        // Le tutoriel de chaque monde ne peut être revu qu'une fois ce monde débloqué.
+        document.getElementById("settings-row-tuto-volcan").style.display = save.volcanUnlocked ? "" : "none";
+        document.getElementById("settings-row-tuto-plage").style.display = save.plageUnlocked ? "" : "none";
     }
+
+    // Boutons "Revoir" des réglages : referment la modale et rejouent le jeu
+    // de diapos demandé (voir startTutorial). Ne modifient jamais les drapeaux
+    // "déjà vu" (tutorialSeen/volcanTutorialSeen/plageTutorialSeen) : les revoir
+    // n'enlève rien au fait qu'ils ont déjà été vus une première fois.
+    document.getElementById("btn-replay-tuto-basics").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        startTutorial(TUTORIAL_SLIDES);
+    });
+    document.getElementById("btn-replay-tuto-volcan").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        // Un callback (même vide) est nécessaire ici : sans lui, closeTutorial()
+        // marquerait à tort save.tutorialSeen (le tuto de BASE) comme vu.
+        startTutorial(VOLCANO_TUTORIAL, () => {});
+    });
+    document.getElementById("btn-replay-tuto-plage").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        startTutorial(PLAGE_TUTORIAL, () => {});
+    });
 
     // Construit la grille d'icônes au choix (voir AVATAR_EMOJIS) ; celle
     // actuellement équipée reste visuellement marquée (bordure accent).
@@ -8307,8 +8376,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.0";
+    const VERSION_NUMBER = "8.0.1";
     const CHANGELOG = [
+        {
+            version: "8.0.1",
+            major: [],
+            minor: [
+                { fr: "Corrige le soleil/la lune qui restait visible par-dessus le fondu au noir de la cinématique plage (fermeture en diaphragme)", en: "Fixed the sun/moon staying visible over the beach cutscene's fade to black (iris close)" },
+                { fr: "Corrige le QTE des crottes de mouettes qui pouvait sembler bloqué : rester collé à un bord ne permettait plus d'esquiver le coup suivant. N'importe quel appui à temps esquive maintenant, et une consigne \"ESQUIVE LES CROTTES !\" s'affiche pendant le QTE", en: "Fixed the seagull-dropping QTE which could feel stuck: being pinned at an edge lane made the next dodge impossible. Any timely tap now dodges, and a \"DODGE THE DROPPINGS!\" prompt shows during the QTE" },
+                { fr: "Ajout d'un bouton pour revoir le tutoriel (Réglages) : les bases du jeu, plus ceux du Volcan et de la Plage une fois ces mondes débloqués", en: "Added a button to replay the tutorial (Settings): the game basics, plus the Volcano and Beach ones once those worlds are unlocked" },
+            ],
+        },
         {
             version: "8.0.0",
             major: [
