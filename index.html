@@ -313,6 +313,9 @@
         .btn.secondary:active { box-shadow: 0 1px 0 #2f374a, 0 3px 6px rgba(0,0,0,0.2); }
         /* padding un peu généreux pour rester confortable au doigt sur mobile */
         .btn.small { padding: 10px 18px; font-size: 14px; border-radius: 10px; }
+        /* Boutons +10/+100/+1000/Max (modale cadeau) : trop de contrôles pour
+           tenir sur une seule ligne avec .btn.small, d'où ce format compact. */
+        .btn.tiny { padding: 5px 9px; font-size: 11.5px; border-radius: 8px; box-shadow: none; }
         .menu-buttons { display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; justify-content: center; }
 
         /* Rangée des "mondes" (niveaux) en bas du menu */
@@ -749,7 +752,17 @@
         .follow-list-row { width: 100%; font: inherit; color: inherit; cursor: pointer; text-align: left; }
         .follow-avatar { font-size: 22px; flex: none; }
         /* Ligne "Offrir de l'argent" (modale ouverte depuis btn-profile-gift) :
-           réutilise .skin-list-row, avec un champ montant + bouton d'envoi. */
+           avatar + pseudo sur une ligne, puis les raccourcis de montant
+           (+10/+100/+1000/Max) + le champ + le bouton d'envoi en dessous
+           (trop de contrôles pour tenir sur une seule ligne sur mobile). */
+        .gift-row { display: flex; flex-direction: column; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 2px solid var(--panel-border); background: var(--card-bg); }
+        .gift-row-top { display: flex; align-items: center; gap: 10px; }
+        .gift-row-top .name { flex: 1; font-weight: 700; font-size: 13px; }
+        .gift-row-controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        /* Spécificité (3 classes) supérieure à ".info-box .btn" (2 classes,
+           width:100%/margin-top:18px) : sans ça les boutons +10/+100/+1000/
+           Max/💸 s'empilent en pleine largeur au lieu d'une ligne compacte. */
+        .info-box .gift-row-controls .btn { width: auto; margin-top: 0; flex: none; }
         .gift-amount-input {
             width: 64px; padding: 6px 8px; border-radius: 8px; flex: none;
             border: 2px solid var(--panel-border); background: var(--app-bg);
@@ -1140,7 +1153,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v7.0.0</div>
+                <div class="version-tag" id="version-tag">v7.0.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1696,6 +1709,7 @@
         giftModalTitle: { fr: "💸 Envoyer de l'argent", en: "💸 Send money" },
         giftNoFollowers: { fr: "Personne à qui offrir de l'argent pour l'instant (abonnés ou abonnements).", en: "Nobody to send money to yet (followers or people you follow)." },
         giftAmountPlaceholder: { fr: "Montant", en: "Amount" },
+        giftMaxBtn: { fr: "Max", en: "Max" },
         giftInvalidAmount: { fr: "Entre un montant valide.", en: "Enter a valid amount." },
         giftNotEnoughMoney: { fr: "Tu n'as pas assez d'argent.", en: "You don't have enough money." },
         giftSent: { fr: "🎁 {amount} $ envoyés !", en: "🎁 Sent {amount}$!" },
@@ -5837,17 +5851,35 @@
                 db.collection("profiles").doc(uid).get().then((doc) => ({ uid, data: doc.exists ? doc.data() : {} }))
             )).then((rows) => {
                 document.getElementById("profile-detail-body").innerHTML = '<div class="skin-list">' + rows.map((r) =>
-                    '<div class="skin-list-row" data-uid="' + escapeHtml(r.uid) + '">' +
-                        '<span class="follow-avatar">' + (safeAvatarEmoji(r.data.avatarEmoji) || "🎒") + '</span>' +
-                        '<span class="name">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
-                        '<input type="number" class="gift-amount-input" min="1" step="1" placeholder="' + escapeHtml(tr("giftAmountPlaceholder")) + '">' +
-                        '<button type="button" class="btn small gift-send-btn">💸</button>' +
+                    '<div class="gift-row" data-uid="' + escapeHtml(r.uid) + '">' +
+                        '<div class="gift-row-top">' +
+                            '<span class="follow-avatar">' + (safeAvatarEmoji(r.data.avatarEmoji) || "🎒") + '</span>' +
+                            '<span class="name">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
+                        '</div>' +
+                        '<div class="gift-row-controls">' +
+                            '<button type="button" class="btn tiny secondary gift-quick-btn" data-add="10">+10</button>' +
+                            '<button type="button" class="btn tiny secondary gift-quick-btn" data-add="100">+100</button>' +
+                            '<button type="button" class="btn tiny secondary gift-quick-btn" data-add="1000">+1000</button>' +
+                            '<button type="button" class="btn tiny secondary gift-quick-btn" data-max="1">' + tr("giftMaxBtn") + '</button>' +
+                            '<input type="number" class="gift-amount-input" min="1" step="1" placeholder="' + escapeHtml(tr("giftAmountPlaceholder")) + '">' +
+                            '<button type="button" class="btn small gift-send-btn">💸</button>' +
+                        '</div>' +
                     '</div>'
                 ).join("") + '</div>';
-                document.querySelectorAll("#profile-detail-body .skin-list-row").forEach((row) => {
+                document.querySelectorAll("#profile-detail-body .gift-row").forEach((row) => {
                     const targetUid = row.getAttribute("data-uid");
                     const input = row.querySelector(".gift-amount-input");
                     const btn = row.querySelector(".gift-send-btn");
+                    row.querySelectorAll(".gift-quick-btn").forEach((quickBtn) => {
+                        quickBtn.addEventListener("click", () => {
+                            if (quickBtn.hasAttribute("data-max")) {
+                                input.value = Math.max(0, Math.floor(save.money));
+                            } else {
+                                const current = Math.max(0, Math.floor(Number(input.value)) || 0);
+                                input.value = Math.min(save.money, current + Number(quickBtn.getAttribute("data-add")));
+                            }
+                        });
+                    });
                     btn.addEventListener("click", () => sendGift(targetUid, input, btn));
                 });
             });
@@ -6323,8 +6355,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "7.0.0";
+    const VERSION_NUMBER = "7.0.1";
     const CHANGELOG = [
+        {
+            version: "7.0.1",
+            major: [],
+            minor: [
+                { fr: "Modale \"Offrir de l'argent\" : boutons +10/+100/+1000/Max pour ne plus avoir à retenir/taper le montant à la main", en: "\"Send money\" popup: +10/+100/+1000/Max buttons so you don't have to remember/type the amount by hand" },
+            ],
+        },
         {
             version: "7.0.0",
             major: [
