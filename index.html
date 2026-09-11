@@ -1114,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.1.1</div>
+                <div class="version-tag" id="version-tag">v6.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1522,6 +1522,10 @@
         challengePerfectDesc: { fr: "Réussis {target} lancer(s) parfait(s)", en: "Land {target} perfect throw(s)" },
         challengeVolcanDesc: { fr: "Lance {target} fois dans le monde Volcan", en: "Throw {target} times in the Volcano world" },
         challengeSkidDesc: { fr: "Déclenche {target} dérapage(s)", en: "Trigger {target} skid(s)" },
+        challengeDistanceCumulDesc: { fr: "Cumule {target} m de distance aujourd'hui", en: "Rack up {target} m of distance today" },
+        challengeGiftDesc: { fr: "Envoie {target} $ en cadeaux aujourd'hui", en: "Send {target}$ in gifts today" },
+        challengeQteDesc: { fr: "Réussis {target} QTE parfait(s) dans l'espace aujourd'hui", en: "Land {target} perfect zero-G QTE(s) today" },
+        challengeSpendDesc: { fr: "Dépense {target} $ en boutique aujourd'hui", en: "Spend {target}$ in the shop today" },
         achvUnlockedPrefix: { fr: "🏆 Succès débloqué : ", en: "🏆 Achievement unlocked: " },
         achvFirstThrowName: { fr: "Premier envol", en: "First launch" },
         achvFirstThrowDesc: { fr: "Fais un premier lancer.", en: "Make a first throw." },
@@ -1827,6 +1831,22 @@
         {
             kind: "perfect", emoji: "✨", descKey: "challengePerfectDesc",
             tiers: [{ target: 1, reward: 150 }, { target: 2, reward: 300 }, { target: 3, reward: 450 }],
+        },
+        {
+            kind: "distanceCumul", emoji: "🛣️", descKey: "challengeDistanceCumulDesc",
+            tiers: [{ target: 500, reward: 150 }, { target: 1200, reward: 300 }, { target: 2500, reward: 500 }],
+        },
+        {
+            kind: "gift", emoji: "🎁", descKey: "challengeGiftDesc",
+            tiers: [{ target: 100, reward: 150 }, { target: 500, reward: 350 }, { target: 1500, reward: 600 }],
+        },
+        {
+            kind: "qte", emoji: "🎯", descKey: "challengeQteDesc",
+            tiers: [{ target: 1, reward: 200 }, { target: 2, reward: 400 }, { target: 3, reward: 600 }],
+        },
+        {
+            kind: "spend", emoji: "🛍️", descKey: "challengeSpendDesc",
+            tiers: [{ target: 300, reward: 150 }, { target: 1000, reward: 350 }, { target: 3000, reward: 600 }],
         },
         {
             kind: "volcan", emoji: "🌋", descKey: "challengeVolcanDesc", requiresVolcan: true,
@@ -2463,10 +2483,12 @@
         list.innerHTML = save.dailyChallenges.map((c, i) => {
             const def = CHALLENGE_POOL.find((p) => p.kind === c.kind);
             const shownRaw = Math.min(c.progress, c.target);
-            const shown = c.kind === "distance" ? shownRaw.toFixed(1) : Math.round(shownRaw);
+            const isDistanceKind = c.kind === "distance" || c.kind === "distanceCumul";
+            const isMoneyKind = c.kind === "earn" || c.kind === "gift" || c.kind === "spend";
+            const shown = isDistanceKind ? shownRaw.toFixed(1) : Math.round(shownRaw);
             const pct = Math.min(100, Math.round((c.progress / c.target) * 100));
             const done = c.progress >= c.target;
-            const unit = c.kind === "distance" ? " m" : c.kind === "earn" ? " $" : "";
+            const unit = isDistanceKind ? " m" : isMoneyKind ? " $" : "";
             const desc = tr(def.descKey).replace("{target}", c.target);
             let action;
             if (c.claimed) {
@@ -2533,6 +2555,7 @@
                     if (save.money >= cost) {
                         save.money -= cost;
                         save.puissanceLevel++;
+                        bumpDailyChallenge("spend", cost, "add");
                         persist();
                         sfxBuy();
                         showToast("✅ " + tr("upgradePuissanceName") + " (" + tr("levelShort") + save.puissanceLevel + ")");
@@ -2552,6 +2575,7 @@
                     if (save.money >= cost) {
                         save.money -= cost;
                         save.vitesseLevel++;
+                        bumpDailyChallenge("spend", cost, "add");
                         persist();
                         sfxBuy();
                         showToast("✅ " + tr("upgradeVitesseName") + " (" + tr("levelShort") + save.vitesseLevel + ")");
@@ -2615,6 +2639,7 @@
                 if (save.money >= cost) {
                     save.money -= cost;
                     save.durability = maxDurability();
+                    bumpDailyChallenge("spend", cost, "add");
                     persist();
                     sfxBuy();
                     showToast(tr("repairDone"));
@@ -2626,6 +2651,7 @@
                     const pointsBought = Math.floor(save.money / 50);
                     save.durability = Math.min(maxDurability(), save.durability + pointsBought);
                     save.money -= pointsBought * 50;
+                    bumpDailyChallenge("spend", pointsBought * 50, "add");
                     persist();
                     sfxBuy();
                     showToast(tr("repairPartialDone"));
@@ -2718,6 +2744,7 @@
                     save.money -= skin.cost;
                     save.ownedSkins.push(skin.id);
                     equipSkin(skin.id);
+                    bumpDailyChallenge("spend", skin.cost, "add");
                     persist();
                     sfxBuy();
                     showToast("✅ " + skin.name + " achetée !");
@@ -2773,6 +2800,7 @@
                     save.money -= trail.cost;
                     save.ownedTrails.push(trail.id);
                     save.equippedTrail = trail.id;
+                    bumpDailyChallenge("spend", trail.cost, "add");
                     persist();
                     sfxBuy();
                     showToast("✅ " + trail.name + " achetée !");
@@ -3089,6 +3117,7 @@
         if (hits === currentQteRingCount()) {
             sfxRecord(); // combo parfait
             save.hasPerfectQte = true;
+            bumpDailyChallenge("qte", 1, "add");
         }
         state = "flying";
     }
@@ -3204,6 +3233,7 @@
         // "skid" seulement au monde Volcan hors apesanteur, comme le dérapage.
         bumpDailyChallenge("throws", 1, "add");
         bumpDailyChallenge("distance", distanceMeters, "max");
+        bumpDailyChallenge("distanceCumul", distanceMeters, "add");
         bumpDailyChallenge("earn", totalGainedThisThrow, "add");
         if (isPerfect) bumpDailyChallenge("perfect", 1, "add");
         if (didSkid) bumpDailyChallenge("skid", 1, "add");
@@ -5526,6 +5556,7 @@
             // Compté seulement une fois le cadeau confirmé (pas à la déduction
             // optimiste plus haut) : voir l'achievement "totalMoneyGifted".
             save.totalMoneyGifted += amount;
+            bumpDailyChallenge("gift", amount, "add");
             persist();
             showToast(tr("giftSent").replace("{amount}", amount));
             inputEl.value = "";
@@ -5819,8 +5850,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.1.1";
+    const VERSION_NUMBER = "6.2.0";
     const CHANGELOG = [
+        {
+            version: "6.2.0",
+            major: [],
+            minor: [
+                { fr: "4 nouveaux types de défis quotidiens (🛣️ distance cumulée, 🎁 cadeaux envoyés, 🎯 QTE parfait dans l'espace, 🛍️ dépenses en boutique) pour que les 3 défis du jour soient moins souvent les mêmes", en: "4 new daily challenge types (🛣️ cumulative distance, 🎁 gifts sent, 🎯 perfect zero-G QTE, 🛍️ shop spending) so the day's 3 challenges repeat less often" },
+            ],
+        },
         {
             version: "6.1.1",
             major: [],
