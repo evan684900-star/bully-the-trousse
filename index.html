@@ -1114,7 +1114,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v6.3.1</div>
+                <div class="version-tag" id="version-tag">v6.4.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2951,6 +2951,7 @@
         qteResults = [];
         craterWorldX = null;
         trailPoints = [];
+        trailSparks = [];
         didSkid = false;
         basketBounceCount = 0;
         document.getElementById("result-skid").style.display = "none";
@@ -3633,41 +3634,182 @@
         return { sx: x - cameraX, sy: groundScreenY - y };
     }
 
-    // Dessine la traînée comme une cape rectangulaire qui suit la trousse :
-    // un ruban à largeur constante reliant les positions récentes
-    // (trailPoints) segment par segment (chacun un petit rectangle), qui
-    // s'estompe avec l'âge au lieu de rétrécir en pointe (sinon on obtient un
-    // effet "comète conique", pas une cape).
-    const CAPE_HALF_WIDTH = 8;   // demi-largeur du ruban (px), largeur constante sur toute sa longueur
-    const CAPE_MAX_AGE_MS = 260; // même durée de vie qu'avant (trailPoints filtré pareil)
+    /* ---- Traînée : sillage vivant (ruban qui se dissipe + étincelles) ----
+       Trois idées derrière le rendu :
+         1. le ruban est ré-échantillonné à pas constant (emitTrail) pour rester
+            lisse même quand une frame couvre 50 px de vol ;
+         2. chaque point continue de vivre après avoir été lâché (updateTrail) :
+            il dérive, s'écarte et le ruban s'épaissit en pâlissant, comme une
+            vraie fumée qui se délite au lieu d'un rectangle figé ;
+         3. le ruban est peint en trois passes (halo large / corps / cœur
+            additif) et complété par des étincelles propres à chaque traînée
+            (braises et fumée pour le feu, cristaux pour la glace, etc.). */
+    const TRAIL_LIFE = 620;      // durée de vie d'un point de ruban (ms)
+    const TRAIL_HEAD_W = 13;     // largeur de référence du ruban près de la trousse (px)
+    const TRAIL_STEP = 8;        // pas de ré-échantillonnage (px monde)
+    const TRAIL_MAX_POINTS = 140;
+    let trailSparks = [];        // braises / cristaux / paillettes / fumée
+
+    // Réglages par traînée : dérive du ruban et nature des étincelles
+    const TRAIL_FX = {
+        blanche:   { rise: 16, spread: 16, sparkRate: 9,  spark: { rgb: "255,255,255", g: -6,  up: 22, r: 3.5, life: 0.7, alpha: 0.30, smoke: true } },
+        doree:     { rise: 10, spread: 12, sparkRate: 26, spark: { rgb: "255,214,90",  g: 70,  up: 34, r: 1.8, life: 0.6, alpha: 0.95, twinkle: true } },
+        glacee:    { rise: -4, spread: 18, sparkRate: 24, spark: { rgb: "196,236,255", g: 34,  up: 18, r: 1.7, life: 0.8, alpha: 0.9,  twinkle: true } },
+        feu:       { rise: 42, spread: 20, sparkRate: 40, spark: { rgb: "255,150,50",  g: -70, up: 48, r: 2.2, life: 0.55, alpha: 1, ember: true } },
+        arcenciel: { rise: 14, spread: 16, sparkRate: 28, spark: { rgb: "rainbow",     g: 20,  up: 30, r: 2.0, life: 0.7, alpha: 0.95, twinkle: true } },
+    };
+    function trailFx(trail) { return TRAIL_FX[trail.id] || TRAIL_FX.blanche; }
+
+    // Mélange une couleur "r,g,b" vers le blanc (k = 0 → couleur, 1 → blanc)
+    function mixWhite(rgb, k) {
+        if (!k) return rgb;
+        const c = rgb.split(",").map(Number);
+        return c.map(v => Math.round(v + (255 - v) * k)).join(",");
+    }
+
+    function newTrailPoint(x, y, t, fx) {
+        return {
+            x: x, y: y, t: t,
+            vx: (Math.random() - 0.5) * fx.spread,
+            vy: fx.rise * (0.6 + Math.random() * 0.8),
+        };
+    }
+
+    // Appelée à chaque frame de vol : sème des points le long du trajet réel
+    // (et pas un seul par frame) puis quelques étincelles selon la vitesse.
+    function emitTrail(x, y, vxNow, vyNow, now, dt) {
+        const fx = trailFx(getTrail(save.equippedTrail));
+        const last = trailPoints[trailPoints.length - 1];
+        if (!last) {
+            trailPoints.push(newTrailPoint(x, y, now, fx));
+        } else {
+            const d = Math.hypot(x - last.x, y - last.y);
+            const n = Math.min(10, Math.floor(d / TRAIL_STEP));
+            for (let i = 1; i <= n; i++) {
+                const k = i / n;
+                trailPoints.push(newTrailPoint(
+                    last.x + (x - last.x) * k,
+                    last.y + (y - last.y) * k,
+                    now - (1 - k) * dt * 1000, fx));
+            }
+        }
+        trailPoints = trailPoints.filter(p => now - p.t < TRAIL_LIFE);
+        if (trailPoints.length > TRAIL_MAX_POINTS) trailPoints.splice(0, trailPoints.length - TRAIL_MAX_POINTS);
+
+        const speed = Math.hypot(vxNow, vyNow);
+        const amount = dt * fx.sparkRate * (0.35 + Math.min(1, speed / 700));
+        let count = Math.floor(amount);
+        if (Math.random() < amount - count) count++;
+        for (let i = 0; i < count; i++) {
+            const s = fx.spark;
+            const ang = Math.random() * Math.PI * 2;
+            const speedOut = Math.random() * s.up;
+            trailSparks.push({
+                x: x + (Math.random() - 0.5) * 22,
+                y: y + (Math.random() - 0.5) * 22,
+                vx: Math.cos(ang) * speedOut - vxNow * 0.06,
+                vy: Math.sin(ang) * speedOut + (s.ember ? 20 : 0),
+                g: s.g,
+                r: s.r * (0.6 + Math.random() * 0.9),
+                life: s.life * (0.6 + Math.random() * 0.7),
+                max: s.life,
+                alpha: s.alpha,
+                rgb: s.rgb === "rainbow" ? rainbowRgb(now + Math.random() * 900) : s.rgb,
+                ember: !!s.ember,
+                smoke: !!s.smoke,
+                twinkle: !!s.twinkle,
+                phase: Math.random() * 6.283,
+            });
+        }
+        // Le feu fume : quelques bouffées sombres, lentes, qui gonflent
+        if (fx.spark.ember && Math.random() < dt * 14) {
+            trailSparks.push({
+                x: x + (Math.random() - 0.5) * 18, y: y + (Math.random() - 0.5) * 18,
+                vx: (Math.random() - 0.5) * 18 - vxNow * 0.05, vy: 18 + Math.random() * 22,
+                g: -6, r: 6 + Math.random() * 6, life: 1.1, max: 1.1,
+                alpha: 0.22, rgb: "96,84,78", smoke: true, phase: 0,
+            });
+        }
+        if (trailSparks.length > 260) trailSparks.splice(0, trailSparks.length - 260);
+    }
+
+    // Le sillage continue de vivre après avoir été lâché : c'est ce qui le
+    // fait respirer au lieu de rester collé à la trajectoire.
+    function updateTrail(dt) {
+        for (const p of trailPoints) {
+            p.x += p.vx * dt;
+            p.y += p.vy * dt;
+            p.vx *= 1 - Math.min(1, 1.4 * dt);
+        }
+        if (!trailSparks.length) return;
+        for (const s of trailSparks) {
+            s.x += s.vx * dt;
+            s.y += s.vy * dt;
+            s.vy -= s.g * dt;
+            s.vx *= 1 - Math.min(1, 1.1 * dt);
+            if (s.smoke) s.r += 14 * dt;
+            s.life -= dt;
+        }
+        trailSparks = trailSparks.filter(s => s.life > 0);
+    }
+
     function drawTrail() {
-        if (trailPoints.length < 2) return;
         const trail = getTrail(save.equippedTrail);
         const now = performance.now();
-        for (let i = 0; i < trailPoints.length - 1; i++) {
-            const p0 = trailPoints[i];
-            const p1 = trailPoints[i + 1];
-            const age0 = (now - p0.t) / CAPE_MAX_AGE_MS;
-            const age1 = (now - p1.t) / CAPE_MAX_AGE_MS;
-            if (age0 >= 1 && age1 >= 1) continue;
-            const s0 = worldToScreen(p0.x, p0.y);
-            const s1 = worldToScreen(p1.x, p1.y);
-            const dx = s1.sx - s0.sx, dy = s1.sy - s0.sy;
-            const len = Math.hypot(dx, dy) || 1;
-            // Perpendiculaire unitaire au segment = direction de la largeur du ruban
-            const nx = -dy / len, ny = dx / len;
-            const alpha = 0.65 * Math.max(0, 1 - (age0 + age1) / 2);
-            if (alpha <= 0) continue;
-            const rgb = trail.rgb === "rainbow" ? rainbowRgb((p0.t + p1.t) / 2) : trail.rgb;
-            ctx.fillStyle = "rgba(" + rgb + "," + alpha + ")";
-            ctx.beginPath();
-            ctx.moveTo(s0.sx + nx * CAPE_HALF_WIDTH, s0.sy + ny * CAPE_HALF_WIDTH);
-            ctx.lineTo(s1.sx + nx * CAPE_HALF_WIDTH, s1.sy + ny * CAPE_HALF_WIDTH);
-            ctx.lineTo(s1.sx - nx * CAPE_HALF_WIDTH, s1.sy - ny * CAPE_HALF_WIDTH);
-            ctx.lineTo(s0.sx - nx * CAPE_HALF_WIDTH, s0.sy - ny * CAPE_HALF_WIDTH);
-            ctx.closePath();
-            ctx.fill();
+        ctx.save();
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+
+        if (trailPoints.length >= 2) {
+            const pts = trailPoints.map(p => {
+                const s = worldToScreen(p.x, p.y);
+                return { sx: s.sx, sy: s.sy, a: Math.max(0, 1 - (now - p.t) / TRAIL_LIFE), t: p.t };
+            });
+            // halo diffus → corps → cœur lumineux (additif) : le dégradé de
+            // largeur + le blanchiment du cœur donnent la sensation de chaleur
+            const layers = [
+                { comp: "source-over", w: 2.7, a: 0.11, white: 0 },
+                { comp: "source-over", w: 1.35, a: 0.30, white: 0.12 },
+                { comp: "lighter", w: 0.45, a: 0.55, white: 0.6 },
+            ];
+            for (const L of layers) {
+                ctx.globalCompositeOperation = L.comp;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const p0 = pts[i], p1 = pts[i + 1];
+                    const fade = (p0.a + p1.a) / 2;
+                    if (fade <= 0.01) continue;
+                    const head = (i + 1) / (pts.length - 1); // 0 = queue, 1 = trousse
+                    const life = Math.pow(fade, 1.3);
+                    const grow = 1 + (1 - fade) * 1.2;       // s'épaissit en se dissipant
+                    const rgb = trail.rgb === "rainbow" ? rainbowRgb((p0.t + p1.t) / 2) : trail.rgb;
+                    ctx.strokeStyle = "rgba(" + mixWhite(rgb, L.white) + "," + (L.a * life * (0.3 + 0.7 * head)).toFixed(3) + ")";
+                    ctx.lineWidth = Math.max(0.7, TRAIL_HEAD_W * (0.28 + 0.72 * head) * grow * L.w);
+                    ctx.beginPath();
+                    ctx.moveTo(p0.sx, p0.sy);
+                    ctx.lineTo(p1.sx, p1.sy);
+                    ctx.stroke();
+                }
+            }
         }
+
+        // Fumée d'abord (opaque, derrière), puis étincelles en additif
+        for (const pass of ["smoke", "spark"]) {
+            ctx.globalCompositeOperation = pass === "smoke" ? "source-over" : "lighter";
+            for (const s of trailSparks) {
+                if (!!s.smoke !== (pass === "smoke")) continue;
+                const k = Math.max(0, s.life / s.max);
+                let a = s.alpha * (s.smoke ? k * k : k);
+                if (s.twinkle) a *= 0.45 + 0.55 * Math.abs(Math.sin(now / 90 + s.phase));
+                if (a <= 0.01) continue;
+                const p = worldToScreen(s.x, s.y);
+                const rgb = s.ember ? mixWhite(s.rgb, k * 0.5) : s.rgb;
+                ctx.fillStyle = "rgba(" + rgb + "," + a.toFixed(3) + ")";
+                ctx.beginPath();
+                ctx.arc(p.sx, p.sy, Math.max(0.5, s.r * (s.smoke ? 1 : 0.4 + 0.6 * k)), 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        ctx.restore();
     }
 
     // Petite variante "r,g,b" de rainbowOrFilter, pour la traînée arc-en-ciel
@@ -3924,8 +4066,7 @@
 
             // échantillonne la position pour la traînée (voir drawTrail), en
             // gardant seulement les points assez récents pour rester visibles
-            trailPoints.push({ x: worldX, y: worldY, t: now });
-            trailPoints = trailPoints.filter(p => now - p.t < 260);
+            emitTrail(worldX, worldY, vx, vy, now, dt);
 
             if (spaceEggTriggered && vy <= 0) {
                 // on vient d'atteindre l'apogée avec la combinaison easter egg :
@@ -4014,6 +4155,7 @@
         }
         updateDust(dt);
         drawDust(ctx);
+        updateTrail(dt);
         drawTrail();
         drawTrousse();
         if (state === "space_transition") {
@@ -5868,8 +6010,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "6.3.1";
+    const VERSION_NUMBER = "6.4.0";
     const CHANGELOG = [
+        {
+            version: "6.4.0",
+            major: [],
+            minor: [
+                { fr: "Traînées refaites en sillage vivant : le ruban se dissipe et s'épaissit en s'estompant au lieu de rester figé, avec des étincelles propres à chaque traînée (braises et fumée pour le feu, cristaux pour la glacée, paillettes pour la dorée...)", en: "Trails reworked into a living wake: the ribbon dissipates and thickens as it fades instead of staying rigid, with sparks unique to each trail (embers and smoke for fire, crystals for icy, glitter for golden...)" },
+            ],
+        },
         {
             version: "6.3.1",
             major: [],
