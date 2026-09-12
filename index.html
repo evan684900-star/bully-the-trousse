@@ -89,6 +89,11 @@
         html[data-world="volcans"] #screen-menu {
             background: linear-gradient(180deg, #5c1b18, #b0451f 55%, #6b2a1e 60%, #3d1310 100%);
         }
+        /* Monde Plage sélectionné : ciel clair, mer à l'horizon et sable jaune,
+           cohérent avec le décor du jeu (voir drawBeachBackground) */
+        html[data-world="plage"] #screen-menu {
+            background: linear-gradient(180deg, #56c8ec, #a8e6f7 45%, #2f9fd0 58%, #e8cd7a 60%, #c9a24f 100%);
+        }
 
         /* ---------- ANIMATION SOLEIL / LUNE (mode nuit) ----------
            Même bloc de markup dupliqué dans le menu et l'écran de jeu : la
@@ -169,6 +174,14 @@
             opacity: 0.4;
             background: radial-gradient(circle at 35% 35%, #ff8f6b, #c1401f 60%, #7a2210 100%);
             box-shadow: 0 0 24px 8px rgba(200,60,20,0.35);
+        }
+        /* Monde Plage : grand soleil d'été bien blanc, lune pâle sur la mer */
+        html[data-world="plage"][data-theme="light"] .sky-anim .sun {
+            background: radial-gradient(circle at 35% 35%, #ffffff, #fff1a8 55%, #ffc94d 100%);
+            box-shadow: 0 0 56px 18px rgba(255,225,120,0.6);
+        }
+        html[data-world="plage"] .sky-anim .moon {
+            background: radial-gradient(circle at 35% 35%, #ffffff, #eaf6ff 60%, #b6d4e8 100%);
         }
 
         /* Sur petit écran (mobile), on réduit, on colle au coin et on allège
@@ -675,13 +688,6 @@
         .leaderboard-row .dist { color: var(--money); font-weight: 800; }
         .leaderboard-row.you { border-color: var(--accent); }
         .leaderboard-row.clickable { cursor: pointer; }
-        /* Ma propre ligne rappelée en bas quand je ne suis pas dans le top 15
-           (voir loadLeaderboard) : détachée du reste par un trait pointillé pour
-           qu'on voie bien qu'il y a un "trou" de classement entre les deux. */
-        .leaderboard-row.outside-top {
-            margin-top: 14px;
-            border-top-style: dashed;
-        }
 
         /* ---------- ÉCRAN PROFIL ---------- */
         #screen-profile { background: var(--shop-bg); flex-direction: column; }
@@ -1028,10 +1034,19 @@
         /* ---------- CINÉMATIQUE DU MONDE VOLCAN ---------- */
         /* La cinématique réutilise le canvas et les décors du jeu : on masque
            simplement le HUD (body.cine-mode) et on superpose #cine-ui. */
-        .screen.cine-fading { z-index: 5; opacity: 1; transition: opacity 2.2s ease; }
+        /* pointer-events: none dès le début du fondu (pas seulement une fois
+           invisible) : sans ça, le menu reste cliquable pendant toute sa durée
+           (2,2 s / 4 s) puisque seule son opacité change — un clic pendant ce
+           délai retombait sur un bouton du menu dessous (ex: la carte
+           "Volcans", qui démarrait ALORS l'autre cinématique par-dessus). */
+        .screen.cine-fading { z-index: 5; opacity: 1; transition: opacity 2.2s ease; pointer-events: none; }
         .screen.cine-fading.cine-gone { opacity: 0; }
         body.cine-mode .hud-top,
         body.cine-mode .hint-text,
+        /* Masque le soleil/la lune (calque CSS, au-dessus du canvas) pendant
+           le fondu en diaphragme de la cinématique plage : ce fondu est peint
+           DANS le canvas, donc ce calque resterait visible par-dessus sinon. */
+        body.cine-blackout .sky-anim { display: none !important; }
         body.cine-mode #meter-wrap,
         body.cine-mode #btn-game-back,
         body.cine-mode .corner-icons-right,
@@ -1121,6 +1136,62 @@
         /* Voile noir de l'échec (3 secondes) */
         #cine-fade { position: absolute; inset: 0; background: #000; opacity: 0; }
 
+        /* ---------- CINÉMATIQUE DU MONDE PLAGE ---------- */
+        /* Le fondu de sortie du menu dure 4 s ici (2,2 s pour le volcan) */
+        .screen.cine-fading.slow { transition-duration: 4s; }
+        /* La barre de précision réapparaît pendant la phase "VISE !!!", alors
+           que body.cine-mode la masque partout ailleurs. */
+        body.cine-mode.cine-aim #meter-wrap { display: block !important; }
+        #bcine-aim {
+            position: absolute;
+            left: 50%;
+            bottom: calc(112px + env(safe-area-inset-bottom));
+            transform: translateX(-50%);
+            font-size: clamp(24px, 6vw, 40px);
+            font-weight: 900;
+            color: #ff3b30;
+            text-shadow: 0 3px 10px rgba(0,0,0,0.8);
+            letter-spacing: 2px;
+            display: none;
+            animation: qtePulse 0.3s ease-in-out infinite alternate;
+        }
+        #bcine-aim.show { display: block; }
+        /* Pause "tutoriel" : le jeu se fige et un texte attend un appui */
+        #bcine-dialog {
+            position: absolute;
+            inset: 0;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.55);
+            pointer-events: auto;
+            padding: 24px;
+        }
+        #bcine-dialog.show { display: flex; }
+        #bcine-dialog .box {
+            background: var(--panel-bg);
+            border: 2px solid var(--panel-border);
+            border-radius: 18px;
+            padding: 22px 24px;
+            max-width: 420px;
+            width: 88vw;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        #bcine-dialog .box p {
+            margin: 0;
+            font-size: clamp(14px, 3.6vw, 17px);
+            font-weight: 700;
+            line-height: 1.5;
+            color: var(--text);
+        }
+        #bcine-dialog .box .sub {
+            margin-top: 14px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dim);
+        }
+
         /* ---------- FENÊTRES D'INFO (récap trousse / aide) ---------- */
         .info-box {
             position: relative;
@@ -1184,7 +1255,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v8.0.0</div>
+                <div class="version-tag" id="version-tag">v9.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1247,6 +1318,8 @@
             <div id="result-coin" style="display:none; color:var(--accent); font-size:13px; font-weight:800; max-width:280px; margin:6px auto 0;"></div>
             <!-- Message rouge affiché uniquement après un dérapage (monde Volcan) -->
             <div id="result-skid" style="display:none; color:#ff6b6b; font-size:12.5px; font-weight:700; line-height:1.45; max-width:280px; margin:8px auto 0;"></div>
+            <!-- Évènements du monde Plage (parasol, serviette, château) -->
+            <div id="result-beach" style="display:none; color:#6bffb0; font-size:12.5px; font-weight:700; line-height:1.45; max-width:280px; margin:8px auto 0;"></div>
             <div class="buttons">
                 <button class="btn" id="btn-throw-again" data-i18n="btnThrowAgain">🔁 Relancer</button>
                 <button class="btn secondary" id="btn-result-shop" data-i18n="btnShop">🛒 Boutique</button>
@@ -1273,6 +1346,14 @@
                 <div class="count"><span id="cine-clickqte-count">0</span> / 10</div>
             </div>
             <div id="cine-fade"></div>
+            <!-- Cinématique de la plage : consigne de visée et pauses "tutoriel" -->
+            <div id="bcine-aim" data-i18n="bcineAim">VISE !!!</div>
+            <div id="bcine-dialog">
+                <div class="box">
+                    <p id="bcine-dialog-text"></p>
+                    <div class="sub" id="bcine-dialog-sub" data-i18n="bcineContinue">appuyer n'importe où pour continuer</div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -1349,7 +1430,18 @@
         </div>
     </div>
 
-    <!-- Proposé quand on reclique sur "Volcans" une fois déjà débloqué -->
+    <!-- Proposé quand on reclique sur "Plage" une fois le monde débloqué -->
+    <div class="modal-overlay" id="plage-replay-modal">
+        <div class="info-box">
+            <h2 data-i18n="plageReplayTitle">🏖️ Reprendre le bus ?</h2>
+            <p data-i18n="plageReplayText">Tu peux revivre la cinématique du voyage, ou repartir directement à la Plage.</p>
+            <div class="replay-buttons">
+                <button class="btn" id="btn-plage-replay-yes" data-i18n="plageReplayYes">🔁 Refaire</button>
+                <button class="btn secondary" id="btn-plage-replay-no" data-i18n="plageReplayNo">🏖️ Juste y aller</button>
+            </div>
+        </div>
+    </div>
+
     <div class="modal-overlay" id="volcan-replay-modal">
         <div class="info-box">
             <h2 data-i18n="volcanReplayTitle">🌋 Refaire la cinématique ?</h2>
@@ -1474,6 +1566,21 @@
             <div class="settings-row">
                 <span data-i18n="settingsLangLabel">Langue</span>
                 <button class="btn small secondary" id="btn-lang-toggle">FR</button>
+            </div>
+
+            <h3 class="settings-section-title" data-i18n="settingsTutoTitle">📖 Revoir le tutoriel</h3>
+            <div class="settings-row">
+                <span data-i18n="settingsTutoBasics">Bases du jeu</span>
+                <button class="btn small secondary" id="btn-replay-tuto-basics" data-i18n="settingsTutoReplay">🔁 Revoir</button>
+            </div>
+            <!-- Affichés seulement si le monde correspondant est débloqué (voir refreshSettingsModal) -->
+            <div class="settings-row" id="settings-row-tuto-volcan" style="display:none;">
+                <span data-i18n="settingsTutoVolcan">Monde Volcans</span>
+                <button class="btn small secondary" id="btn-replay-tuto-volcan" data-i18n="settingsTutoReplay">🔁 Revoir</button>
+            </div>
+            <div class="settings-row" id="settings-row-tuto-plage" style="display:none;">
+                <span data-i18n="settingsTutoPlage">Monde Plage</span>
+                <button class="btn small secondary" id="btn-replay-tuto-plage" data-i18n="settingsTutoReplay">🔁 Revoir</button>
             </div>
 
             <h3 class="settings-section-title" data-i18n="settingsAccountTitle">👤 Paramètres du compte</h3>
@@ -1615,6 +1722,87 @@
         volcanReplayText: { fr: "Tu peux revivre la cinématique de déblocage, ou aller directement au monde Volcans.", en: "You can relive the unlock cutscene, or go straight to the Volcans world." },
         volcanReplayYes: { fr: "🔁 Refaire", en: "🔁 Replay" },
         volcanReplayNo: { fr: "🌋 Juste y aller", en: "🌋 Just go there" },
+        // --- Monde Plage : boutique, cinématique, évènements, santé mentale ---
+        claquettesName: { fr: "Trousse à Claquettes", en: "Flip-Flop Pencil Case" },
+        claquettesDesc: {
+            fr: "Aucun bonus de stats : elle sert juste de ticket d'entrée. L'acheter débloque l'accès au monde Plage depuis le menu.",
+            en: "No stat bonus: it's just the entry ticket. Buying it unlocks access to the Beach world from the menu."
+        },
+        claquettesOwned: { fr: "Achetée", en: "Owned" },
+        claquettesBought: { fr: "🩴 Trousse à Claquettes achetée ! Le monde Plage t'attend.", en: "🩴 Flip-Flop Pencil Case bought! The Beach world awaits." },
+        plageNeedsClaquettes: { fr: "🩴 Achète la Trousse à Claquettes en boutique (100 000 $) pour aller à la Plage !", en: "🩴 Buy the Flip-Flop Pencil Case in the shop ($100,000) to reach the Beach!" },
+        busTicketName: { fr: "Billet de bus (retour)", en: "Bus ticket (return)" },
+        busTicketDesc: {
+            fr: "Le bus du retour vers le monde normal. Tu retrouveras ta progression d'avant la plage exactement là où tu l'avais laissée (et ta progression plage t'attendra si tu reviens).",
+            en: "The bus back to the normal world. You'll find your pre-beach progress exactly where you left it (and your beach progress will wait for you if you come back)."
+        },
+        busTicketBought: { fr: "🚌 Bus pris ! Te revoilà dans le monde normal.", en: "🚌 Bus taken! You're back in the normal world." },
+        busTicketFreeDesc: {
+            fr: "Tu as déjà payé ce trajet une fois : le retour vers le monde normal est maintenant gratuit, à chaque fois que tu reviens sur la plage.",
+            en: "You've already paid for this trip once: the ride back to the normal world is now free, every time you come back to the beach."
+        },
+        busTicketFreeBtn: { fr: "🚌 Reprendre (gratuit)", en: "🚌 Take it (free)" },
+        stuckOnBeach: { fr: "🚌 Pas assez d'argent pour le bus ! Il te faut un billet à 250 000 $ en boutique.", en: "🚌 Not enough money for the bus! You need a $250,000 ticket from the shop." },
+        plageReplayTitle: { fr: "🏖️ Reprendre le bus ?", en: "🏖️ Take the bus again?" },
+        plageReplayText: { fr: "Tu peux revivre la cinématique du voyage, ou repartir directement à la Plage.", en: "You can relive the trip cutscene, or head straight back to the Beach." },
+        plageReplayYes: { fr: "🔁 Refaire", en: "🔁 Replay" },
+        plageReplayNo: { fr: "🏖️ Juste y aller", en: "🏖️ Just go there" },
+        bcineAim: { fr: "VISE !!!", en: "AIM !!!" },
+        bcineContinue: { fr: "appuyer n'importe où pour continuer", en: "press anywhere to continue" },
+        bcineNotGreen: { fr: "Pas dans la zone verte !", en: "Not in the green zone!" },
+        bcineForgot: {
+            fr: "Par contre... vous avez oublié votre argent !",
+            en: "But... you forgot your money!"
+        },
+        bcineCheh: { fr: "cheh tom", en: "cheh tom" },
+        bcineUnlocked: { fr: "monde plage debloqué, voici les bases", en: "beach world unlocked, here are the basics" },
+        bcineParasol1: { fr: "les parasols sont tres utiles pour rebondir dessus !", en: "parasols are very handy to bounce off of!" },
+        bcineParasol2: { fr: "leurs apparitions sont aleatoires n'essayer pas de reperer l'endroit et d'y y aller a chaque fois 😝", en: "they show up at random, don't try to memorise the spot and aim for it every time 😝" },
+        bcineTutoAnyway: { fr: "en temps normal ça se serait arreté là mais vu que c'est un tuto...", en: "normally it would have ended right there, but since this is a tutorial..." },
+        bcineTowel1: { fr: "les serviettes, elles, n'ont aucun effet particulier : juste de la déco sur le sable", en: "the towels, though, have no particular effect: just decoration on the sand" },
+        bcineTowel2: { fr: "on continue notre lancée sans s'arrêter dessus, promis", en: "we keep going without stopping there, promise" },
+        bcineTowel3: { fr: "mais c'est toujours un tuto !", en: "but it's still a tutorial!" },
+        bcineWelcome: { fr: "bref bienvenue dans le monde plage...", en: "anyway, welcome to the beach world..." },
+        beachParasolToast: { fr: "⛱️ Rebond sur un parasol !", en: "⛱️ Bounced off a parasol!" },
+        beachResultParasol: { fr: "⛱️ Rebond sur un parasol : le lancer a continué de plus belle !", en: "⛱️ Bounced off a parasol: the throw carried on even better!" },
+        beachResultTowel: { fr: "🏖️ Atterrissage dans une serviette (juste pour le style).", en: "🏖️ Landed in a towel (just for style)." },
+        beachResultCastle: { fr: "🏰 Château de sable écroulé sur la trousse : le lancer s'arrête là.", en: "🏰 Sandcastle collapsed on the pencil case: the throw ends here." },
+        plageTutoTitle1: { fr: "🏖️ Bienvenue à la Plage !", en: "🏖️ Welcome to the Beach!" },
+        plageTutoText1: {
+            fr: "Tes améliorations, tes skins, tes traînées et ta trousse restent exactement les mêmes qu'ailleurs. Par contre... tu as oublié ton argent en chemin : tu repars de 0 $. Le classement de la plage, lui, reste séparé de celui du monde normal.",
+            en: "Your upgrades, skins, trails and pencil case stay exactly the same as elsewhere. But... you forgot your money on the way: you're starting back at $0. The beach leaderboard, though, stays separate from the normal world's."
+        },
+        plageTutoTitle2: { fr: "😈 Sans un sou", en: "😈 Not a penny to your name" },
+        plageTutoText2: {
+            fr: "Et la mauvaise nouvelle ? Vous n'avez pas assez d'argent pour reprendre le bus et retourner dans le monde normal 😈 Vous devez farmer jusqu'à 250 000 pour un billet de bus dans la boutique ! Bonne chance....",
+            en: "And the bad news? You don't have enough money to take the bus back to the normal world 😈 You'll have to farm up to 250,000 for a bus ticket in the shop! Good luck...."
+        },
+        plageTutoTitle3: { fr: "⛱️ Ce qui traîne sur le sable", en: "⛱️ What's lying around on the sand" },
+        plageTutoText3: {
+            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (juste pour le style) et châteaux de sable (fin du lancer) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
+            en: "The sand is randomly generated on every throw: parasols (bounce), towels (just for style) and sandcastles (throw over) each show up with their own chance, but only past 100 m."
+        },
+        leaderboardTitlePlage: { fr: "🏖️ Classement Plage", en: "🏖️ Beach leaderboard" },
+        achvClaquettesName: { fr: "Pieds nus dans le sable", en: "Barefoot in the sand" },
+        achvClaquettesDesc: { fr: "Achète la Trousse à Claquettes.", en: "Buy the Flip-Flop Pencil Case." },
+        achvPlageThrowsName: { fr: "Habitué(e) du sable", en: "Sand regular" },
+        achvPlageThrowsDesc: { fr: "Effectue 100 lancers dans le monde Plage.", en: "Make 100 throws in the Beach world." },
+        achvPlage500Name: { fr: "Loin du bus", en: "Far from the bus" },
+        achvPlage500Desc: { fr: "Atteins un record de 500 m sur la plage.", en: "Reach a record of 500 m on the beach." },
+        achvPlage2000Name: { fr: "Jusqu'à l'horizon", en: "All the way to the horizon" },
+        achvPlage2000Desc: { fr: "Atteins un record de 2000 m sur la plage.", en: "Reach a record of 2000 m on the beach." },
+        achvPlageMoneyName: { fr: "Économies de vacances", en: "Holiday savings" },
+        achvPlageMoneyDesc: { fr: "Gagne 250 000 $ sur la plage : de quoi payer le bus du retour.", en: "Earn $250,000 on the beach: exactly the price of the bus home." },
+        achvParasolName: { fr: "Rebondi(e) mais pas vaincu(e)", en: "Bounced but not beaten" },
+        achvParasolDesc: { fr: "Rebondis 25 fois sur un parasol.", en: "Bounce off a parasol 25 times." },
+        achvTowelsName: { fr: "Ramasse-serviettes", en: "Towel collector" },
+        achvTowelsDesc: { fr: "Atterris 20 fois dans une serviette trouvée sur le sable.", en: "Land 20 times in a towel found on the sand." },
+        achvCastlesName: { fr: "Démolisseur de châteaux", en: "Castle wrecker" },
+        achvCastlesDesc: { fr: "Fais s'écrouler 15 châteaux de sable sur la trousse.", en: "Make 15 sandcastles collapse on the pencil case." },
+        achvPlageName: { fr: "Sable entre les pages", en: "Sand between the pages" },
+        achvPlageDesc: { fr: "Débloque le monde Plage.", en: "Unlock the Beach world." },
+        achvBusName: { fr: "Retour de vacances", en: "Back from holiday" },
+        achvBusDesc: { fr: "Achète le billet de bus et reviens de la Plage.", en: "Buy the bus ticket and come back from the Beach." },
         changelogTitle: { fr: "📋 Journal des changements", en: "📋 Changelog" },
         changelogMajor: { fr: "Mise à jour majeure :", en: "Major update:" },
         changelogMinor: { fr: "Ajouts mineurs :", en: "Minor additions:" },
@@ -1706,6 +1894,11 @@
         linksWhatsappLabel: { fr: "Chaîne WhatsApp", en: "WhatsApp channel" },
         linksWhatsappDesc: { fr: "Actus de ce jeu", en: "Updates about this game" },
         settingsTitle: { fr: "⚙️ Réglages", en: "⚙️ Settings" },
+        settingsTutoTitle: { fr: "📖 Revoir le tutoriel", en: "📖 Replay tutorial" },
+        settingsTutoBasics: { fr: "Bases du jeu", en: "Game basics" },
+        settingsTutoVolcan: { fr: "Monde Volcans", en: "Volcans world" },
+        settingsTutoPlage: { fr: "Monde Plage", en: "Beach world" },
+        settingsTutoReplay: { fr: "🔁 Revoir", en: "🔁 Replay" },
         settingsThemeLabel: { fr: "Thème", en: "Theme" },
         settingsLangLabel: { fr: "Langue", en: "Language" },
         settingsAccountTitle: { fr: "👤 Paramètres du compte", en: "👤 Account settings" },
@@ -1909,6 +2102,16 @@
         // déclenché (COIN_BONUS_CHANCE) donne toujours un multiplicateur visible
     ];
 
+    /* ---- Monde Plage (voir section 9ter) ---- */
+    const CLAQUETTES_COST = 100000;   // "Trousse à Claquettes" : ticket d'entrée du monde Plage
+    const BUS_TICKET_COST = 250000;   // billet de bus du retour vers le monde normal
+    // En dessous de cette distance, le lancer reste sur le "sable proche du
+    // bus" : aucun évènement (parasol/serviette/château) ne peut apparaître.
+    // Ça laisse une zone d'échauffement sans surprise.
+    const BEACH_EVENT_MIN_DISTANCE = 100;
+    // Chaque évènement du monde Plage est tiré au sort à chaque lancer.
+    const BEACH_EVENT_CHANCE = { parasol: 0.5, towel: 0.6, castle: 0.4 };
+
     /* ============ 2. DONNÉES STATIQUES ============ */
     // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
     // "unlocked" à true et d'ajouter un décor pour en activer un nouveau.
@@ -1933,6 +2136,16 @@
         { id: "dixMille10000m", emoji: "🌀", nameKey: "achv10000mName", descKey: "achv10000mDesc", check: (s) => s.bestDistance >= 10000 },
         { id: "lancerParfait", emoji: "✨", nameKey: "achvPerfectName", descKey: "achvPerfectDesc", check: (s) => s.hasPerfectThrow },
         { id: "volcanDebloque", emoji: "🌋", nameKey: "achvVolcanName", descKey: "achvVolcanDesc", check: (s) => s.volcanUnlocked },
+        { id: "claquettes", emoji: "🩴", nameKey: "achvClaquettesName", descKey: "achvClaquettesDesc", check: (s) => s.hasClaquettes },
+        { id: "plageDebloquee", emoji: "🏖️", nameKey: "achvPlageName", descKey: "achvPlageDesc", check: (s) => s.plageUnlocked },
+        { id: "retourDeVacances", emoji: "🚌", nameKey: "achvBusName", descKey: "achvBusDesc", check: (s) => s.hasTakenBusBack },
+        { id: "plageLancers", emoji: "🦀", nameKey: "achvPlageThrowsName", descKey: "achvPlageThrowsDesc", check: (s) => s.plageThrows >= 100 },
+        { id: "plage500m", emoji: "📏", nameKey: "achvPlage500Name", descKey: "achvPlage500Desc", check: (s) => s.plageBestDistance >= 500 },
+        { id: "plage2000m", emoji: "🌊", nameKey: "achvPlage2000Name", descKey: "achvPlage2000Desc", check: (s) => s.plageBestDistance >= 2000 },
+        { id: "plageEconomies", emoji: "💸", nameKey: "achvPlageMoneyName", descKey: "achvPlageMoneyDesc", check: (s) => s.plageMoneyEarned >= 250000 },
+        { id: "parasols25", emoji: "⛱️", nameKey: "achvParasolName", descKey: "achvParasolDesc", check: (s) => s.plageParasolBounces >= 25 },
+        { id: "serviettes20", emoji: "🧺", nameKey: "achvTowelsName", descKey: "achvTowelsDesc", check: (s) => s.plageTowelsFound >= 20 },
+        { id: "chateaux15", emoji: "🏰", nameKey: "achvCastlesName", descKey: "achvCastlesDesc", check: (s) => s.plageCastlesCrushed >= 15 },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
         { id: "collectionneur", emoji: "🎨", nameKey: "achvCollectorName", descKey: "achvCollectorDesc", check: (s) => s.ownedSkins.length >= SKINS.length },
         { id: "riche5000", emoji: "💰", nameKey: "achvRichName", descKey: "achvRichDesc", check: (s) => s.money >= 5000 },
@@ -2128,6 +2341,23 @@
             volcanTutorialSeen: false, // tutoriel spécifique au monde Volcan
             durability: 100,           // 0 à 100, perdue lors des dérapages, réparable en boutique
             playTime: 0,               // secondes de jeu cumulées
+            // --- Monde Plage (voir section 9ter) ---
+            hasClaquettes: false,      // "Trousse à Claquettes" achetée : donne accès à la cinématique
+            plageUnlocked: false,      // devient true une fois la cinématique terminée
+            plageTutorialSeen: false,  // tutoriel spécifique au monde Plage
+            inPlage: false,            // le joueur est "coincé" sur la plage tant qu'il n'a pas repris le bus
+            hasTakenBusBack: false,    // a déjà payé le billet de bus du retour au moins une fois
+            hasForgottenMoney: false,  // l'argent a déjà été remis à 0 à l'arrivée sur la plage (une seule fois, voir enterBeachProfile)
+            // Compteurs propres à la plage : le record y est distinct de
+            // celui du monde normal (voir onLanded), mais l'argent, les
+            // améliorations, les skins/traînées et la durabilité sont
+            // désormais partagés entre les deux mondes.
+            plageThrows: 0,            // lancers effectués sur la plage
+            plageBestDistance: 0,      // meilleur lancer sur la plage
+            plageMoneyEarned: 0,       // argent gagné sur la plage depuis le début
+            plageParasolBounces: 0,    // rebonds sur un parasol
+            plageTowelsFound: 0,       // serviettes trouvées pendant un lancer (purement décoratif)
+            plageCastlesCrushed: 0,    // châteaux de sable écroulés sur la trousse
             // --- Succès ---
             unlockedAchievements: [],  // ids des succès déjà débloqués (voir ACHIEVEMENTS)
             totalThrows: 0,            // nombre total de lancers effectués
@@ -2172,6 +2402,29 @@
         return merged;
     }
 
+    // --- Entrée/sortie du monde Plage ---
+    // L'argent, les améliorations, les skins/traînées et la durabilité sont
+    // partagés en permanence entre le monde normal et la plage : ces
+    // fonctions ne font que basculer le monde courant. Seul l'argent est
+    // remis à 0 à l'arrivée, une seule fois (voir save.hasForgottenMoney et
+    // la cinématique, "vous avez oublié votre argent").
+    function enterBeachProfile() {
+        if (save.inPlage) return;
+        if (!save.hasForgottenMoney) {
+            save.money = 0;
+            save.hasForgottenMoney = true;
+        }
+        save.inPlage = true;
+        save.currentWorld = "plage";
+    }
+
+    // Retour en bus : simple retour au monde normal, rien à échanger.
+    function leaveBeachProfile() {
+        if (!save.inPlage) return;
+        save.inPlage = false;
+        save.currentWorld = "cour";
+    }
+
     function loadSave() {
         try {
             const raw = localStorage.getItem(SAVE_KEY);
@@ -2204,6 +2457,9 @@
     function recordDailyEarning(amount) {
         if (amount <= 0) return;
         save.totalMoneyEarned += amount;
+        // L'argent de la plage est compté à part : c'est lui qui mesure le
+        // chemin parcouru vers le billet de bus (voir le succès correspondant).
+        if (save.inPlage) save.plageMoneyEarned += amount;
         const key = todayKey();
         save.dailyEarnings[key] = (save.dailyEarnings[key] || 0) + amount;
         pruneDailyMap(save.dailyEarnings);
@@ -2433,7 +2689,8 @@
         document.getElementById("menu-money").textContent = save.money;
         document.getElementById("menu-puissance").textContent = totalPuissance();
         document.getElementById("menu-vitesse").textContent = totalVitesse();
-        document.getElementById("menu-record").textContent = save.bestDistance.toFixed(1) + " m";
+        document.getElementById("menu-record").textContent =
+            (save.currentWorld === "plage" ? save.plageBestDistance : save.bestDistance).toFixed(1) + " m";
         document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
         // "tu veux de l'aide ?" n'apparaît qu'après un échec dans la cinématique
         document.getElementById("menu-help").classList.toggle("show", !!save.volcanHelpAvailable);
@@ -2457,11 +2714,24 @@
         const row = document.getElementById("worlds-row");
         row.innerHTML = "";
         WORLDS.forEach((w) => {
-            const playable = w.unlocked || (w.id === "volcans" && save.volcanUnlocked);
+            const playable = w.unlocked
+                || (w.id === "volcans" && save.volcanUnlocked)
+                || (w.id === "plage" && save.plageUnlocked);
             const card = document.createElement("div");
             card.className = "world-card" + (playable ? "" : " locked") + (save.currentWorld === w.id && playable ? " selected" : "");
             card.innerHTML = '<div class="emoji">' + w.emoji + '</div><div class="name">' + w.name + '</div>';
             card.addEventListener("click", () => {
+                // Coincé sur la plage : tant que le billet de bus n'est pas
+                // payé, aucun autre monde n'est accessible (voir leaveBeachProfile).
+                if (save.inPlage && w.id !== "plage") {
+                    showToast(tr("stuckOnBeach"));
+                    sfxError();
+                    return;
+                }
+                if (w.id === "plage") {
+                    handlePlageCardClick();
+                    return;
+                }
                 if (w.id === "volcans" && !save.volcanUnlocked) {
                     tryStartVolcanoCinematic();
                     return;
@@ -2491,6 +2761,23 @@
                 row.appendChild(buildChallengesCard());
             }
         });
+    }
+
+    // Clic sur la carte "Plage" : il faut d'abord la Trousse à Claquettes
+    // (boutique, 100 000 $), puis la cinématique du voyage. Une fois le monde
+    // découvert, on propose de revivre la cinématique ou d'y aller directement.
+    function handlePlageCardClick() {
+        if (save.inPlage) return; // déjà sur place : la carte est déjà sélectionnée
+        if (!save.hasClaquettes) {
+            showToast(tr("plageNeedsClaquettes"));
+            sfxError();
+            return;
+        }
+        if (!save.plageUnlocked) {
+            startBeachCinematic();
+            return;
+        }
+        document.getElementById("plage-replay-modal").classList.add("show");
     }
 
     // Carte cliquable ouvrant la modale des succès (voir renderAchievements).
@@ -2738,13 +3025,89 @@
                 }
             ));
             // Réparation : n'apparaît qu'une fois le monde Volcan découvert,
-            // puisque les dérapages y sont la seule source de dégâts.
-            if (save.volcanUnlocked) body.appendChild(buildRepairCard());
+            // puisque les dérapages y sont la seule source de dégâts. Inutile
+            // sur la plage, où rien n'abîme la trousse.
+            if (save.volcanUnlocked && !save.inPlage) body.appendChild(buildRepairCard());
+            if (save.inPlage) {
+                body.appendChild(buildBusTicketCard());
+            } else if (!save.hasClaquettes) {
+                body.appendChild(buildClaquettesCard());
+            }
         } else if (currentTab === "skins") {
             SKINS.forEach(skin => body.appendChild(buildSkinCard(skin)));
         } else {
             TRAILS.forEach(trail => body.appendChild(buildTrailCard(trail)));
         }
+    }
+
+    // "Trousse à Claquettes" : pas de bonus, c'est le ticket d'entrée du monde
+    // Plage (voir handlePlageCardClick). Disparaît de la boutique une fois achetée.
+    function buildClaquettesCard() {
+        const card = document.createElement("div");
+        card.className = "upgrade-card";
+        card.innerHTML =
+            '<div class="icon">🩴</div>' +
+            '<div class="info"><h3>' + tr("claquettesName") + '</h3><p>' + tr("claquettesDesc") + '</p></div>';
+        const btn = document.createElement("button");
+        btn.className = "btn small";
+        btn.textContent = CLAQUETTES_COST + " $";
+        btn.addEventListener("click", () => {
+            if (save.money < CLAQUETTES_COST) {
+                sfxError();
+                showToast(tr("notEnoughMoney"));
+                return;
+            }
+            save.money -= CLAQUETTES_COST;
+            save.hasClaquettes = true;
+            bumpDailyChallenge("spend", CLAQUETTES_COST, "add");
+            persist();
+            sfxBuy();
+            showToast(tr("claquettesBought"));
+            refreshShop();
+            playPurchasePop();
+            buildWorldsRow();
+        });
+        card.appendChild(btn);
+        return card;
+    }
+
+    // Billet de bus : la seule sortie de la plage (voir leaveBeachProfile).
+    // Ne coûte les 250 000 $ que la toute première fois — comme la Trousse à
+    // Claquettes à l'entrée, c'est un déblocage permanent (save.hasTakenBusBack),
+    // pas un péage à chaque aller-retour : une fois payé, le trajet retour est
+    // gratuit pour toujours.
+    function buildBusTicketCard() {
+        const card = document.createElement("div");
+        card.className = "upgrade-card";
+        const free = save.hasTakenBusBack;
+        card.innerHTML =
+            '<div class="icon">🚌</div>' +
+            '<div class="info"><h3>' + tr("busTicketName") + '</h3><p>' + tr(free ? "busTicketFreeDesc" : "busTicketDesc") + '</p></div>';
+        const btn = document.createElement("button");
+        btn.className = "btn small" + (free ? " secondary" : "");
+        btn.textContent = free ? tr("busTicketFreeBtn") : (BUS_TICKET_COST + " $");
+        btn.addEventListener("click", () => {
+            if (!free) {
+                if (save.money < BUS_TICKET_COST) {
+                    sfxError();
+                    showToast(tr("notEnoughMoney"));
+                    return;
+                }
+                save.money -= BUS_TICKET_COST;
+                bumpDailyChallenge("spend", BUS_TICKET_COST, "add");
+                save.hasTakenBusBack = true;
+            }
+            leaveBeachProfile();
+            persist();
+            sfxBuy();
+            showToast(tr("busTicketBought"));
+            buildWorldsRow();
+            refreshMenu();
+            refreshShop();
+            playPurchasePop();
+        });
+        card.appendChild(btn);
+        return card;
     }
 
     // Crée une carte d'amélioration (Puissance ou Vitesse) avec son bouton d'achat
@@ -3105,6 +3468,15 @@
         trailSparks = [];
         didSkid = false;
         basketBounceCount = 0;
+        // Le monde Plage est regénéré à chaque lancer : parasols, serviettes et
+        // châteaux ne sont jamais deux fois au même endroit (voir section 9ter).
+        if (save.currentWorld === "plage") {
+            generateBeachDecor();
+            rollBeachEvents();
+        } else {
+            beachProps = [];
+        }
+        document.getElementById("result-beach").style.display = "none";
         document.getElementById("result-skid").style.display = "none";
         document.getElementById("result-coin").style.display = "none";
         document.getElementById("qte-wrap").classList.remove("show");
@@ -3172,6 +3544,9 @@
         hintText.style.display = "none";
         sfxLaunch();
         if (getSkin(save.equippedSkin).isCoin) sfxCoinFlip();
+        // Monde Plage : l'accessoire du prochain atterrissage est posé
+        // maintenant, à l'endroit exact où la trousse va retomber.
+        if (save.currentWorld === "plage") beachOnLaunch();
     }
 
     // Un clic/tap ou la touche Espace fait avancer la machine à états d'une étape
@@ -3307,6 +3682,18 @@
         state = "landed";
         const distanceMeters = worldX / SCALE;
         save.totalThrows++;
+        // Monde Plage : serviette (déco) ou château (qui s'écroule) selon les
+        // évènements tirés au lancer (voir beachOnLaunch).
+        const beachEl = document.getElementById("result-beach");
+        if (save.currentWorld === "plage") {
+            beachFinalizeLanding();
+            save.plageThrows++;
+            const beachText = beachResultText();
+            beachEl.textContent = beachText;
+            beachEl.style.display = beachText ? "block" : "none";
+        } else {
+            beachEl.style.display = "none";
+        }
         if (isPerfect) save.hasPerfectThrow = true;
         // Un dérapage abîme la trousse : -10 de durabilité et message rouge
         // dans le panneau de résultat (réparation en boutique).
@@ -3319,8 +3706,11 @@
         } else {
             skidEl.style.display = "none";
         }
-        if (distanceMeters > save.bestDistance) {
-            save.bestDistance = distanceMeters;
+        // Record par monde : le monde normal et la plage ont chacun leur
+        // propre record (et leur propre classement, voir scoresCollection).
+        const recordField = save.currentWorld === "plage" ? "plageBestDistance" : "bestDistance";
+        if (distanceMeters > save[recordField]) {
+            save[recordField] = distanceMeters;
             document.getElementById("result-record").style.display = "block";
             sfxRecord();
             pushScoreIfRecord(distanceMeters);
@@ -4318,7 +4708,9 @@
             } else if (worldY <= 0 && vy < 0) {
                 // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
                 worldY = 0;
-                if (tryBasketBounce()) {
+                if (save.currentWorld === "plage" && tryBeachParasolBounce()) {
+                    // rebond sur un parasol : le lancer continue (voir section 9ter)
+                } else if (tryBasketBounce()) {
                     // le rebond a déjà remis l'état à "charging_power", rien d'autre à faire
                 } else if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
                     // Monde Volcan : la poussière rouge rend le sol glissant
@@ -4390,6 +4782,8 @@
             drawSpaceBackground(w, h);
         } else if (save.currentWorld === "volcans") {
             drawVolcanoBackground(w, h);
+        } else if (save.currentWorld === "plage") {
+            drawBeachBackground(w, h);
         } else {
             drawBackground(w, h);
         }
@@ -4682,6 +5076,9 @@
     let cineCloudScroll = 0;
     let cineRot = 0;
     let cineSavedTheme = null; // thème du joueur avant la cinématique (voir startVolcanoCinematic/cineTeardown)
+    // Deux cinématiques partagent cette boucle et ce canvas : celle du volcan
+    // (phases cine*) et celle de la plage (phases bc*, voir section 9ter).
+    let cineKind = "volcan";
 
     function cIn(t) { return t * t * t; }
     function cOut(t) { return 1 - Math.pow(1 - t, 3); }
@@ -4703,6 +5100,7 @@
 
     function startVolcanoCinematic() {
         cineActive = true;
+        cineKind = "volcan";
         // Le voile de nuit bugue avec les décors de la cinématique : on force le
         // mode jour pendant qu'elle tourne, et on remet le thème d'origine à la fin
         // (voir cineTeardown).
@@ -4812,7 +5210,12 @@
     function cineTeardown() {
         cineActive = false;
         cineStopQuake();
-        document.body.classList.remove("cine-mode");
+        document.body.classList.remove("cine-mode", "cine-aim", "cine-blackout");
+        document.getElementById("bcine-dialog").classList.remove("show");
+        document.getElementById("bcine-aim").classList.remove("show");
+        meterWrap.style.display = "none";
+        screens.menu.classList.remove("slow");
+        cineKind = "volcan";
         screens.game.classList.remove("active");
         screens.menu.classList.remove("cine-fading", "cine-gone");
         canvas.style.transform = "";
@@ -4857,6 +5260,15 @@
         if (!cineLastFrame) cineLastFrame = now;
         const dt = Math.min((now - cineLastFrame) / 1000, 0.04);
         cineLastFrame = now;
+        if (cineKind === "plage") {
+            bcT += dt;
+            bcUpdate(dt);
+            if (cineActive) {
+                bcRender(dt);
+                requestAnimationFrame(cineLoop);
+            }
+            return;
+        }
         cineT += dt;
         cineUpdate(dt);
         if (cineActive) {
@@ -5269,18 +5681,1167 @@
     /* ---- Entrées pendant la cinématique ---- */
     window.addEventListener("keydown", (e) => {
         if (!cineActive) return;
+        if (cineKind === "plage") {
+            if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); bcTap(window.innerWidth / 2); }
+            return;
+        }
         if (e.code === "ArrowLeft") { e.preventDefault(); cineMove(-1); }
         else if (e.code === "ArrowRight") { e.preventDefault(); cineMove(1); }
         else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); cineAddClick(); }
     });
     window.addEventListener("pointerdown", (e) => {
         if (!cineActive) return;
+        if (cineKind === "plage") { bcTap(e.clientX); return; }
         if (cinePhase === "descent") { cineAddClick(); return; }
         if (cinePhase === "rocks") {
             const rect = canvas.getBoundingClientRect();
             cineMove(e.clientX < rect.left + rect.width / 2 ? -1 : 1);
         }
     });
+
+    /* ============ 9ter. MONDE PLAGE : DÉCOR, ÉVÈNEMENTS ET CINÉMATIQUE ============
+       Tout ce qui concerne le monde Plage est regroupé ici :
+         - les objets dessinés à la main (parasol, serviette, château, crabe, bus...)
+         - le décor du monde (drawBeachBackground) et ses accessoires aléatoires
+         - les évènements d'un lancer (rebond, serviette, château)
+         - la santé mentale
+         - la cinématique de déblocage (startBeachCinematic)
+       Comme pour le volcan, la cinématique réutilise le canvas du jeu et sa
+       propre boucle de rendu (voir cineLoop, qui aiguille selon cineKind). */
+
+    /* ---- Objets dessinés à la main ---- */
+
+    // Parasol : mât + toile en parts alternées rouge/blanc. (sx, groundY) = pied.
+    function drawParasol(c, sx, groundY, seed, scale) {
+        const k = scale || 1;
+        const poleH = 84 * k, r = 52 * k;
+        c.save();
+        c.translate(sx, groundY);
+        // ombre portée au sol
+        c.fillStyle = "rgba(120,90,40,0.22)";
+        c.beginPath();
+        c.ellipse(0, 0, r * 0.75, 8 * k, 0, 0, Math.PI * 2);
+        c.fill();
+        // mât
+        c.strokeStyle = "#8a6a45";
+        c.lineWidth = 4 * k;
+        c.beginPath();
+        c.moveTo(0, 0);
+        c.lineTo(0, -poleH);
+        c.stroke();
+        // toile : 6 parts alternées
+        const top = -poleH;
+        for (let i = 0; i < 6; i++) {
+            const a0 = Math.PI + (i / 6) * Math.PI;
+            const a1 = Math.PI + ((i + 1) / 6) * Math.PI;
+            c.fillStyle = i % 2 === 0 ? "#e8503f" : "#fdf6ec";
+            c.beginPath();
+            c.moveTo(0, top);
+            c.arc(0, top + r * 0.34, r, a0, a1);
+            c.closePath();
+            c.fill();
+        }
+        // pointe
+        c.fillStyle = "#8a6a45";
+        c.beginPath();
+        c.arc(0, top - 3 * k, 4 * k, 0, Math.PI * 2);
+        c.fill();
+        c.restore();
+    }
+
+    // Serviette de plage posée à plat, vue de trois quarts : un parallélogramme
+    // rayé, plus une petite ombre pour l'asseoir dans le sable.
+    function drawTowel(c, sx, groundY, seed) {
+        const wdt = 104, hgt = 30, skew = 16;
+        c.save();
+        c.translate(sx, groundY);
+        c.fillStyle = "rgba(120,90,40,0.18)";
+        c.beginPath();
+        c.ellipse(0, 2, wdt * 0.55, 9, 0, 0, Math.PI * 2);
+        c.fill();
+        const hue = Math.floor(seededRand(seed) * 4);
+        const colors = [["#2fa8d8", "#fdf6ec"], ["#f0724f", "#fdf6ec"], ["#7ac943", "#fdf6ec"], ["#a05bd6", "#fdf6ec"]][hue];
+        for (let i = 0; i < 6; i++) {
+            const x0 = -wdt / 2 + (i * wdt) / 6;
+            c.fillStyle = i % 2 === 0 ? colors[0] : colors[1];
+            c.beginPath();
+            c.moveTo(x0, 0);
+            c.lineTo(x0 + wdt / 6, 0);
+            c.lineTo(x0 + wdt / 6 + skew, -hgt);
+            c.lineTo(x0 + skew, -hgt);
+            c.closePath();
+            c.fill();
+        }
+        c.strokeStyle = "rgba(0,0,0,0.15)";
+        c.lineWidth = 1.5;
+        c.beginPath();
+        c.moveTo(-wdt / 2, 0);
+        c.lineTo(wdt / 2, 0);
+        c.lineTo(wdt / 2 + skew, -hgt);
+        c.lineTo(-wdt / 2 + skew, -hgt);
+        c.closePath();
+        c.stroke();
+        c.restore();
+    }
+
+    // Château de sable : trois tours crénelées et un fanion. "collapsed" le
+    // remplace par un tas de sable d'où dépasse le drapeau (voir l'évènement
+    // "château" d'un lancer).
+    function drawSandcastle(c, sx, groundY, seed, collapsed) {
+        c.save();
+        c.translate(sx, groundY);
+        if (collapsed) {
+            c.fillStyle = "#d9b45e";
+            c.beginPath();
+            c.moveTo(-46, 0);
+            c.quadraticCurveTo(-20, -30, 6, -26);
+            c.quadraticCurveTo(30, -22, 46, 0);
+            c.closePath();
+            c.fill();
+            c.fillStyle = "rgba(0,0,0,0.12)";
+            c.beginPath();
+            c.ellipse(0, 0, 48, 7, 0, 0, Math.PI * 2);
+            c.fill();
+            c.strokeStyle = "#8a6a45";
+            c.lineWidth = 2;
+            c.beginPath();
+            c.moveTo(14, -24);
+            c.lineTo(20, -52);
+            c.stroke();
+            c.fillStyle = "#e8503f";
+            c.beginPath();
+            c.moveTo(20, -52);
+            c.lineTo(42, -45);
+            c.lineTo(20, -38);
+            c.closePath();
+            c.fill();
+            c.restore();
+            return;
+        }
+        const towers = [{ x: -30, h: 44, w: 24 }, { x: 0, h: 62, w: 28 }, { x: 30, h: 44, w: 24 }];
+        c.fillStyle = "rgba(0,0,0,0.12)";
+        c.beginPath();
+        c.ellipse(0, 0, 52, 8, 0, 0, Math.PI * 2);
+        c.fill();
+        towers.forEach((t, i) => {
+            c.fillStyle = i === 1 ? "#e6c169" : "#d9b45e";
+            c.fillRect(t.x - t.w / 2, -t.h, t.w, t.h);
+            // créneaux
+            for (let k = 0; k < 3; k++) {
+                c.fillRect(t.x - t.w / 2 + k * (t.w / 3), -t.h - 7, t.w / 5, 7);
+            }
+            // porte de la tour centrale
+            if (i === 1) {
+                c.fillStyle = "rgba(120,85,40,0.55)";
+                c.fillRect(t.x - 6, -18, 12, 18);
+            }
+        });
+        // fanion sur la tour centrale
+        c.strokeStyle = "#8a6a45";
+        c.lineWidth = 2;
+        c.beginPath();
+        c.moveTo(0, -69);
+        c.lineTo(0, -92);
+        c.stroke();
+        c.fillStyle = "#e8503f";
+        c.beginPath();
+        c.moveTo(0, -92);
+        c.lineTo(22, -85);
+        c.lineTo(0, -78);
+        c.closePath();
+        c.fill();
+        c.restore();
+    }
+
+    // Petit coquillage posé sur le sable (pure décoration).
+    function drawShell(c, sx, groundY, seed) {
+        const r = 6 + seededRand(seed) * 5;
+        c.save();
+        c.translate(sx, groundY);
+        c.fillStyle = seededRand(seed + 1) > 0.5 ? "#fff0e0" : "#ffd9c7";
+        c.beginPath();
+        c.arc(0, 0, r, Math.PI, 0);
+        c.closePath();
+        c.fill();
+        c.strokeStyle = "rgba(160,110,90,0.5)";
+        c.lineWidth = 1;
+        for (let i = 1; i < 4; i++) {
+            c.beginPath();
+            c.moveTo(0, 0);
+            c.lineTo(-r + (2 * r * i) / 4, -r * 0.92);
+            c.stroke();
+        }
+        c.restore();
+    }
+
+    // Crabe : corps ovale, yeux sur tiges, deux pinces et six pattes qui
+    // gigotent avec le temps. "dir" = -1 s'il regarde à gauche.
+    function drawCrab(c, x, y, size, t, dir) {
+        const k = size / 34;
+        const wig = Math.sin(t * 9) * 3 * k;
+        c.save();
+        c.translate(x, y);
+        c.scale(dir < 0 ? -1 : 1, 1);
+        c.strokeStyle = "#a52a1a";
+        c.lineWidth = 2.4 * k;
+        c.lineCap = "round";
+        for (let i = -1; i <= 1; i++) {
+            for (const sgn of [-1, 1]) {
+                c.beginPath();
+                c.moveTo(sgn * 9 * k, -2 * k + i * 4 * k);
+                c.lineTo(sgn * (19 * k + i), 4 * k + i * 3 * k + wig * (i + 2) * 0.3);
+                c.stroke();
+            }
+        }
+        // pinces
+        for (const sgn of [-1, 1]) {
+            c.beginPath();
+            c.moveTo(sgn * 11 * k, -6 * k);
+            c.lineTo(sgn * 21 * k, -13 * k - wig * 0.4);
+            c.stroke();
+            c.fillStyle = "#e8503f";
+            c.beginPath();
+            c.ellipse(sgn * 24 * k, -15 * k - wig * 0.4, 6 * k, 4.5 * k, sgn * 0.5, 0, Math.PI * 2);
+            c.fill();
+        }
+        // corps
+        c.fillStyle = "#e8503f";
+        c.beginPath();
+        c.ellipse(0, 0, 14 * k, 10 * k, 0, 0, Math.PI * 2);
+        c.fill();
+        c.fillStyle = "rgba(0,0,0,0.12)";
+        c.beginPath();
+        c.ellipse(0, 4 * k, 12 * k, 4 * k, 0, 0, Math.PI * 2);
+        c.fill();
+        // yeux sur tiges
+        for (const sgn of [-1, 1]) {
+            c.strokeStyle = "#e8503f";
+            c.lineWidth = 2 * k;
+            c.beginPath();
+            c.moveTo(sgn * 5 * k, -8 * k);
+            c.lineTo(sgn * 5 * k, -15 * k);
+            c.stroke();
+            c.fillStyle = "#fff";
+            c.beginPath();
+            c.arc(sgn * 5 * k, -17 * k, 3.2 * k, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = "#1a1a1a";
+            c.beginPath();
+            c.arc(sgn * 5 * k, -17 * k, 1.6 * k, 0, Math.PI * 2);
+            c.fill();
+        }
+        c.restore();
+    }
+
+    // Bus scolaire vu de profil. (x, groundY) = coin avant-gauche au sol.
+    // "doorOpen" (0 à 1) écarte les deux battants de la porte, "passenger"
+    // fait dépasser le haut de la trousse par la fenêtre du milieu.
+    function drawBus(c, x, groundY, scale, doorOpen, passenger) {
+        const k = scale || 1;
+        const bw = 420 * k, bh = 150 * k;
+        const top = groundY - bh;
+        c.save();
+        c.translate(x, 0);
+        // ombre au sol
+        c.fillStyle = "rgba(60,45,20,0.25)";
+        c.beginPath();
+        c.ellipse(bw / 2, groundY + 4, bw * 0.48, 9 * k, 0, 0, Math.PI * 2);
+        c.fill();
+        // carrosserie
+        c.fillStyle = "#f2b705";
+        c.beginPath();
+        c.moveTo(0, groundY - 14 * k);
+        c.lineTo(0, top + 26 * k);
+        c.quadraticCurveTo(0, top, 26 * k, top);
+        c.lineTo(bw - 14 * k, top);
+        c.quadraticCurveTo(bw, top, bw, top + 16 * k);
+        c.lineTo(bw, groundY - 14 * k);
+        c.closePath();
+        c.fill();
+        // bande décorative
+        c.fillStyle = "#c98f00";
+        c.fillRect(0, groundY - 46 * k, bw, 8 * k);
+        // pare-brise (à droite : le bus roule vers la droite)
+        c.fillStyle = "#bfe9f7";
+        c.beginPath();
+        c.moveTo(bw - 62 * k, top + 12 * k);
+        c.lineTo(bw - 8 * k, top + 16 * k);
+        c.lineTo(bw - 8 * k, top + 66 * k);
+        c.lineTo(bw - 62 * k, top + 66 * k);
+        c.closePath();
+        c.fill();
+        // fenêtres latérales
+        for (let i = 0; i < 4; i++) {
+            const wx = 28 * k + i * 64 * k;
+            c.fillStyle = "#bfe9f7";
+            c.fillRect(wx, top + 14 * k, 52 * k, 52 * k);
+            c.strokeStyle = "rgba(90,70,20,0.4)";
+            c.lineWidth = 2 * k;
+            c.strokeRect(wx, top + 14 * k, 52 * k, 52 * k);
+            // La trousse assise : son haut dépasse par une fenêtre que la
+            // porte ne recouvre pas (la porte masque la 2e).
+            if (passenger && i === 2) {
+                c.save();
+                c.beginPath();
+                c.rect(wx, top + 14 * k, 52 * k, 52 * k);
+                c.clip();
+                paintTrousse(c, wx + 26 * k, top + 62 * k, 48 * k, 0);
+                c.restore();
+            }
+        }
+        // porte (deux battants coulissants), côté gauche du bus
+        const dx = 100 * k, dw = 54 * k, dh = 92 * k;
+        c.fillStyle = "#9ed7ea";
+        c.fillRect(dx, groundY - dh - 14 * k, dw, dh);
+        c.fillStyle = "#e0a904";
+        const slide = (dw / 2) * c01(doorOpen || 0);
+        c.fillRect(dx - slide, groundY - dh - 14 * k, dw / 2, dh);
+        c.fillRect(dx + dw / 2 + slide, groundY - dh - 14 * k, dw / 2, dh);
+        c.strokeStyle = "rgba(90,70,20,0.5)";
+        c.lineWidth = 2 * k;
+        c.strokeRect(dx, groundY - dh - 14 * k, dw, dh);
+        // roues
+        [88 * k, bw - 82 * k].forEach((wx) => {
+            c.fillStyle = "#22242c";
+            c.beginPath();
+            c.arc(wx, groundY - 14 * k, 22 * k, 0, Math.PI * 2);
+            c.fill();
+            c.fillStyle = "#9aa0ab";
+            c.beginPath();
+            c.arc(wx, groundY - 14 * k, 9 * k, 0, Math.PI * 2);
+            c.fill();
+        });
+        c.restore();
+    }
+
+    /* ---- Décor du monde Plage ---- */
+    // Sable jaune, petites dunes, coquillages, mer à l'horizon, plus les
+    // accessoires tirés au hasard pour ce lancer (voir beachProps).
+    function drawBeachBackground(w, h) {
+        groundScreenY = h * 0.68 + cameraY;
+        const night = save.theme === "dark";
+
+        // ciel
+        const sky = ctx.createLinearGradient(0, 0, 0, groundScreenY);
+        if (night) {
+            sky.addColorStop(0, "#0b1c3a");
+            sky.addColorStop(1, "#2b4e75");
+        } else {
+            sky.addColorStop(0, "#4ec3ea");
+            sky.addColorStop(0.65, "#a9e7f7");
+            sky.addColorStop(1, "#ffe9bd");
+        }
+        ctx.fillStyle = sky;
+        ctx.fillRect(0, 0, w, groundScreenY);
+
+        // mer à l'horizon : une bande d'eau avec quelques crêtes de vagues
+        const seaH = 46;
+        const seaTop = groundScreenY - seaH;
+        const sea = ctx.createLinearGradient(0, seaTop, 0, groundScreenY);
+        if (night) { sea.addColorStop(0, "#123a5c"); sea.addColorStop(1, "#1b5a7e"); }
+        else { sea.addColorStop(0, "#1f8fc4"); sea.addColorStop(1, "#4fc4e0"); }
+        ctx.fillStyle = sea;
+        ctx.fillRect(0, seaTop, w, seaH);
+        const tw = performance.now() / 1000;
+        ctx.strokeStyle = night ? "rgba(200,230,255,0.25)" : "rgba(255,255,255,0.55)";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 18; i++) {
+            const sx = mod(i * 137 + Math.sin(tw * 0.7 + i) * 14 - cameraX * 0.08, w + 160) - 80;
+            const sy = seaTop + 8 + ((i * 37) % (seaH - 14));
+            ctx.beginPath();
+            ctx.moveTo(sx, sy);
+            ctx.quadraticCurveTo(sx + 9, sy - 3, sx + 18, sy);
+            ctx.stroke();
+        }
+
+        // dunes lointaines (parallaxe lente), posées sur la ligne d'eau
+        const duneSpacing = 320, dunePar = 0.18;
+        const dparX = cameraX * dunePar;
+        const dStart = Math.floor((dparX - duneSpacing) / duneSpacing);
+        const dEnd = Math.ceil((dparX + w + duneSpacing) / duneSpacing);
+        for (let i = dStart; i <= dEnd; i++) {
+            const sx = i * duneSpacing - dparX;
+            const dh = 34 + seededRand(i * 2.3) * 30;
+            const dw = 190 + seededRand(i * 5.1) * 130;
+            ctx.fillStyle = night ? "#6c5a2f" : "#e0c173";
+            ctx.beginPath();
+            ctx.moveTo(sx - dw / 2, groundScreenY + 2);
+            ctx.quadraticCurveTo(sx, groundScreenY - dh, sx + dw / 2, groundScreenY + 2);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        // sable
+        const g = ctx.createLinearGradient(0, groundScreenY, 0, h);
+        if (night) { g.addColorStop(0, "#8a7440"); g.addColorStop(1, "#4d4123"); }
+        else { g.addColorStop(0, "#f2d98b"); g.addColorStop(1, "#cfa958"); }
+        ctx.fillStyle = g;
+        ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+
+        // petites dunes au sol + coquillages (même vitesse que le sol)
+        const bumpSpacing = 150;
+        const bStart = Math.floor(cameraX / bumpSpacing) - 1;
+        for (let i = bStart; i < bStart + Math.ceil(w / bumpSpacing) + 2; i++) {
+            const sx = i * bumpSpacing + (seededRand(i + 0.4) - 0.5) * 70 - cameraX;
+            if (sx < -140 || sx > w + 140) continue;
+            const bh = 10 + seededRand(i * 1.7) * 16;
+            const bw2 = 90 + seededRand(i * 3.1) * 70;
+            ctx.fillStyle = night ? "rgba(255,240,190,0.06)" : "rgba(255,255,255,0.22)";
+            ctx.beginPath();
+            ctx.moveTo(sx - bw2 / 2, groundScreenY + 16);
+            ctx.quadraticCurveTo(sx, groundScreenY + 16 - bh, sx + bw2 / 2, groundScreenY + 16);
+            ctx.closePath();
+            ctx.fill();
+            if (seededRand(i * 7.9) > 0.45) {
+                drawShell(ctx, sx + 34, groundScreenY + 34 + seededRand(i * 4.4) * (h - groundScreenY - 50), i * 3.3);
+            }
+        }
+
+        drawBeachProps(w, h);
+
+        // repères de distance (identiques aux autres mondes), masqués pendant
+        // la cinématique où la distance parcourue n'a aucun sens
+        if (cineActive) return;
+        ctx.strokeStyle = "rgba(255,255,255,0.4)";
+        ctx.fillStyle = "rgba(80,60,20,0.75)";
+        ctx.font = "12px sans-serif";
+        ctx.lineWidth = 2;
+        const startMeter = Math.floor((cameraX / SCALE) / 10) * 10;
+        for (let m = startMeter; m < startMeter + 200; m += 10) {
+            const sx = m * SCALE - cameraX;
+            if (sx < -20 || sx > w + 20) continue;
+            ctx.beginPath();
+            ctx.moveTo(sx, groundScreenY);
+            ctx.lineTo(sx, groundScreenY + 14);
+            ctx.stroke();
+            ctx.fillText(m + "m", sx + 4, groundScreenY + 26);
+        }
+    }
+
+    // Dessine les accessoires posés sur le sable pour ce lancer (voir beachProps)
+    function drawBeachProps(w, h) {
+        beachProps.forEach((prop) => {
+            const sx = prop.x - cameraX;
+            if (sx < -160 || sx > w + 160) return;
+            const baseY = groundScreenY + (prop.depth || 0);
+            if (prop.type === "parasol") drawParasol(ctx, sx, baseY, prop.seed, prop.scale || 1);
+            else if (prop.type === "towel") drawTowel(ctx, sx, baseY, prop.seed);
+            else if (prop.type === "castle") drawSandcastle(ctx, sx, baseY, prop.seed, prop.collapsed);
+        });
+    }
+
+    /* ---- Accessoires et évènements d'un lancer ---- */
+    // beachProps : ce qui est posé sur le sable pour CE lancer. La plage est
+    // regénérée à chaque lancer, donc rien n'est jamais deux fois au même
+    // endroit (voir generateBeachDecor / beachPlaceLandingProp).
+    let beachProps = [];
+    let beachEvents = { parasol: false, towel: false, castle: false };
+    let beachUsed = { parasol: false, towel: false, castle: false };
+    let beachLog = [];        // évènements réellement vécus, affichés au résultat
+
+    // Décor purement visuel semé un peu partout devant la trousse : c'est lui
+    // qui donne l'impression d'une plage différente à chaque lancer.
+    function generateBeachDecor() {
+        beachProps = [];
+        const count = 10 + Math.floor(Math.random() * 8);
+        // Réparti par tranches (jamais deux objets au même endroit), mais avec
+        // une position aléatoire DANS sa tranche : la plage change vraiment
+        // d'un lancer à l'autre sans jamais s'empiler.
+        const slot = 520;
+        for (let i = 0; i < count; i++) {
+            const roll = Math.random();
+            const type = roll < 0.4 ? "parasol" : (roll < 0.75 ? "towel" : "castle");
+            beachProps.push({
+                type,
+                x: 350 + i * slot + Math.random() * (slot - 220),
+                seed: Math.random() * 1000,
+                scale: 0.8 + Math.random() * 0.4,
+                depth: 10 + Math.random() * 40,
+                decorative: true,
+            });
+        }
+    }
+
+    // Tirage des évènements de ce lancer (voir BEACH_EVENT_CHANCE)
+    function rollBeachEvents() {
+        beachEvents = {
+            parasol: Math.random() < BEACH_EVENT_CHANCE.parasol,
+            towel: Math.random() < BEACH_EVENT_CHANCE.towel,
+            castle: Math.random() < BEACH_EVENT_CHANCE.castle,
+        };
+        beachUsed = { parasol: false, towel: false, castle: false };
+        beachLog = [];
+    }
+
+    // Où la trousse va retomber si rien ne l'interrompt (balistique simple,
+    // même intégration que gameLoop) : sert à poser l'accessoire pile à
+    // l'endroit de l'atterrissage pour que le rebond/la serviette soient crédibles.
+    function predictLandingX() {
+        const disc = Math.sqrt(Math.max(0, vy * vy + 2 * currentG * Math.max(0, worldY)));
+        const tFall = (vy + disc) / currentG;
+        return worldX + vx * tFall;
+    }
+
+    // Pose l'accessoire du prochain atterrissage : le parasol tant qu'il n'a
+    // pas servi (c'est lui qui fait rebondir), sinon la serviette, sinon le château.
+    function beachPlaceLandingProp() {
+        let type = null;
+        if (beachEvents.parasol && !beachUsed.parasol) type = "parasol";
+        else if (beachEvents.towel && !beachUsed.towel) type = "towel";
+        else if (beachEvents.castle && !beachUsed.castle) type = "castle";
+        if (!type) return;
+        const x = predictLandingX();
+        // enlève un accessoire décoratif trop proche, pour ne pas empiler deux objets
+        beachProps = beachProps.filter((p) => !(p.decorative && Math.abs(p.x - x) < 140));
+        beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1, depth: 0, event: true });
+    }
+
+    // Appelé juste après le lancer (voir lockAccuracyAndLaunch). En dessous de
+    // BEACH_EVENT_MIN_DISTANCE (distance prédite, avant tout rebond), aucun
+    // évènement ne peut se déclencher : on force tout à faux plutôt que de
+    // tirer au sort, sans quoi une chance non nulle finirait par en placer un.
+    function beachOnLaunch() {
+        if (predictLandingX() / SCALE < BEACH_EVENT_MIN_DISTANCE) {
+            beachEvents = { parasol: false, towel: false, castle: false };
+            beachUsed = { parasol: false, towel: false, castle: false };
+            beachLog = [];
+            return;
+        }
+        rollBeachEvents();
+        beachPlaceLandingProp();
+    }
+
+    // Atterrissage sur un parasol : la trousse repart dans les airs au lieu de
+    // finir son lancer, et l'accessoire suivant est posé sur la nouvelle cible.
+    function tryBeachParasolBounce() {
+        if (!beachEvents.parasol || beachUsed.parasol || inSpaceMode) return false;
+        beachUsed.parasol = true;
+        beachLog.push("parasol");
+        save.plageParasolBounces++;
+        worldY = 1;
+        vy = Math.max(240, Math.abs(vy) * 0.62);
+        vx = vx * 0.94;
+        rotSpeed = 6 + vx / 60;
+        showToast(tr("beachParasolToast"));
+        beachPlaceLandingProp();
+        return true;
+    }
+
+    // Atterrissage final : serviette (purement décorative) ou château (qui s'écroule).
+    function beachFinalizeLanding() {
+        if (inSpaceMode) return;
+        if (beachEvents.towel && !beachUsed.towel) {
+            beachUsed.towel = true;
+            beachLog.push("towel");
+            save.plageTowelsFound++;
+        } else if (beachEvents.castle && !beachUsed.castle) {
+            beachUsed.castle = true;
+            beachLog.push("castle");
+            save.plageCastlesCrushed++;
+            // le château le plus proche s'effondre sur la trousse
+            let best = null, bestD = 200;
+            beachProps.forEach((p) => {
+                if (p.type !== "castle") return;
+                const d = Math.abs(p.x - worldX);
+                if (d < bestD) { bestD = d; best = p; }
+            });
+            if (best) best.collapsed = true;
+        }
+    }
+
+    // Récapitulatif des évènements du lancer, affiché dans le panneau de résultat.
+    function beachResultText() {
+        const lines = [];
+        if (beachLog.indexOf("parasol") >= 0) lines.push(tr("beachResultParasol"));
+        if (beachLog.indexOf("towel") >= 0) lines.push(tr("beachResultTowel"));
+        if (beachLog.indexOf("castle") >= 0) lines.push(tr("beachResultCastle"));
+        return lines.join(" ");
+    }
+
+    /* ---- Cinématique de déblocage du monde Plage ----
+       Découpage temporel (~1 min 15 au total). Aucun bruitage n'est joué ici :
+       la bande-son de cette cinématique sera ajoutée plus tard. */
+    const BCINE = {
+        fade: 4.0,        // fondu de sortie du menu (4 s, sans zoom sur la trousse)
+        hail: 2.4,        // la trousse se penche à gauche pour héler le bus
+        busIn: 3.4,       // dézoom + le bus arrive par la gauche
+        doorOpen: 0.9,    // la porte s'ouvre en face de la trousse
+        boarding: 1.8,    // la trousse monte dans le bus
+        seated: 1.6,      // on la voit assise, son haut dépasse par la fenêtre
+        busOut: 2.6,      // le bus repart vers la droite
+        iris: 1.2,        // fermeture en diaphragme
+        black: 3.0,       // écran noir : faux temps de chargement
+        arrive: 2.8,      // l'iris s'ouvre, la trousse descend du bus sur la plage
+        busLeave: 2.4,    // le bus repart et sort du cadre
+        pivot: 3.2,       // droite / gauche / droite / gauche
+        collapse: 1.2,    // la trousse s'affale à l'horizontale dans un soupir
+        forgot: 4.2,      // message blanc en fondu lent (1,5 s)
+        cheh: 0.1,        // "cheh tom"
+        afterCheh: 0.7,
+        crab: 2.2,        // un crabe sort du sable, "!" et sursaut
+        backAway: 2.0,    // recul prudent vers la droite
+        swarm: 2.0,       // 5 crabes de plus, qui avancent
+        chase: 3.0,       // course-poursuite
+        aimIntro: 0.7,    // la trousse s'arrête net
+        aim: 5.0,         // 5 s pour viser (interdit : la zone verte)
+        fly1: 2.8,        // vol horizontal, la caméra se rapproche puis dézoome
+        parasol: 1.1,     // rebond sur le parasol
+        fly2: 3.0,        // 200 m plus loin
+        castle: 1.2,      // le château s'écroule sur la trousse
+        fly3: 2.6,
+        towel: 1.6,       // la trousse s'allonge dans la serviette
+        fly4: 1.8,        // dernier vol avant l'arrivée
+        outro: 4.5,       // "bref bienvenue dans le monde plage..."
+    };
+    const BCINE_AIM_FORBIDDEN = SPACE_EGG_ACCURACY_MAX; // la "zone verte" du début de barre
+    const BCINE_FG = 74;             // premier plan : px sous la ligne d'horizon
+    const BCINE_TROUSSE_SIZE = 96;   // la trousse est plus grande qu'en jeu : elle est devant
+    const BCINE_DOOR_OFFSET = 127;   // centre de la porte, depuis le coin avant-gauche du bus
+
+    let bcPhase = "";
+    let bcT = 0;
+    let bcLast = 0;
+    let bcScroll = 0;       // défilement du monde pendant les phases "plage"
+    let bcZoom = 1;
+    let bcLean = 0;         // inclinaison de la trousse (hélage / pivots)
+    let bcDrop = 0;         // enfoncement dans le sol (trousse affalée / allongée)
+    let bcAlt = 0;          // hauteur de la trousse au-dessus du sol (px)
+    let bcOnBus = false;    // la trousse est à l'intérieur du bus
+    let bcBusX = 0;         // position écran du coin avant-gauche du bus
+    let bcDoor = 0;         // ouverture de la porte (0 à 1)
+    let bcCrabs = [];       // { x (monde), phase } — le premier sort du sable
+    let bcBang = 0;         // opacité du "!" au-dessus de la trousse
+    let bcMsg = null;       // { key, t, fade } message blanc en surimpression
+    let bcIris = 1;         // 1 = image entière, 0 = tout noir (diaphragme)
+    let bcDialogQueue = [];
+    let bcDialogNext = "";
+    let bcAimValue = 0;
+    let bcTrousseScreenX = 0.42; // position horizontale de la trousse (fraction de w)
+
+    const bcineDialog = document.getElementById("bcine-dialog");
+    const bcineDialogText = document.getElementById("bcine-dialog-text");
+    const bcineAim = document.getElementById("bcine-aim");
+
+    function startBeachCinematic() {
+        cineActive = true;
+        cineKind = "plage";
+        // Comme pour le volcan : le mode jour est forcé le temps de la
+        // cinématique, puis le thème d'origine est restauré (voir cineTeardown).
+        cineSavedTheme = save.theme;
+        if (save.theme !== "light") {
+            save.theme = "light";
+            applyTheme();
+        }
+        document.body.classList.add("cine-mode");
+        screens.game.classList.add("active");
+        screens.menu.classList.add("cine-fading", "slow");
+        requestAnimationFrame(() => screens.menu.classList.add("cine-gone"));
+        resizeCanvas();
+        cameraY = 0; // l'horizon repart de sa position par défaut
+        bcScroll = 0; bcZoom = 1; bcLean = 0; bcAlt = 0; bcDrop = 0;
+        bcOnBus = false; bcDoor = 0; bcBang = 0; bcMsg = null; bcIris = 1;
+        bcCrabs = []; bcDialogQueue = [];
+        generateBeachDecor(); // un peu de décor sur le sable pendant le trajet
+        dustParticles = [];
+        cineUI.fade.style.opacity = 0;
+        bcSetPhase("fade");
+        cineLastFrame = 0;
+        requestAnimationFrame(cineLoop);
+    }
+
+    function bcSetPhase(name) {
+        bcPhase = name;
+        bcT = 0;
+        bcineAim.classList.remove("show");
+        document.body.classList.remove("cine-aim");
+        if (name !== "dialog") bcineDialog.classList.remove("show");
+
+        if (name === "forgot") bcMsg = { key: "bcineForgot", fade: 1.5, t: 0 };
+        if (name === "cheh") bcMsg = { key: "bcineCheh", fade: 0, t: 0 };
+        if (name === "afterCheh") bcMsg = null;
+        // Elle redescend du bus dès le début de la phase : c'est justement ce
+        // qu'on doit voir quand l'iris se rouvre.
+        if (name === "arrive") bcOnBus = false;
+        if (name === "crab") {
+            // un premier crabe sort du sable, à gauche de la trousse
+            bcCrabs = [{ x: bcScroll - 150, rise: 0 }];
+        }
+        if (name === "swarm") {
+            const base = bcCrabs.length ? bcCrabs[0].x : bcScroll - 150;
+            for (let i = 0; i < 5; i++) bcCrabs.push({ x: base - 56 - i * 64, rise: 0 });
+        }
+        if (name === "aim") {
+            meterWrap.style.display = "block";
+            meterFill.style.width = "100%";
+            document.body.classList.add("cine-aim");
+            bcineAim.classList.add("show");
+        } else {
+            meterWrap.style.display = "none";
+        }
+        // Les accessoires sont posés au DÉBUT du vol qui y mène, à la distance
+        // exacte que la trousse va parcourir : ils entrent dans le cadre bien
+        // avant l'impact au lieu d'apparaître d'un coup sous elle.
+        if (name === "fly1") {
+            bcMsg = { key: "bcineUnlocked", fade: 0.8, t: 0 };
+            bcAddProp("parasol", 700 * BCINE.fly1 + 520 * BCINE.parasol * 0.45);
+        }
+        if (name === "fly2") bcAddProp("castle", 200 * SCALE);
+        if (name === "fly3") bcAddProp("towel", 620 * BCINE.fly3);
+        if (name === "outro") bcMsg = { key: "bcineWelcome", fade: 1.2, t: 0 };
+    }
+
+    // Position (monde) de la trousse : elle reste à une fraction fixe de
+    // l'écran, c'est le décor qui défile (voir bcDrawBeach).
+    function bcTrousseWorldX() {
+        return bcScroll + (canvas.width / devicePixelRatio) * bcTrousseScreenX;
+    }
+
+    // Pose un accessoire "ahead" pixels devant la trousse, en dégageant le
+    // décor aléatoire autour pour ne pas empiler deux objets au même endroit.
+    function bcAddProp(type, ahead) {
+        const x = bcTrousseWorldX() + ahead;
+        beachProps = beachProps.filter((p) => !(p.decorative && Math.abs(p.x - x) < 200));
+        beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1.25, depth: BCINE_FG });
+    }
+
+    // File de textes "appuyer n'importe où pour continuer" : le jeu se fige
+    // pendant ces pauses, exactement comme un tutoriel intégré.
+    function bcShowDialogs(keys, nextPhase) {
+        bcDialogQueue = keys.slice();
+        bcDialogNext = nextPhase;
+        bcMsg = null; // le message blanc laisse la place à la boîte de dialogue
+        bcPhase = "dialog";
+        bcT = 0;
+        bcineAim.classList.remove("show");
+        meterWrap.style.display = "none";
+        bcineDialogText.textContent = tr(bcDialogQueue[0]);
+        bcineDialog.classList.add("show");
+    }
+
+    function bcDialogAdvance() {
+        bcDialogQueue.shift();
+        if (bcDialogQueue.length) {
+            bcineDialogText.textContent = tr(bcDialogQueue[0]);
+            return;
+        }
+        bcineDialog.classList.remove("show");
+        bcSetPhase(bcDialogNext);
+    }
+
+    /* ---- Logique : enchaînement des phases ---- */
+    function bcUpdate(dt) {
+        // Voir le commentaire CSS de body.cine-blackout : actif exactement
+        // pendant que le diaphragme couvre l'écran (fermeture, noir, ouverture).
+        document.body.classList.toggle("cine-blackout", bcIris < 0.999);
+        if (bcMsg) bcMsg.t += dt;
+
+        switch (bcPhase) {
+            case "fade":
+                if (bcT >= BCINE.fade) {
+                    screens.menu.classList.remove("active", "cine-fading", "cine-gone", "slow");
+                    bcSetPhase("hail");
+                }
+                break;
+            case "hail": {
+                // se penche vers la gauche, comme pour héler un taxi du bras droit
+                const p = c01(bcT / BCINE.hail);
+                bcLean = -0.42 * Math.sin(p * Math.PI * 2.5) * (1 - p * 0.3);
+                if (bcT >= BCINE.hail) { bcLean = 0; bcSetPhase("busIn"); }
+                break;
+            }
+            case "busIn":
+                if (bcT >= BCINE.busIn) bcSetPhase("doorOpen");
+                break;
+            case "doorOpen":
+                bcDoor = c01(bcT / BCINE.doorOpen);
+                if (bcT >= BCINE.doorOpen) bcSetPhase("boarding");
+                break;
+            case "boarding":
+                if (bcT >= BCINE.boarding) { bcOnBus = true; bcSetPhase("seated"); }
+                break;
+            case "seated":
+                if (bcT >= BCINE.seated) { bcDoor = 0; bcSetPhase("busOut"); }
+                break;
+            case "busOut":
+                if (bcT >= BCINE.busOut) bcSetPhase("iris");
+                break;
+            case "iris":
+                bcIris = 1 - c01(bcT / BCINE.iris);
+                if (bcT >= BCINE.iris) { bcIris = 0; bcSetPhase("black"); }
+                break;
+            case "black":
+                if (bcT >= BCINE.black) bcSetPhase("arrive");
+                break;
+            case "arrive":
+                // l'iris se rouvre pile au moment où la trousse descend du bus
+                bcIris = c01(bcT / (BCINE.arrive * 0.45));
+                if (bcT >= BCINE.arrive) { bcIris = 1; bcSetPhase("busLeave"); }
+                break;
+            case "busLeave":
+                if (bcT >= BCINE.busLeave) bcSetPhase("pivot");
+                break;
+            case "pivot": {
+                // droite, gauche, droite, gauche : quatre quarts de tour hésitants
+                const p = c01(bcT / BCINE.pivot);
+                bcLean = Math.sin(p * Math.PI * 4) * 0.5;
+                if (bcT >= BCINE.pivot) { bcLean = 0; bcSetPhase("collapse"); }
+                break;
+            }
+            case "collapse": {
+                // s'affale à plat dans un soupir : le sprite est déjà couché,
+                // donc on la fait glisser au sol avec un petit basculement
+                const p = cOut(c01(bcT / BCINE.collapse));
+                bcDrop = 20 * p;
+                bcLean = 0.16 * p;
+                if (bcT >= BCINE.collapse) bcSetPhase("forgot");
+                break;
+            }
+            case "forgot":
+                if (bcT >= BCINE.forgot) bcSetPhase("cheh");
+                break;
+            case "cheh":
+                if (bcT >= BCINE.cheh) bcSetPhase("afterCheh");
+                break;
+            case "afterCheh":
+                if (bcT >= BCINE.afterCheh) bcSetPhase("crab");
+                break;
+            case "crab": {
+                const p = c01(bcT / BCINE.crab);
+                if (bcCrabs[0]) bcCrabs[0].rise = c01(p * 2.4);
+                if (p > 0.35) {
+                    bcBang = c01((p - 0.35) * 6);
+                    // la trousse se relève en sursaut (petit bond compris)
+                    const up = cOut(c01((p - 0.35) / 0.3));
+                    bcDrop = 20 * (1 - up);
+                    bcLean = 0.16 * (1 - up);
+                    bcAlt = 26 * Math.sin(up * Math.PI);
+                }
+                if (bcT >= BCINE.crab) { bcDrop = 0; bcLean = 0; bcAlt = 0; bcSetPhase("backAway"); }
+                break;
+            }
+            case "backAway":
+                bcScroll += 60 * dt; // recule doucement vers la droite
+                bcBang = Math.max(0, bcBang - dt * 0.5);
+                if (bcT >= BCINE.backAway) bcSetPhase("swarm");
+                break;
+            case "swarm":
+                bcScroll += 40 * dt;
+                bcCrabs.forEach((crab, i) => {
+                    crab.rise = Math.min(1, crab.rise + dt * 1.6);
+                    crab.x += 70 * dt; // les crabes avancent vers la trousse
+                });
+                if (bcT >= BCINE.swarm) bcSetPhase("chase");
+                break;
+            case "chase":
+                bcScroll += 340 * dt;
+                bcCrabs.forEach((crab) => { crab.x += 320 * dt; });
+                bcBang = Math.max(0, bcBang - dt);
+                if (bcT >= BCINE.chase) bcSetPhase("aimIntro");
+                break;
+            case "aimIntro":
+                bcScroll += 340 * dt * (1 - c01(bcT / BCINE.aimIntro)); // freinage net
+                bcCrabs.forEach((crab) => { crab.x += 150 * dt; });
+                if (bcT >= BCINE.aimIntro) bcSetPhase("aim");
+                break;
+            case "aim":
+                // la barre oscille comme en jeu ; au bout de 5 s, un tir valide
+                // est joué automatiquement pour ne jamais coincer le joueur
+                bcAimValue = Math.sin(bcT * 3.4);
+                meterMarker.style.left = ((bcAimValue + 1) / 2 * 100) + "%";
+                if (bcT >= BCINE.aim) bcLaunchFromAim();
+                break;
+            case "fly1":
+                bcScroll += 700 * dt;
+                bcAlt = 190;
+                // la caméra se rapproche puis dézoome doucement 1 s plus tard
+                bcZoom = bcT < 1 ? 1 + 0.45 * cOut(bcT) : 1.45 - 0.45 * cInOut(c01((bcT - 1) / (BCINE.fly1 - 1)));
+                if (bcT >= BCINE.fly1) bcSetPhase("parasol");
+                break;
+            case "parasol": {
+                bcZoom = 1;
+                bcMsg = null;
+                bcScroll += 520 * dt;
+                const p = c01(bcT / BCINE.parasol);
+                // descente sur le parasol puis rebond immédiat
+                bcAlt = p < 0.45 ? 190 * (1 - p / 0.45) + 96 : 96 + 260 * cOut((p - 0.45) / 0.55);
+                if (bcT >= BCINE.parasol) bcShowDialogs(["bcineParasol1", "bcineParasol2"], "fly2");
+                break;
+            }
+            case "fly2": {
+                // ~200 m plus loin, en cloche, jusque dans un château de sable
+                const p = c01(bcT / BCINE.fly2);
+                bcScroll += (200 * SCALE / BCINE.fly2) * dt;
+                bcAlt = 356 + 120 * Math.sin(p * Math.PI) - 356 * cIn(p);
+                if (bcT >= BCINE.fly2) { bcAlt = 0; bcSetPhase("castle"); }
+                break;
+            }
+            case "castle":
+                bcAlt = 0;
+                // le château s'écroule sur la trousse dès le premier contact
+                if (bcT < 0.05) {
+                    beachProps.forEach((p) => {
+                        if (p.type === "castle" && Math.abs(p.x - bcTrousseWorldX()) < 180) p.collapsed = true;
+                    });
+                }
+                if (bcT >= BCINE.castle) bcShowDialogs(["bcineTutoAnyway"], "fly3");
+                break;
+            case "fly3": {
+                const p = c01(bcT / BCINE.fly3);
+                bcScroll += 620 * dt;
+                bcAlt = 300 * Math.sin(p * Math.PI * 0.92);
+                if (bcT >= BCINE.fly3) { bcAlt = 0; bcSetPhase("towel"); }
+                break;
+            }
+            case "towel":
+                // elle s'allonge dans la serviette : elle s'enfonce dedans
+                bcAlt = 0;
+                bcDrop = 16 * cOut(c01(bcT / (BCINE.towel * 0.6)));
+                if (bcT >= BCINE.towel) {
+                    bcShowDialogs(["bcineTowel1", "bcineTowel2", "bcineTowel3"], "fly4");
+                }
+                break;
+            case "fly4": {
+                bcDrop = 0;
+                const p = c01(bcT / BCINE.fly4);
+                bcScroll += 620 * dt;
+                bcAlt = 330 * cOut(p);
+                if (bcT >= BCINE.fly4) bcSetPhase("outro");
+                break;
+            }
+            case "outro":
+                bcScroll += 560 * dt;
+                bcAlt = 330;
+                if (bcT >= BCINE.outro) { bcFinish(); return; }
+                break;
+        }
+    }
+
+    // Tir de la phase "VISE !!!" : tout sauf la zone verte est accepté.
+    function bcLaunchFromAim(fromTap) {
+        if (fromTap && bcAimValue <= BCINE_AIM_FORBIDDEN) {
+            showToast(tr("bcineNotGreen"));
+            return; // zone verte interdite : on laisse la barre continuer
+        }
+        meterWrap.style.display = "none";
+        bcineAim.classList.remove("show");
+        document.body.classList.remove("cine-aim");
+        bcSetPhase("fly1");
+    }
+
+    /* ---- Rendu ---- */
+    function bcRender(dt) {
+        const w = canvas.width / devicePixelRatio;
+        const h = canvas.height / devicePixelRatio;
+        ctx.setTransform(devicePixelRatio, 0, 0, devicePixelRatio, 0, 0);
+        ctx.clearRect(0, 0, w, h);
+
+        if (bcPhase === "black") {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, w, h);
+            return;
+        }
+
+        const yardPhases = ["fade", "hail", "busIn", "doorOpen", "boarding", "seated", "busOut", "iris"];
+        if (yardPhases.indexOf(bcPhase) >= 0) bcDrawYard(w, h);
+        else bcDrawBeach(w, h);
+
+        // message blanc en surimpression
+        if (bcMsg) {
+            const a = bcMsg.fade > 0 ? c01(bcMsg.t / bcMsg.fade) : 1;
+            ctx.save();
+            ctx.globalAlpha = a;
+            ctx.textAlign = "center";
+            ctx.fillStyle = "#fff";
+            ctx.shadowColor = "rgba(0,0,0,0.8)";
+            ctx.shadowBlur = 12;
+            const size = Math.round(Math.min(26, w * 0.042));
+            ctx.font = "800 " + size + "px 'Segoe UI', Arial, sans-serif";
+            wrapCanvasText(ctx, tr(bcMsg.key), w / 2, h * 0.17, w * 0.84, size * 1.35);
+            ctx.restore();
+        }
+
+        // fermeture/ouverture en diaphragme
+        if (bcIris < 0.999) {
+            const maxR = Math.hypot(w, h) / 2;
+            ctx.save();
+            ctx.fillStyle = "#000";
+            ctx.beginPath();
+            ctx.rect(0, 0, w, h);
+            ctx.arc(w / 2, h / 2, maxR * cInOut(c01(bcIris)), 0, Math.PI * 2, true);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    // Coupe un texte en lignes qui tiennent dans "maxW" et les centre sur (x, y)
+    function wrapCanvasText(c, text, x, y, maxW, lineH) {
+        const words = String(text).split(" ");
+        const lines = [];
+        let line = "";
+        words.forEach((word) => {
+            const test = line ? line + " " + word : word;
+            if (c.measureText(test).width > maxW && line) {
+                lines.push(line);
+                line = word;
+            } else {
+                line = test;
+            }
+        });
+        if (line) lines.push(line);
+        lines.forEach((l, i) => c.fillText(l, x, y + i * lineH));
+    }
+
+    // Phases "cour d'école" : décor habituel, la trousse hèle le bus, monte, part.
+    // Trois plans, comme demandé : la trousse devant (dessinée en coordonnées
+    // écran, donc grande et basse), le bus derrière elle, et le décor au fond.
+    // Le dézoom est obtenu en dessinant le décor sur un "canvas virtuel" plus
+    // grand (vw x vh) puis en le réduisant : le cadre reste couvert, sans bord.
+    function bcDrawYard(w, h) {
+        const groundY = h * 0.68;
+
+        let zoom = 1;
+        if (bcPhase === "busIn") zoom = 1 - 0.42 * cInOut(c01(bcT / BCINE.busIn));
+        else if (["doorOpen", "boarding", "seated", "busOut", "iris"].indexOf(bcPhase) >= 0) zoom = 0.58;
+        const vw = w / zoom, vh = h / zoom;
+
+        // Point d'ancrage : la trousse est au premier plan, sous la ligne d'horizon
+        const fx = w * 0.45;
+        const fy = groundY + BCINE_FG;
+        const fxv = fx / zoom; // le même X, vu du décor réduit
+
+        cameraX = -fxv; // worldX 0 tombe pile sous la trousse
+        ctx.save();
+        ctx.scale(zoom, zoom);
+        drawBackground(vw, vh);
+
+        // Le bus arrive par la gauche et s'arrête quand sa porte est devant la
+        // trousse (la porte est à doorOffset du coin avant-gauche du bus).
+        const busTarget = fxv - BCINE_DOOR_OFFSET;
+        const busStart = -560;
+        if (["busIn", "doorOpen", "boarding", "seated"].indexOf(bcPhase) >= 0) {
+            const p = bcPhase === "busIn" ? cOut(c01(bcT / BCINE.busIn)) : 1;
+            bcBusX = busStart + (busTarget - busStart) * p;
+        } else if (bcPhase === "busOut") {
+            bcBusX = busTarget + cIn(c01(bcT / BCINE.busOut)) * (vw + 800);
+        }
+        if (bcPhase !== "fade" && bcPhase !== "hail") {
+            drawBus(ctx, bcBusX, vh * 0.68, 1, bcDoor, bcOnBus);
+        }
+        ctx.restore();
+
+        // La trousse, au premier plan (hors zoom), tant qu'elle n'est pas montée.
+        // Pendant l'embarquement elle rejoint la porte du bus en rapetissant :
+        // elle s'éloigne de la caméra en même temps qu'elle avance.
+        if (!bcOnBus) {
+            let tx = fx, ty = fy, size = BCINE_TROUSSE_SIZE, alpha = 1;
+            if (bcPhase === "boarding") {
+                const p = cInOut(c01(bcT / BCINE.boarding));
+                const doorX = (bcBusX + BCINE_DOOR_OFFSET) * zoom;
+                const doorY = groundY - 26;
+                tx = fx + (doorX - fx) * p;
+                ty = fy + (doorY - fy) * p;
+                size = BCINE_TROUSSE_SIZE + (56 - BCINE_TROUSSE_SIZE) * p;
+                alpha = 1 - c01((p - 0.6) / 0.4);
+            }
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            paintTrousse(ctx, tx, ty, size, bcLean);
+            ctx.restore();
+        }
+    }
+
+    // Phases "plage" : décor du monde, bus qui dépose puis repart, crabes, vol.
+    // Ici tout se joue au premier plan (trousse, crabes, accessoires posés
+    // BCINE_FG px sous la ligne d'horizon), le bus juste derrière.
+    function bcDrawBeach(w, h) {
+        cameraX = bcScroll;
+        const zoom = bcZoom;
+        const vw = w / zoom, vh = h / zoom;
+        const fxv = w * bcTrousseScreenX; // X de la trousse dans le décor
+
+        ctx.save();
+        ctx.scale(zoom, zoom);
+        drawBeachBackground(vw, vh);
+
+        const fy = groundScreenY + BCINE_FG;
+
+        // Le bus dépose la trousse (porte un peu à gauche d'elle, pour qu'on
+        // la voie vraiment en descendre) puis repart vers la droite.
+        if (bcPhase === "arrive" || bcPhase === "busLeave") {
+            let busX = fxv - 90 - BCINE_DOOR_OFFSET;
+            if (bcPhase === "busLeave") busX += cIn(c01(bcT / BCINE.busLeave)) * (vw + 800);
+            drawBus(ctx, busX, groundScreenY + 20, 1, bcPhase === "arrive" ? 1 : 0, bcOnBus);
+        }
+
+        // Crabes : le premier sort du sable, les autres le rejoignent
+        const now = performance.now() / 1000;
+        bcCrabs.forEach((crab, i) => {
+            const sx = crab.x - bcScroll + fxv;
+            if (sx < -90 || sx > vw + 90) return;
+            const rise = crab.rise === undefined ? 1 : crab.rise;
+            ctx.save();
+            // découpe au ras du sable : tant que le crabe n'a pas fini de
+            // remonter, la partie enterrée reste invisible
+            ctx.beginPath();
+            ctx.rect(sx - 80, fy - 160, 160, 162);
+            ctx.clip();
+            drawCrab(ctx, sx, fy + 34 - 40 * rise, 46, now + i, 1);
+            ctx.restore();
+        });
+
+        // La trousse
+        if (!bcOnBus) {
+            let tx = fxv, ty = fy - bcAlt + bcDrop, alpha = 1;
+            if (bcPhase === "arrive") {
+                // descend le marchepied puis fait un pas de côté sur le sable
+                const p = cOut(c01((bcT - BCINE.arrive * 0.3) / (BCINE.arrive * 0.7)));
+                tx = (fxv - 90) + 90 * p;
+                ty = (groundScreenY - 26) + (fy - (groundScreenY - 26)) * p;
+                alpha = c01(bcT / (BCINE.arrive * 0.35));
+            }
+            ctx.save();
+            ctx.globalAlpha = alpha;
+            paintTrousse(ctx, tx, ty, BCINE_TROUSSE_SIZE, bcLean);
+            ctx.restore();
+            // "!" de surprise au-dessus d'elle
+            if (bcBang > 0.01) {
+                ctx.save();
+                ctx.globalAlpha = bcBang;
+                ctx.textAlign = "center";
+                ctx.fillStyle = "#ffcf3f";
+                ctx.strokeStyle = "rgba(40,25,0,0.85)";
+                ctx.lineWidth = 5;
+                ctx.font = "900 62px 'Segoe UI', Arial, sans-serif";
+                ctx.strokeText("!", tx, ty - 66);
+                ctx.fillText("!", tx, ty - 66);
+                ctx.restore();
+            }
+        }
+        ctx.restore();
+    }
+
+    // Fin de la cinématique : le monde Plage est débloqué et le joueur y est
+    // déposé (voir enterBeachProfile), puis le tutoriel.
+    function bcFinish() {
+        cineTeardown();
+        save.plageUnlocked = true;
+        const plageWorld = WORLDS.find(w => w.id === "plage");
+        if (plageWorld) plageWorld.unlocked = true;
+        enterBeachProfile();
+        persist();
+        showScreen("menu");
+        buildWorldsRow();
+        if (!save.plageTutorialSeen) {
+            startTutorial(PLAGE_TUTORIAL, () => { save.plageTutorialSeen = true; persist(); });
+        }
+    }
+
+    // Un appui pendant la cinématique de la plage : valide un dialogue, ou
+    // tire pendant la phase de visée.
+    function bcTap(clientX) {
+        if (bcPhase === "dialog") { bcDialogAdvance(); return; }
+        if (bcPhase === "aim") bcLaunchFromAim(true);
+    }
 
     /* ============ 12. FIREBASE (SAUVEGARDE CLOUD + CLASSEMENT) ============ */
     const firebaseConfig = {
@@ -5352,6 +6913,10 @@
                 if (save.volcanUnlocked) {
                     const volcanWorld = WORLDS.find(w => w.id === "volcans");
                     if (volcanWorld) volcanWorld.unlocked = true;
+                }
+                if (save.plageUnlocked) {
+                    const plageWorld = WORLDS.find(w => w.id === "plage");
+                    if (plageWorld) plageWorld.unlocked = true;
                 }
                 buildWorldsRow();
                 refreshMenu();
@@ -5463,18 +7028,20 @@
         }
     }
 
-    // Retire du classement l'entrée de l'ancien compte après récupération :
-    // sans ça son pseudo y resterait affiché en double (le record récupéré est
-    // republié sous le compte courant juste après). bestDistance à 0 la fait
-    // sortir du top, et le retireToken prouve aux règles Firestore qu'on a bien
-    // récupéré CE compte-là.
+    // Retire des classements (normal ET Plage) l'entrée de l'ancien compte
+    // après récupération : sans ça son pseudo y resterait affiché en double
+    // (le record récupéré est republié sous le compte courant juste après).
+    // bestDistance à 0 la fait sortir du top, et le retireToken prouve aux
+    // règles Firestore qu'on a bien récupéré CE compte-là.
     function retireOldLeaderboardEntry(oldUid, retireToken, pseudo) {
         if (!db || !oldUid || !retireToken || oldUid === currentUser.uid) return Promise.resolve();
-        return db.collection("scores").doc(oldUid).set({
-            pseudo: pseudo || "",
-            bestDistance: 0,
-            retireToken: retireToken,
-        }).catch((err) => console.error("Retrait de l'ancienne entrée impossible :", err));
+        return Promise.all(["scores", "scoresPlage"].map((col) =>
+            db.collection(col).doc(oldUid).set({
+                pseudo: pseudo || "",
+                bestDistance: 0,
+                retireToken: retireToken,
+            }).catch((err) => console.error("Retrait de l'ancienne entrée (" + col + ") impossible :", err))
+        ));
     }
 
     // Récupère la partie associée à un code saisi par le joueur.
@@ -5516,10 +7083,15 @@
                         const volcanWorld = WORLDS.find((w) => w.id === "volcans");
                         if (volcanWorld) volcanWorld.unlocked = true;
                     }
+                    if (save.plageUnlocked) {
+                        const plageWorld = WORLDS.find((w) => w.id === "plage");
+                        if (plageWorld) plageWorld.unlocked = true;
+                    }
                     persist(); // envoie la partie choisie (+ la copie de récupération)
-                    // Republie l'entrée de classement tout de suite au lieu
+                    // Republie les deux classements tout de suite au lieu
                     // d'attendre le prochain record (voir pushScoreIfRecord).
-                    pushScoreIfRecord(save.bestDistance);
+                    pushScoreTo("scores", save.bestDistance);
+                    pushScoreTo("scoresPlage", save.plageBestDistance);
                     buildWorldsRow();
                     refreshMenu();
                     refreshSettingsModal();
@@ -5744,27 +7316,45 @@
     // d'index composite.
     function computeRank(bestDistance) {
         if (!db) return Promise.resolve(null);
-        return countDocs(db.collection("scores").where("bestDistance", ">", bestDistance)).then((n) => n + 1);
+        return countDocs(db.collection(scoresCollection()).where("bestDistance", ">", bestDistance)).then((n) => n + 1);
     }
 
-    // Met à jour l'entrée du classement (un seul document par joueur, écrasé
-    // à chaque nouveau record, jamais à chaque lancer pour limiter les écritures)
-    function pushScoreIfRecord(distanceMeters) {
-        if (!db || !currentUser) return;
-        db.collection("scores").doc(currentUser.uid).set({
+    // Le monde Plage a son propre classement : on n'y compare pas des records
+    // faits avec des améliorations à zéro à ceux du monde normal.
+    function scoresCollection() {
+        return save.inPlage ? "scoresPlage" : "scores";
+    }
+
+    // Écrit un score dans une collection de classement donnée (un seul
+    // document par joueur, écrasé à chaque appel). Factorisé pour être
+    // réutilisé par pushScoreIfRecord (lancer normal) ET par la récupération
+    // de sauvegarde (voir redeemRecoveryCode, qui doit pousser les DEUX
+    // classements d'un coup sans attendre un nouveau record).
+    function pushScoreTo(col, distanceMeters) {
+        if (!db || !currentUser || !(distanceMeters > 0)) return;
+        db.collection(col).doc(currentUser.uid).set({
             pseudo: save.pseudo || "Anonyme",
             bestDistance: distanceMeters,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         }, { merge: true }).catch((err) => console.error("Envoi du score impossible :", err));
     }
 
+    // Met à jour l'entrée du classement (un seul document par joueur, écrasé
+    // à chaque nouveau record, jamais à chaque lancer pour limiter les écritures)
+    function pushScoreIfRecord(distanceMeters) {
+        pushScoreTo(scoresCollection(), distanceMeters);
+    }
+
     // Affiche le pseudo actuel et (re)charge le classement à l'ouverture de l'écran
     function refreshLeaderboardScreen() {
         document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
+        document.querySelector('[data-i18n="leaderboardTitle"]').textContent =
+            save.inPlage ? tr("leaderboardTitlePlage") : tr("leaderboardTitle");
         loadLeaderboard();
     }
 
-    // Charge et affiche le top 15 des meilleures distances, tous joueurs confondus
+    // Charge et affiche TOUTES les meilleures distances, tous joueurs confondus
+    // (pas de limite : voir la demande explicite, contrairement au top 15 d'avant).
     function loadLeaderboard() {
         const body = document.getElementById("leaderboard-body");
         if (!FIREBASE_ENABLED || !db) {
@@ -5772,15 +7362,13 @@
             return;
         }
         body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardLoading") + '</p>';
-        db.collection("scores").orderBy("bestDistance", "desc").limit(15).get().then((snapshot) => {
+        db.collection(scoresCollection()).orderBy("bestDistance", "desc").get().then((snapshot) => {
             body.innerHTML = "";
             let rank = 0;
-            let foundMe = false;
             snapshot.forEach((doc) => {
                 rank++;
                 const data = doc.data();
                 const isMe = !!(currentUser && doc.id === currentUser.uid);
-                if (isMe) foundMe = true;
                 const row = document.createElement("div");
                 row.className = "leaderboard-row clickable" + (isMe ? " you" : "");
                 row.innerHTML =
@@ -5802,39 +7390,11 @@
             });
             if (rank === 0) {
                 body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardEmpty") + '</p>';
-                return;
             }
-            // Hors du top 15, ma ligne n'apparaissait nulle part : impossible de
-            // savoir où je me situe, et le halo doré "c'est toi" semblait avoir
-            // disparu (il n'y avait simplement aucune ligne à moi à l'écran).
-            // On rappelle donc ma propre ligne en bas, avec mon vrai rang.
-            if (!foundMe) appendOwnLeaderboardRow(body);
         }).catch((err) => {
             console.error("Chargement du classement impossible :", err);
             body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardError") + '</p>';
         });
-    }
-
-    // Ma ligne rappelée en bas du classement quand je suis hors du top 15.
-    // Best-effort : si le calcul du rang échoue (hors ligne...), on n'affiche
-    // rien plutôt que d'inventer une position.
-    function appendOwnLeaderboardRow(body) {
-        if (!currentUser || !save.bestDistance) return; // pas encore classé
-        computeRank(save.bestDistance).then((myRank) => {
-            if (!myRank) return;
-            const row = document.createElement("div");
-            row.className = "leaderboard-row clickable you outside-top";
-            row.innerHTML =
-                '<span class="rank">#' + myRank + '</span>' +
-                '<span class="pseudo">' + escapeHtml(save.pseudo || "???") + '</span>' +
-                '<span class="dist">' + save.bestDistance.toFixed(1) + ' m</span>';
-            row.addEventListener("click", () => {
-                Object.values(screens).forEach((s) => s.classList.remove("active"));
-                screens.profile.classList.add("active");
-                renderProfile();
-            });
-            body.appendChild(row);
-        }).catch((err) => console.error("Calcul de mon rang impossible :", err));
     }
 
     /* ============ 15. ÉCRAN PROFIL (compte, abonnés, progression) ============ */
@@ -6364,6 +7924,14 @@
         },
     ];
 
+    // Tutoriel spécifique au monde Plage, joué une seule fois juste après la
+    // cinématique (voir bcFinish).
+    const PLAGE_TUTORIAL = [
+        { icon: "🏖️", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle1", "plageTutoText1"] },
+        { icon: "😈", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle2", "plageTutoText2"] },
+        { icon: "⛱️", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle3", "plageTutoText3"] },
+    ];
+
     let tutorialStep = 0;
     let tutorialSlides = TUTORIAL_SLIDES; // jeu de diapos actuellement affiché
     let tutorialDoneCb = null;            // appelé à la fermeture, si défini
@@ -6381,8 +7949,10 @@
         const slide = tutorialSlides[tutorialStep];
         const localized = slide[save.lang] || slide.fr;
         document.getElementById("tutorial-icon").textContent = slide.icon;
-        document.getElementById("tutorial-title").textContent = localized.title;
-        document.getElementById("tutorial-text").textContent = localized.text;
+        // "keys" = le texte vit dans STRINGS (traduit en direct au changement
+        // de langue) plutôt que dans la diapo elle-même.
+        document.getElementById("tutorial-title").textContent = slide.keys ? tr(slide.keys[0]) : localized.title;
+        document.getElementById("tutorial-text").textContent = slide.keys ? tr(slide.keys[1]) : localized.text;
 
         const dots = document.getElementById("tutorial-dots");
         dots.innerHTML = "";
@@ -6441,7 +8011,29 @@
         renderAvatarGrid();
         refreshRecoveryUI();
         clearAccountFormError("recovery-error");
+        // Le tutoriel de chaque monde ne peut être revu qu'une fois ce monde débloqué.
+        document.getElementById("settings-row-tuto-volcan").style.display = save.volcanUnlocked ? "" : "none";
+        document.getElementById("settings-row-tuto-plage").style.display = save.plageUnlocked ? "" : "none";
     }
+
+    // Boutons "Revoir" des réglages : referment la modale et rejouent le jeu
+    // de diapos demandé (voir startTutorial). Ne modifient jamais les drapeaux
+    // "déjà vu" (tutorialSeen/volcanTutorialSeen/plageTutorialSeen) : les revoir
+    // n'enlève rien au fait qu'ils ont déjà été vus une première fois.
+    document.getElementById("btn-replay-tuto-basics").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        startTutorial(TUTORIAL_SLIDES);
+    });
+    document.getElementById("btn-replay-tuto-volcan").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        // Un callback (même vide) est nécessaire ici : sans lui, closeTutorial()
+        // marquerait à tort save.tutorialSeen (le tuto de BASE) comme vu.
+        startTutorial(VOLCANO_TUTORIAL, () => {});
+    });
+    document.getElementById("btn-replay-tuto-plage").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        startTutorial(PLAGE_TUTORIAL, () => {});
+    });
 
     // Construit la grille d'icônes au choix (voir AVATAR_EMOJIS) ; celle
     // actuellement équipée reste visuellement marquée (bordure accent).
@@ -6518,7 +8110,8 @@
         document.getElementById("info-dura-bar").style.width = (save.durability / maxDurability() * 100) + "%";
         document.getElementById("info-name").textContent = save.pseudo || "Trousse";
         document.getElementById("info-time").textContent = formatPlayTime(save.playTime);
-        document.getElementById("info-best").textContent = save.bestDistance.toFixed(1) + " m";
+        document.getElementById("info-best").textContent =
+            (save.currentWorld === "plage" ? save.plageBestDistance : save.bestDistance).toFixed(1) + " m";
         document.getElementById("trousse-modal").classList.add("show");
     }
 
@@ -6536,6 +8129,20 @@
     // Popup "refaire la cinématique ?" (voir buildWorldsRow) : "Refaire" la
     // relance depuis le début, "Juste y aller" sélectionne le monde Volcans
     // sans repasser par la cinématique.
+    // Popup "reprendre le bus ?" (voir handlePlageCardClick)
+    document.getElementById("btn-plage-replay-yes").addEventListener("click", () => {
+        document.getElementById("plage-replay-modal").classList.remove("show");
+        startBeachCinematic();
+    });
+    document.getElementById("btn-plage-replay-no").addEventListener("click", () => {
+        document.getElementById("plage-replay-modal").classList.remove("show");
+        enterBeachProfile();
+        persist();
+        sfxCharge();
+        buildWorldsRow();
+        refreshMenu();
+    });
+
     document.getElementById("btn-volcan-replay-yes").addEventListener("click", () => {
         document.getElementById("volcan-replay-modal").classList.remove("show");
         startVolcanoCinematic();
@@ -6559,8 +8166,65 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.0";
+    const VERSION_NUMBER = "9.0.0";
     const CHANGELOG = [
+        {
+            version: "9.0.0",
+            major: [
+                { fr: "Le classement (monde normal ET Plage) n'est plus limité à un top 15 : il affiche tout le monde, sans exception (l'ancien rappel de \"ta ligne\" en bas de classement n'a donc plus lieu d'être)", en: "The leaderboard (normal world AND Beach) is no longer capped at a top 15: it now shows everyone, no exceptions (the old \"your row\" recall at the bottom is no longer needed)" },
+                { fr: "Le code de récupération (Réglages) couvre maintenant aussi le classement de la Plage : récupérer sa partie sur un autre appareil retire proprement l'ancienne entrée des deux classements", en: "The recovery code (Settings) now also covers the Beach leaderboard: recovering your save on another device properly retires the old entry from both leaderboards" },
+            ],
+            minor: [],
+        },
+        {
+            version: "8.1.7",
+            major: [],
+            minor: [
+                { fr: "Plus de double économie sur la plage : l'argent, les améliorations, les skins/traînées et la durabilité sont désormais partagés avec le monde normal. Seul l'argent est remis à 0 à l'arrivée, une seule fois (le classement de la plage reste séparé, avec son propre record)", en: "No more separate beach economy: money, upgrades, skins/trails and durability are now shared with the normal world. Only your money is reset to 0 on arrival, once (the beach leaderboard stays separate, with its own record)" },
+                { fr: "Suppression de la santé mentale : les serviettes trouvées pendant un lancer restent, mais sont désormais purement décoratives ; la carte serviette a disparu de la boutique", en: "Removed the mental health system: towels found during a throw remain, but are now purely decorative; the towel card is gone from the shop" },
+            ],
+        },
+        {
+            version: "8.1.5",
+            major: [],
+            minor: [
+                { fr: "Rééquilibrage du monde Plage : trois évènements aléatoires par lancer (parasol, serviette, château de sable), tirés indépendamment au-delà de 100 m ; 11 succès liés à la plage", en: "Beach world rebalance: three random events per throw (parasol, towel, sandcastle), rolled independently past 100 m; 11 beach-related achievements" },
+            ],
+        },
+        {
+            version: "8.1.3",
+            major: [],
+            minor: [
+                { fr: "Corrige un vrai bug de la cinématique (plage comme volcan) : cliquer pendant le fondu de sortie du menu (2,2 à 4 s) retombait sur les boutons du menu resté cliquable dessous — un clic malheureux sur la carte \"Volcans\" pouvait démarrer l'autre cinématique par-dessus", en: "Fixed a real cutscene bug (beach and volcano alike): clicking during the menu's fade-out (2.2 to 4 s) landed on the menu's buttons, which stayed clickable underneath — an unlucky tap on the \"Volcanoes\" card could start the other cutscene on top of it" },
+            ],
+        },
+        {
+            version: "8.1.2",
+            major: [],
+            minor: [
+                { fr: "Les parasols, serviettes et châteaux de sable n'apparaissent plus que sur les lancers de plus de 100 m ; en dessous, le stress des crabes (-5 de santé mentale) ne s'applique plus non plus", en: "Parasols, towels and sandcastles now only show up on throws past 100 m; below that, the crab stress (-5 mental health) no longer applies either" },
+                { fr: "Le billet de bus du retour ne coûte 250 000 $ que la toute première fois : une fois payé, revenir sur la plage puis en repartir est gratuit pour toujours (comme la Trousse à Claquettes à l'entrée)", en: "The return bus ticket only costs $250,000 the very first time: once paid, coming back to the beach and leaving again is free forever (like the Flip-Flop Pencil Case on the way in)" },
+            ],
+        },
+        {
+            version: "8.1.1",
+            major: [],
+            minor: [
+                { fr: "Corrige le soleil/la lune qui restait visible par-dessus le fondu au noir de la cinématique plage (fermeture en diaphragme)", en: "Fixed the sun/moon staying visible over the beach cutscene's fade to black (iris close)" },
+                { fr: "Ajout d'un bouton pour revoir le tutoriel (Réglages) : les bases du jeu, plus ceux du Volcan et de la Plage une fois ces mondes débloqués", en: "Added a button to replay the tutorial (Settings): the game basics, plus the Volcano and Beach ones once those worlds are unlocked" },
+            ],
+        },
+        {
+            version: "8.1.0",
+            major: [
+                { fr: "Nouveau monde : la Plage ! Il s'ouvre avec la Trousse à Claquettes (100 000 $ en boutique), puis une longue cinématique : le bus, le trajet, l'arrivée sur le sable, les crabes... et un tuto joué en direct", en: "New world: the Beach! It opens with the Flip-Flop Pencil Case ($100,000 in the shop), then a long cutscene: the bus, the trip, the arrival on the sand, the crabs... and a tutorial played live" },
+            ],
+            minor: [
+                { fr: "La plage est regénérée à chaque lancer : parasols, serviettes et châteaux de sable ne sont jamais deux fois au même endroit", en: "The beach is regenerated on every throw: parasols, towels and sandcastles are never twice in the same place" },
+                { fr: "Trois évènements tirés au sort à chaque lancer : rebond sur un parasol (50%), serviette (60%) et château de sable (40%)", en: "Three events rolled on every throw: parasol bounce (50%), towel (60%) and sandcastle (40%)" },
+                { fr: "11 nouveaux succès liés à la plage : acheter les claquettes, débloquer le monde, rentrer en bus, 100 lancers sur le sable, records de 500 m et 2000 m, 250 000 $ gagnés là-bas, 25 rebonds sur parasol, 20 serviettes, 15 châteaux écroulés, et le burn-out", en: "11 new beach achievements: buy the flip-flops, unlock the world, take the bus home, 100 throws on the sand, 500 m and 2000 m records, $250,000 earned there, 25 parasol bounces, 20 towels, 15 collapsed castles, and the burnout" },
+            ],
+        },
         {
             version: "8.0.0",
             major: [
@@ -6960,7 +8624,7 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
@@ -7024,6 +8688,47 @@
             persist();
             showScreen("menu");
             startVolcanoCinematic();
+        },
+        // Rejoue la cinématique de la plage (depuis n'importe quel écran)
+        cinematiquePlage() {
+            showScreen("menu");
+            startBeachCinematic();
+        },
+        // Remet le monde Plage à l'état "pas encore découvert" (et rend
+        // la progression du monde normal si on était coincé sur la plage)
+        resetPlage() {
+            if (save.inPlage) leaveBeachProfile();
+            save.plageUnlocked = false;
+            save.plageTutorialSeen = false;
+            save.hasClaquettes = false;
+            save.hasForgottenMoney = false;
+            const plageWorld = WORLDS.find(w => w.id === "plage");
+            if (plageWorld) plageWorld.unlocked = false;
+            persist();
+            buildWorldsRow();
+            refreshMenu();
+            console.log("🏖️ Monde Plage remis à zéro");
+        },
+        // Va directement à la plage, sans cinématique
+        goPlage() {
+            save.hasClaquettes = true;
+            save.plageUnlocked = true;
+            const plageWorld = WORLDS.find(w => w.id === "plage");
+            if (plageWorld) plageWorld.unlocked = true;
+            enterBeachProfile();
+            persist();
+            buildWorldsRow();
+            refreshMenu();
+            console.log("🏖️ Direction la plage");
+        },
+        // Reprend le bus du retour sans payer
+        retourBus() {
+            if (!save.inPlage) { console.warn("Tu n'es pas sur la plage."); return; }
+            leaveBeachProfile();
+            persist();
+            buildWorldsRow();
+            refreshMenu();
+            console.log("🚌 Retour au monde normal");
         },
         // Remet le monde Volcan à l'état "pas encore découvert"
         resetVolcan() {
@@ -7129,12 +8834,16 @@
                 "  volcanReplayPopup()      — popup \"refaire la cinématique ?\"\n" +
                 "  changelogPopup()         — ouvre le journal des changements\n" +
                 "  cinematique()            — rejoue la cinématique de déblocage du volcan\n" +
+                "  cinematiquePlage()       — rejoue la cinématique de déblocage de la plage\n" +
                 "  quakeSound()             — joue le son de tremblement de terre",
                 "color:#6bffb0; font-weight:bold;", "color:inherit;"
             );
             console.log(
                 "%cMonde / thème%c\n" +
                 "  resetVolcan()            — remet le monde Volcans à \"pas encore débloqué\"\n" +
+                "  resetPlage()             — remet le monde Plage à \"pas encore débloqué\"\n" +
+                "  goPlage()                — part à la plage sans cinématique\n" +
+                "  retourBus()              — revient de la plage sans payer le billet\n" +
                 "  toggleTheme()            — bascule thème clair / sombre",
                 "color:#6bffb0; font-weight:bold;", "color:inherit;"
             );
@@ -7193,6 +8902,14 @@
     } else if (save.currentWorld === "volcans") {
         save.currentWorld = "cour";
     }
+    // Le monde Plage reste débloqué d'une session à l'autre. Si le joueur avait
+    // quitté en plein séjour à la plage, il y revient (profil plage déjà actif).
+    if (save.plageUnlocked) {
+        const plageWorld = WORLDS.find(w => w.id === "plage");
+        if (plageWorld) plageWorld.unlocked = true;
+    }
+    if (save.inPlage) save.currentWorld = "plage";
+    else if (save.currentWorld === "plage") save.currentWorld = "cour";
     // Compteur de temps de jeu (écrit sur le disque toutes les 30 s seulement)
     setInterval(() => {
         save.playTime++;

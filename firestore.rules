@@ -11,9 +11,9 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
-    // Classement : tout le monde peut lire (pour afficher le classement),
-    // mais chacun ne peut écrire QUE sa propre entrée, avec des valeurs
-    // plausibles (pseudo court, distance positive et raisonnable).
+    // Classement du monde normal : tout le monde peut lire (pour afficher le
+    // classement), mais chacun ne peut écrire QUE sa propre entrée, avec des
+    // valeurs plausibles (pseudo court, distance positive et raisonnable).
     // Limite : ça bloque les écritures grossières, mais un joueur qui ouvre
     // la console de son navigateur peut techniquement encore envoyer une
     // fausse distance dans les bornes autorisées — une validation complète
@@ -42,7 +42,29 @@ service cloud.firestore {
                        == request.resource.data.retireToken;
     }
 
-    // Code de récupération : permet de retrouver sa partie sur un autre
+    // Classement du monde Plage : miroir exact de "scores" (même schéma, même
+    // mécanisme de retrait via retireToken). Séparé de "scores" parce que, sur
+    // la plage, tout repart de zéro (argent, améliorations, skins...) — les
+    // records n'y sont pas comparables à ceux du monde normal.
+    match /scoresPlage/{uid} {
+      allow read: if true;
+      allow write: if request.auth != null
+                   && request.auth.uid == uid
+                   && request.resource.data.pseudo is string
+                   && request.resource.data.pseudo.size() <= 24
+                   && request.resource.data.bestDistance is number
+                   && request.resource.data.bestDistance >= 0
+                   && request.resource.data.bestDistance <= 100000;
+      allow update: if request.auth != null
+                    && request.resource.data.bestDistance == 0
+                    && request.resource.data.retireToken is string
+                    && exists(/databases/$(database)/documents/recoveryTokens/$(uid))
+                    && get(/databases/$(database)/documents/recoveryTokens/$(uid)).data.token
+                       == request.resource.data.retireToken;
+    }
+
+    // Code de récupération : permet de retrouver sa partie (monde normal ET
+    // plage, c'est le même document "users/{uid}" complet) sur un autre
     // appareil sans email ni mot de passe (voir revealRecoveryCode). L'id du
     // document EST le code secret de 16 chiffres, et le document contient une
     // copie de la sauvegarde.
@@ -59,9 +81,10 @@ service cloud.firestore {
     }
 
     // Miroir du "retireToken" de chaque compte, uniquement pour que les règles
-    // du classement puissent le vérifier (get() côté règles fonctionne même
-    // avec "allow read: if false"). Jamais lisible par un client : sinon
-    // n'importe qui pourrait retirer l'entrée de classement de n'importe qui.
+    // du classement (scores ET scoresPlage) puissent le vérifier (get() côté
+    // règles fonctionne même avec "allow read: if false"). Jamais lisible par
+    // un client : sinon n'importe qui pourrait retirer l'entrée de classement
+    // de n'importe qui.
     match /recoveryTokens/{uid} {
       allow read: if false;
       allow write: if request.auth != null && request.auth.uid == uid;
