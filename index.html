@@ -1255,7 +1255,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.0.0</div>
+                <div class="version-tag" id="version-tag">v9.1.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1546,8 +1546,11 @@
 
     <div class="toast" id="toast"></div>
 
-    <!-- Musique de fond, démarrée au premier clic de l'utilisateur (voir plus bas) -->
+    <!-- Musique de fond, une piste par monde (voir applyWorldMusic plus bas),
+         démarrée au premier clic de l'utilisateur. -->
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
+    <audio id="bg-music-plage" src="musique-plage.mp3" loop preload="auto"></audio>
+    <audio id="bg-music-volcan" src="musique-volcan.mp3" loop preload="auto"></audio>
     <div class="corner-icons-right">
         <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
         <button id="btn-settings" class="theme-btn" title="Réglages">⚙️</button>
@@ -1877,6 +1880,8 @@
         achvPerfectQteDesc: { fr: "Réussis les 5 anneaux du QTE en apesanteur d'affilée.", en: "Land all 5 rings of the zero-G QTE in a row." },
         achvGifterName: { fr: "Grand donateur", en: "Big spender" },
         achvGifterDesc: { fr: "Envoie 1 000 000 $ en cadeaux depuis le début.", en: "Send a cumulative $1,000,000 in gifts." },
+        achvMusicName: { fr: "Adorateur de la musique", en: "Music worshipper" },
+        achvMusicDesc: { fr: "Écoute la musique de fond pendant 3h consécutives.", en: "Listen to the background music for 3 consecutive hours." },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
             en: "Not enough active players yet for reliable stats ("
@@ -2163,6 +2168,7 @@
         { id: "niveau50", emoji: "💯", nameKey: "achvLevel50Name", descKey: "achvLevel50Desc", check: (s) => s.puissanceLevel + s.vitesseLevel >= 50 },
         { id: "defisAccomplis", emoji: "📅", nameKey: "achvDailyChallengesName", descKey: "achvDailyChallengesDesc", check: (s) => s.dailyChallenges.length >= 3 && s.dailyChallenges.every((c) => c.claimed) },
         { id: "grandDonateur", emoji: "🎁", nameKey: "achvGifterName", descKey: "achvGifterDesc", check: (s) => s.totalMoneyGifted >= 1000000 },
+        { id: "adorateurMusique", emoji: "🎧", nameKey: "achvMusicName", descKey: "achvMusicDesc", check: (s) => (s.musicListenSeconds || 0) >= 10800 },
     ];
 
     // Défis quotidiens (voir ensureDailyChallenges/bumpDailyChallenge) : 3 tirés
@@ -2341,6 +2347,7 @@
             volcanTutorialSeen: false, // tutoriel spécifique au monde Volcan
             durability: 100,           // 0 à 100, perdue lors des dérapages, réparable en boutique
             playTime: 0,               // secondes de jeu cumulées
+            musicListenSeconds: 0,     // secondes d'écoute ININTERROMPUE de la musique de fond (remis à 0 dès qu'elle s'arrête, voir le succès "Adorateur de la musique")
             // --- Monde Plage (voir section 9ter) ---
             hasClaquettes: false,      // "Trousse à Claquettes" achetée : donne accès à la cinématique
             plageUnlocked: false,      // devient true une fois la cinématique terminée
@@ -2615,22 +2622,43 @@
     // Petit jingle plus marqué, joué quand le multiplicateur de la pièce se déclenche
     function sfxCoinBonus() { beep(700, 0.08, "sine", 0.12); beep(1050, 0.08, "sine", 0.12); beep(1400, 0.14, "sine", 0.12); }
 
-    // Musique de fond en boucle. Les navigateurs bloquent la lecture audio tant
-    // qu'il n'y a pas eu d'interaction de l'utilisateur : on démarre donc la
-    // lecture au tout premier clic/tap détecté n'importe où sur la page, puis
-    // on ne s'en occupe plus (l'écouteur ne se déclenche qu'une seule fois).
-    const bgMusic = document.getElementById("bg-music");
+    // Musique de fond en boucle, une piste par monde (voir applyWorldMusic,
+    // appelée à chaque changement de monde depuis applyWorldTheme). Les
+    // navigateurs bloquent la lecture audio tant qu'il n'y a pas eu
+    // d'interaction de l'utilisateur : on démarre donc la lecture au tout
+    // premier clic/tap détecté n'importe où sur la page, puis on ne s'en
+    // occupe plus (l'écouteur ne se déclenche qu'une seule fois).
+    const musicTracks = {
+        cour: document.getElementById("bg-music"),
+        volcans: document.getElementById("bg-music-volcan"),
+        plage: document.getElementById("bg-music-plage"),
+    };
     const muteBtn = document.getElementById("btn-mute");
-    bgMusic.volume = 0.35;
+    Object.values(musicTracks).forEach((track) => { track.volume = 0.35; });
+
+    function currentMusicTrack() {
+        return musicTracks[save.currentWorld] || musicTracks.cour;
+    }
 
     function applyMuteState() {
-        bgMusic.muted = save.musicMuted;
+        Object.values(musicTracks).forEach((track) => { track.muted = save.musicMuted; });
         muteBtn.textContent = save.musicMuted ? "🔇" : "🔊";
     }
     applyMuteState();
 
+    // Coupe les pistes des autres mondes et (re)lance celle du monde courant
+    // si elle ne joue pas déjà : un simple changement d'écran dans le même
+    // monde (menu/boutique/jeu...) ne doit jamais couper/relancer la musique.
+    function applyWorldMusic() {
+        const track = currentMusicTrack();
+        Object.values(musicTracks).forEach((t) => {
+            if (t !== track && !t.paused) t.pause();
+        });
+        if (track.paused) track.play().catch(() => { /* voir tryStartMusic */ });
+    }
+
     function tryStartMusic() {
-        bgMusic.play().then(() => {
+        currentMusicTrack().play().then(() => {
             document.removeEventListener("pointerdown", tryStartMusic);
         }).catch(() => { /* toujours bloqué : on retentera au prochain clic */ });
     }
@@ -2661,6 +2689,7 @@
     // (ciel du menu, couleurs lune/soleil, voir .sky-anim) puisse s'y adapter.
     function applyWorldTheme() {
         document.documentElement.setAttribute("data-world", save.currentWorld);
+        applyWorldMusic();
     }
     applyWorldTheme();
 
@@ -8166,8 +8195,16 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.0.0";
+    const VERSION_NUMBER = "9.1.0";
     const CHANGELOG = [
+        {
+            version: "9.1.0",
+            major: [],
+            minor: [
+                { fr: "Chaque monde a maintenant sa propre musique de fond : une piste pour la Plage, une pour les Volcans, en plus de celle du monde normal. Le changement se fait automatiquement en changeant de monde", en: "Each world now has its own background music: one track for the Beach, one for the Volcanoes, on top of the normal world's. It switches automatically when you change world" },
+                { fr: "Nouveau succès \"Adorateur de la musique\" : écouter la musique de fond sans coupure pendant 3h d'affilée", en: "New \"Music worshipper\" achievement: listen to the background music without interruption for 3 hours straight" },
+            ],
+        },
         {
             version: "9.0.0",
             major: [
@@ -8913,6 +8950,11 @@
     // Compteur de temps de jeu (écrit sur le disque toutes les 30 s seulement)
     setInterval(() => {
         save.playTime++;
+        // Succès "Adorateur de la musique" : la piste doit jouer sans la
+        // moindre coupure (pas coupée au réglage, pas en pause) pendant 3h
+        // d'affilée — toute interruption remet le compteur à 0.
+        save.musicListenSeconds = (!save.musicMuted && !currentMusicTrack().paused)
+            ? (save.musicListenSeconds || 0) + 1 : 0;
         if (save.playTime % 30 === 0) persist();
     }, 1000);
     buildWorldsRow();
