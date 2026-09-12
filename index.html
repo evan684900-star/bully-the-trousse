@@ -648,6 +648,18 @@
         .trail-swatch.rainbow {
             background: linear-gradient(90deg, #ff5a5a, #ffd23f, #6bffb0, #63c8ff, #c07bff);
         }
+        .trail-swatch.aurora {
+            background: linear-gradient(90deg, rgba(90,255,170,0.25), #5affaa, #46e6eb, #78a0ff, #c878ff);
+        }
+        .trail-swatch.confetti {
+            background:
+                radial-gradient(circle at 18% 30%, #ff5a6e 0 3px, transparent 3px),
+                radial-gradient(circle at 38% 70%, #ffcd46 0 3px, transparent 3px),
+                radial-gradient(circle at 58% 28%, #6eeb96 0 3px, transparent 3px),
+                radial-gradient(circle at 76% 66%, #5fb4ff 0 3px, transparent 3px),
+                radial-gradient(circle at 90% 34%, #cd7dff 0 3px, transparent 3px),
+                linear-gradient(90deg, rgba(255,235,180,0.12), rgba(255,235,180,0.75));
+        }
         .upgrade-card .info, .skin-card .info { flex: 1; }
         .upgrade-card .info h3, .skin-card .info h3 { margin: 0 0 4px; font-size: 15px; }
         .upgrade-card .info p, .skin-card .info p { margin: 0; font-size: 12px; color: var(--text-dim); }
@@ -1255,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.2.0</div>
+                <div class="version-tag" id="version-tag">v9.3.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2310,6 +2322,10 @@
         { id: "foudre", name: "Traînée Foudre", cost: 15000, desc: "Des éclairs qui claquent autour de la trousse.", rgb: "150,205,255" },
         { id: "neon", name: "Traînée Néon", cost: 25000, desc: "Un sillage cyber qui crache des pixels magenta.", rgb: "80,240,255" },
         { id: "stellaire", name: "Traînée Stellaire", cost: 40000, desc: "Une poussière d'étoiles qui tournent lentement.", rgb: "190,140,255" },
+        { id: "encre", name: "Traînée d'Encre", cost: 55000, desc: "Un ruban d'encre épais qui bave et diffuse en taches.", rgb: "140,130,255" },
+        { id: "confetti", name: "Traînée Confettis", cost: 70000, desc: "Une pluie de confettis multicolores qui tournoient.", rgb: "255,235,180", swatch: "confetti" },
+        { id: "aurore", name: "Traînée Aurore", cost: 90000, desc: "De grands rideaux boréaux qui ondulent du vert au violet.", rgb: "aurora" },
+        { id: "trounoir", name: "Traînée Trou Noir", cost: 120000, desc: "Un vortex qui aspire la lumière en spirale derrière la trousse.", rgb: "150,90,255" },
     ];
     function getTrail(id) { return TRAILS.find(t => t.id === id) || TRAILS[0]; }
 
@@ -3311,8 +3327,11 @@
         card.className = "skin-card";
 
         const swatch = document.createElement("div");
-        swatch.className = "trail-swatch" + (trail.rgb === "rainbow" ? " rainbow" : "");
-        if (trail.rgb !== "rainbow") {
+        // Aperçu : dégradé de la couleur du ruban, ou une classe dédiée pour les
+        // traînées dont la couleur bouge (arc-en-ciel, aurore, confettis).
+        const swatchClass = trail.swatch || (trail.rgb === "rainbow" ? "rainbow" : trail.rgb === "aurora" ? "aurora" : "");
+        swatch.className = "trail-swatch" + (swatchClass ? " " + swatchClass : "");
+        if (!swatchClass) {
             swatch.style.background = "linear-gradient(90deg, rgba(" + trail.rgb + ",0.15), rgb(" + trail.rgb + "))";
         }
         card.appendChild(swatch);
@@ -4258,6 +4277,20 @@
         // Poussière d'étoiles : sparkles à 4 branches qui tournent lentement
         stellaire: { rise: 10, spread: 20, sparkRate: 44, width: 1.1, glow: 1.35,
                      spark: { rgb: "228,195,255", g: 4, up: 24, r: 4.6, life: 1.3, alpha: 0.95, shape: "star", spin: 1.4, twinkle: true } },
+        // Encre : ruban épais et mat, taches molles qui diffusent en retombant
+        encre:     { rise: -8, spread: 10, sparkRate: 20, width: 1.55, glow: 0.55, swirl: 6,
+                     spark: { rgb: "120,108,240", g: 40, up: 12, r: 5.5, life: 1.4, alpha: 0.5, shape: "blob", grow: 16, wobble: 14, smoke: true } },
+        // Confettis : rectangles multicolores qui tournent sur eux-mêmes en tombant
+        confetti:  { rise: 8, spread: 18, sparkRate: 62, width: 0.9, glow: 0.9, swirl: 10,
+                     spark: { palette: ["255,90,110", "255,205,70", "110,235,150", "95,180,255", "205,125,255"],
+                              g: 60, up: 30, r: 3.2, life: 1.5, alpha: 1, shape: "confetti", spin: 6.5, wobble: 40 } },
+        // Aurore : rideaux verticaux lents, couleur qui glisse du vert au violet
+        aurore:    { rise: 26, spread: 24, sparkRate: 15, width: 2.1, glow: 1.15, swirl: 18,
+                     spark: { rgb: "aurora", g: -8, up: 14, r: 7, life: 1.8, alpha: 0.3, shape: "curtain", wobble: 26, grow: 4 } },
+        // Trou noir : la lumière tourne en spirale et se fait avaler
+        trounoir:  { rise: 4, spread: 8, sparkRate: 48, width: 1.25, glow: 1.5, swirl: 4,
+                     spark: { rgb: "255,190,120", g: 0, up: 0, r: 2.6, life: 1.1, alpha: 1, twinkle: true,
+                              orbit: { spin: 5.5, shrink: 46 } } },
     };
     function trailFx(trail) { return TRAIL_FX[trail.id] || TRAIL_FX.blanche; }
 
@@ -4270,9 +4303,12 @@
 
     function newTrailPoint(x, y, t, fx) {
         return {
-            x: x, y: y, t: t,
+            x: x, y: y, t: t, age: 0,
             vx: (Math.random() - 0.5) * fx.spread,
             vy: fx.rise * (0.6 + Math.random() * 0.8),
+            // phase de turbulence propre au point : c'est elle qui fait onduler
+            // le ruban au lieu de l'étaler en ligne droite (voir updateTrail)
+            ph: Math.random() * 6.283,
         };
     }
 
@@ -4315,7 +4351,14 @@
                 life: s.life * (0.6 + Math.random() * 0.7),
                 max: s.life,
                 alpha: s.alpha,
-                rgb: s.rgb === "rainbow" ? rainbowRgb(now + Math.random() * 900) : s.rgb,
+                rgb: s.palette ? s.palette[Math.floor(Math.random() * s.palette.length)]
+                               : sparkRgb(s.rgb, now + Math.random() * 900),
+                orbit: !!s.orbit,
+                ox: x, oy: y,
+                oang: ang,
+                orad: 16 + Math.random() * 48,
+                ospin: s.orbit ? s.orbit.spin * (0.8 + Math.random() * 0.5) : 0,
+                oshrink: s.orbit ? s.orbit.shrink * (0.7 + Math.random() * 0.6) : 0,
                 ember: !!s.ember,
                 smoke: !!s.smoke,
                 twinkle: !!s.twinkle,
@@ -4343,13 +4386,31 @@
     // Le sillage continue de vivre après avoir été lâché : c'est ce qui le
     // fait respirer au lieu de rester collé à la trajectoire.
     function updateTrail(dt) {
+        const fxNow = trailFx(getTrail(save.equippedTrail));
+        const swirl = fxNow.swirl == null ? 12 : fxNow.swirl;
         for (const p of trailPoints) {
+            p.age += dt;
             p.x += p.vx * dt;
             p.y += p.vy * dt;
+            // Turbulence : chaque point décrit une petite boucle de convection,
+            // ce qui donne au ruban le flottement d'une vraie fumée.
+            p.x += Math.cos(p.age * 4.2 + p.ph) * swirl * dt;
+            p.y += Math.sin(p.age * 3.1 + p.ph * 1.7) * swirl * 0.7 * dt;
             p.vx *= 1 - Math.min(1, 1.4 * dt);
         }
         if (!trailSparks.length) return;
         for (const s of trailSparks) {
+            // Orbite (Trou Noir) : l'étincelle tourne autour de son point
+            // d'émission en se rapprochant, jusqu'à disparaître au centre.
+            if (s.orbit) {
+                s.oang += s.ospin * dt;
+                s.orad = Math.max(0, s.orad - s.oshrink * dt);
+                s.x = s.ox + Math.cos(s.oang) * s.orad;
+                s.y = s.oy + Math.sin(s.oang) * s.orad * 0.55;
+                if (s.spin) s.rot += s.spin * dt;
+                s.life -= dt;
+                continue;
+            }
             s.x += s.vx * dt;
             s.y += s.vy * dt;
             s.vy -= s.g * dt;
@@ -4388,6 +4449,19 @@
         c.restore();
     }
 
+    // Lisse le ruban à l'écran : chaque point est tiré vers la moyenne de ses
+    // voisins, ce qui enlève le tremblement dû à la dérive aléatoire et donne
+    // une courbe continue plutôt qu'une suite de petits segments.
+    function smoothRibbon(pts) {
+        for (let pass = 0; pass < 2 && pts.length > 2; pass++) {
+            for (let i = 1; i < pts.length - 1; i++) {
+                pts[i].sx = pts[i].sx * 0.5 + (pts[i - 1].sx + pts[i + 1].sx) * 0.25;
+                pts[i].sy = pts[i].sy * 0.5 + (pts[i - 1].sy + pts[i + 1].sy) * 0.25;
+            }
+        }
+        return pts;
+    }
+
     function drawTrail() {
         const trail = getTrail(save.equippedTrail);
         const fx = trailFx(trail);
@@ -4399,35 +4473,89 @@
         ctx.lineJoin = "round";
 
         if (trailPoints.length >= 2) {
-            const pts = trailPoints.map(p => {
+            const pts = smoothRibbon(trailPoints.map(p => {
                 const s = worldToScreen(p.x, p.y);
                 return { sx: s.sx, sy: s.sy, a: Math.max(0, 1 - (now - p.t) / TRAIL_LIFE), t: p.t };
-            });
-            // halo diffus → corps → cœur lumineux (additif) : le dégradé de
-            // largeur + le blanchiment du cœur donnent la sensation de chaleur
+            }));
+            const n = pts.length;
+            // Pour chaque point : la normale à la trajectoire et la demi-largeur
+            // du ruban. Le profil est fuselé (pointe fine en queue, épais près de
+            // la trousse) et gonfle en pâlissant, comme un sillage qui se dilue.
+            for (let i = 0; i < n; i++) {
+                const prev = pts[Math.max(0, i - 1)], next = pts[Math.min(n - 1, i + 1)];
+                const dx = next.sx - prev.sx, dy = next.sy - prev.sy;
+                const len = Math.hypot(dx, dy) || 1;
+                pts[i].nx = -dy / len; pts[i].ny = dx / len;
+                pts[i].tx = dx / len; pts[i].ty = dy / len;
+                const head = n > 1 ? i / (n - 1) : 1;
+                const fade = pts[i].a;
+                const taper = Math.pow(head, 0.55) * (0.2 + 0.8 * Math.min(1, fade * 1.4));
+                pts[i].hw = Math.max(0.3, TRAIL_HEAD_W * 0.5 * widthMul * taper * (1 + (1 - fade) * 1.5));
+            }
+            // Trois passes de rubans pleins : brume large diffuse → corps → cœur
+            // additif surexposé (seulement sur la moitié "chaude", près de la
+            // trousse). Un ruban rempli évite le chapelet de segments arrondis.
             const layers = [
-                { comp: "source-over", w: 2.7, a: 0.11, white: 0 },
-                { comp: "source-over", w: 1.35, a: 0.30, white: 0.12 },
-                { comp: "lighter", w: 0.45, a: 0.55, white: 0.6 },
+                { comp: "source-over", w: 3.0,  a: 0.075, white: 0,    from: 0 },
+                { comp: "source-over", w: 1.0,  a: 0.38,  white: 0.1,  from: 0 },
+                { comp: "lighter",     w: 0.34, a: 0.62,  white: 0.62, from: 0.3 },
             ];
             for (const L of layers) {
                 ctx.globalCompositeOperation = L.comp;
-                for (let i = 0; i < pts.length - 1; i++) {
-                    const p0 = pts[i], p1 = pts[i + 1];
-                    const fade = (p0.a + p1.a) / 2;
-                    if (fade <= 0.01) continue;
-                    const head = (i + 1) / (pts.length - 1); // 0 = queue, 1 = trousse
-                    const life = Math.pow(fade, 1.3);
-                    const grow = 1 + (1 - fade) * 1.2;       // s'épaissit en se dissipant
-                    const rgb = trail.rgb === "rainbow" ? rainbowRgb((p0.t + p1.t) / 2) : trail.rgb;
-                    const layerA = L.a * (L.comp === "lighter" ? glowMul : 1) * life * (0.3 + 0.7 * head);
-                    ctx.strokeStyle = "rgba(" + mixWhite(rgb, L.white) + "," + Math.min(1, layerA).toFixed(3) + ")";
-                    ctx.lineWidth = Math.max(0.7, TRAIL_HEAD_W * widthMul * (0.28 + 0.72 * head) * grow * L.w);
-                    ctx.beginPath();
-                    ctx.moveTo(p0.sx, p0.sy);
-                    ctx.lineTo(p1.sx, p1.sy);
-                    ctx.stroke();
+                const start = Math.floor((n - 1) * L.from);
+                if (n - start < 2) continue;
+                const tail = pts[start], headP = pts[n - 1];
+                // Un seul chemin rempli par passe (aller par un bord, retour par
+                // l'autre) : plus aucune couture entre les segments. Le fondu le
+                // long du sillage est confié à un dégradé queue → trousse, qui
+                // gère aussi les couleurs animées (arc-en-ciel, aurore).
+                let paint;
+                if (Math.hypot(headP.sx - tail.sx, headP.sy - tail.sy) < 2) {
+                    const rgb = trailRgbAt(trail, headP.t);
+                    paint = "rgba(" + mixWhite(rgb, L.white) + "," + Math.min(1, L.a * 0.5).toFixed(3) + ")";
+                } else {
+                    const g = ctx.createLinearGradient(tail.sx, tail.sy, headP.sx, headP.sy);
+                    const STOPS = 12;
+                    for (let k = 0; k <= STOPS; k++) {
+                        const idx = start + Math.round((k / STOPS) * (n - 1 - start));
+                        const p = pts[idx];
+                        const headF = (idx + 1) / n;
+                        const life = Math.pow(p.a, 1.25);
+                        const rgb = trailRgbAt(trail, p.t);
+                        const a = L.a * (L.comp === "lighter" ? glowMul : 1) * life * (0.25 + 0.75 * headF);
+                        g.addColorStop(k / STOPS, "rgba(" + mixWhite(rgb, L.white) + "," + Math.min(1, a).toFixed(3) + ")");
+                    }
+                    paint = g;
                 }
+                ctx.fillStyle = paint;
+                ctx.beginPath();
+                for (let i = start; i < n; i++) {
+                    const p = pts[i], w = p.hw * L.w;
+                    const x = p.sx + p.nx * w, y = p.sy + p.ny * w;
+                    if (i === start) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                }
+                for (let i = n - 1; i >= start; i--) {
+                    const p = pts[i], w = p.hw * L.w;
+                    ctx.lineTo(p.sx - p.nx * w, p.sy - p.ny * w);
+                }
+                ctx.closePath();
+                ctx.fill();
+            }
+            // Halo de tête : la source lumineuse collée à la trousse, qui palpite
+            // légèrement. C'est elle qui "allume" le départ du sillage.
+            const h = pts[n - 1];
+            if (h && glowMul > 0.25) {
+                const rgb = trailRgbAt(trail, now);
+                const rad = TRAIL_HEAD_W * widthMul * (1.7 + 0.22 * Math.sin(now / 70));
+                const g = ctx.createRadialGradient(h.sx, h.sy, 0, h.sx, h.sy, rad);
+                g.addColorStop(0, "rgba(" + mixWhite(rgb, 0.7) + "," + (0.5 * glowMul).toFixed(3) + ")");
+                g.addColorStop(0.45, "rgba(" + rgb + "," + (0.2 * glowMul).toFixed(3) + ")");
+                g.addColorStop(1, "rgba(" + rgb + ",0)");
+                ctx.globalCompositeOperation = "lighter";
+                ctx.fillStyle = g;
+                ctx.beginPath();
+                ctx.arc(h.sx, h.sy, rad, 0, Math.PI * 2);
+                ctx.fill();
             }
         }
 
@@ -4468,9 +4596,50 @@
                     ctx.restore();
                 } else if (s.shape === "star") {
                     drawSparkStar(ctx, p.sx, p.sy, rad * 2.2, s.rot);
+                } else if (s.shape === "confetti") {
+                    // Confetti : rectangle qui tourne ET se retourne (la hauteur
+                    // est pincée par un cosinus, comme une face qui bascule)
+                    const flip = Math.abs(Math.cos(s.rot));
+                    ctx.save();
+                    ctx.translate(p.sx, p.sy);
+                    ctx.rotate(s.rot * 0.55);
+                    ctx.fillRect(-rad, -rad * 1.5 * flip, rad * 2, rad * 3 * flip + 0.7);
+                    ctx.restore();
+                } else if (s.shape === "curtain") {
+                    // Rideau d'aurore : fuseau vertical très doux (un dégradé
+                    // radial étiré, donc pas de bord net comme un rectangle)
+                    ctx.save();
+                    ctx.translate(p.sx, p.sy);
+                    ctx.scale(1, 6.5);
+                    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, rad);
+                    g.addColorStop(0, col);
+                    g.addColorStop(0.45, "rgba(" + rgb + "," + (a * 0.45).toFixed(3) + ")");
+                    g.addColorStop(1, "rgba(" + rgb + ",0)");
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, rad, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                } else if (s.shape === "blob" || s.smoke) {
+                    // Tache d'encre / bouffée de fumée : bord flou, centre dense
+                    const r2 = rad * 1.5;
+                    const g = ctx.createRadialGradient(p.sx, p.sy, 0, p.sx, p.sy, r2);
+                    g.addColorStop(0, col);
+                    g.addColorStop(0.55, "rgba(" + rgb + "," + (a * 0.5).toFixed(3) + ")");
+                    g.addColorStop(1, "rgba(" + rgb + ",0)");
+                    ctx.fillStyle = g;
+                    ctx.beginPath();
+                    ctx.arc(p.sx, p.sy, r2, 0, Math.PI * 2);
+                    ctx.fill();
                 } else {
                     ctx.beginPath();
                     ctx.arc(p.sx, p.sy, rad, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Bloom : un second cercle très faible, pour que l'étincelle
+                    // baigne dans sa propre lumière au lieu d'être un point net
+                    ctx.fillStyle = "rgba(" + rgb + "," + (a * 0.2).toFixed(3) + ")";
+                    ctx.beginPath();
+                    ctx.arc(p.sx, p.sy, rad * 2.6, 0, Math.PI * 2);
                     ctx.fill();
                 }
             }
@@ -4494,6 +4663,31 @@
         else if (h < 300) { r = x; g = 0; b = c; }
         else { r = c; g = 0; b = x; }
         return Math.round((r + m) * 255) + "," + Math.round((g + m) * 255) + "," + Math.round((b + m) * 255);
+    }
+
+    // Aurore boréale : la couleur glisse lentement le long d'une petite palette
+    // (vert → cyan → bleu → violet → vert) au lieu de faire toute la roue.
+    function auroraRgb(t) {
+        const stops = [[90, 255, 170], [70, 230, 235], [120, 160, 255], [200, 120, 255], [90, 255, 170]];
+        const k = ((t / 2600) % 1) * (stops.length - 1);
+        const i = Math.floor(k), f = k - i;
+        const a = stops[i], b = stops[i + 1];
+        return Math.round(a[0] + (b[0] - a[0]) * f) + "," +
+               Math.round(a[1] + (b[1] - a[1]) * f) + "," +
+               Math.round(a[2] + (b[2] - a[2]) * f);
+    }
+
+    // Couleur du ruban / d'une étincelle à l'instant t : fixe la plupart du
+    // temps, animée pour les cas spéciaux "rainbow" et "aurora".
+    function trailRgbAt(trail, t) {
+        if (trail.rgb === "rainbow") return rainbowRgb(t);
+        if (trail.rgb === "aurora") return auroraRgb(t);
+        return trail.rgb;
+    }
+    function sparkRgb(rgb, t) {
+        if (rgb === "rainbow") return rainbowRgb(t);
+        if (rgb === "aurora") return auroraRgb(t);
+        return rgb;
     }
 
     // Dessine une pièce pixelisée (skin "Trousse Pièce") : un cercle généré par
@@ -8243,8 +8437,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.2.0";
+    const VERSION_NUMBER = "9.3.0";
     const CHANGELOG = [
+        {
+            version: "9.3.0",
+            major: [],
+            minor: [
+                { fr: "4 nouvelles traînées : Encre (un ruban épais qui bave en taches), Confettis (des rectangles multicolores qui tournoient en tombant), Aurore (de grands rideaux boréaux qui ondulent du vert au violet) et Trou Noir (la lumière aspirée en spirale derrière la trousse)", en: "4 new trails: Ink (a thick ribbon that bleeds into blots), Confetti (multicolored rectangles tumbling as they fall), Aurora (big northern-lights curtains rippling from green to violet) and Black Hole (light sucked into a spiral behind the pencil case)" },
+                { fr: "Traînées bien plus réalistes : le sillage est maintenant un vrai ruban fuselé et lissé (fini le chapelet de segments), il ondule avec sa propre turbulence comme de la fumée, et un halo lumineux qui palpite est collé à la trousse", en: "Much more realistic trails: the wake is now a real tapered, smoothed ribbon (no more string of segments), it ripples with its own turbulence like smoke, and a pulsing glow is attached to the pencil case" },
+                { fr: "Étincelles retouchées : chaque particule baigne dans sa propre lueur, et les fumées/taches ont des bords flous au lieu de cercles nets", en: "Reworked sparks: every particle now sits in its own bloom, and smoke/blots have soft edges instead of hard circles" },
+            ],
+        },
         {
             version: "9.2.0",
             major: [],
