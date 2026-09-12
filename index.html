@@ -1267,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.3.0</div>
+                <div class="version-tag" id="version-tag">v9.4.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1670,6 +1670,7 @@
         hintZeroG: { fr: "🛸 En apesanteur...", en: "🛸 Weightless..." },
         hintBasketBounce: { fr: "👟 Rebond ! Reclique pour verrouiller la PUISSANCE !", en: "👟 Bounce! Click again to lock in POWER!" },
         basketBounceToast: { fr: "👟 Rebond sur les baskets !", en: "👟 Bounced off the sneakers!" },
+        rocketReturnToast: { fr: "🚀 Traverse la Lune et revient !", en: "🚀 Tunnels through the Moon and comes back!" },
         qtePrompt: { fr: "🚀 CLIQUE QUAND ÇA S'ALIGNE !", en: "🚀 CLICK WHEN IT LINES UP!" },
         resultDistanceTitle: { fr: "Distance parcourue", en: "Distance travelled" },
         resultRecord: { fr: "🏆 NOUVEAU RECORD !", en: "🏆 NEW RECORD!" },
@@ -2097,6 +2098,10 @@
     const QTE_RING_TOLERANCE = 15;         // marge acceptée autour de la cible pour réussir
     const SPACE_BOOST_VX = 2600;           // vitesse folle horizontale si tous les anneaux sont réussis
     const SPACE_BOOST_VY = 150;
+    // Trousse Fusée / Boeing 747 (voir SKINS plus bas)
+    const ROCKET_SPACE_SPEED_MULT = 1.5;   // vitesse du boost spatial (voir finishQte)
+    const PLANE_WORLD_SPEED_MULT = 1.5;    // vitesse initiale du lancer (voir lockAccuracyAndLaunch)
+    const ROCKET_RETURN_BOUNCE = 0.55;     // part de la vitesse verticale conservée en traversant la Lune
 
     // Rééquilibrage : la distance (donc l'argent) augmente déjà avec la
     // Puissance/Vitesse, mais de moins en moins vite à haut niveau (la formule
@@ -2304,6 +2309,30 @@
             id: "claude", name: "Trousse Claude", cost: 4500,
             desc: "Aucun bonus de stats, mais un coup de main de l'IA : la fenêtre du lancer parfait est élargie de 75%, donc bien plus facile à viser.",
             bonusPuissance: 0, bonusVitesse: 0, filter: "sepia(0.5) saturate(1.8) hue-rotate(-15deg) brightness(0.95)", isClaude: true
+        },
+        {
+            // Prototype "projet-trousseXfusée-012" : dessinée avec sa propre
+            // flamme de propulseur (voir drawRocketFlame). Ne triche jamais sur
+            // le lancer initial (aucun bonus de stats) mais devient 50% plus
+            // rapide dès qu'elle est propulsée en apesanteur après le QTE
+            // (voir ROCKET_SPACE_SPEED_MULT, finishQte), et ne s'écrase jamais
+            // sur la Lune à l'atterrissage : elle la traverse et retombe
+            // directement sur le monde en cours pour continuer sa course
+            // (voir gameLoop, section atterrissage en apesanteur).
+            id: "fusee", name: "projet-trousseXfusée-012", cost: 50000,
+            desc: "Aucun bonus de stats, mais 50% plus rapide une fois propulsée en apesanteur, et ne s'écrase jamais sur la Lune : elle la traverse et retombe directement sur le monde en cours pour continuer sa course.",
+            bonusPuissance: 0, bonusVitesse: 0, filter: "grayscale(0.25) saturate(1.5) hue-rotate(190deg) brightness(1.05)", isRocket: true
+        },
+        {
+            // Boeing 747 : petites ailes dessinées de chaque côté (voir
+            // drawPlaneWings). Ne peut jamais partir en apesanteur, même en
+            // visant pile la zone verte de l'easter egg (voir
+            // lockAccuracyAndLaunch, spaceEggTriggered) ; en échange, 50% plus
+            // rapide dès le décollage dans le monde en cours (voir
+            // PLANE_WORLD_SPEED_MULT).
+            id: "avion", name: "Boeing 747", cost: 100000,
+            desc: "Aucun bonus de stats, mais 50% plus rapide dans le monde en cours ; ne peut en revanche jamais décoller vers l'espace, même en visant la zone verte.",
+            bonusPuissance: 0, bonusVitesse: 0, filter: "grayscale(0.5) brightness(1.2) contrast(0.9)", isPlane: true
         },
     ];
 
@@ -3248,9 +3277,9 @@
             iconCanvas.height = 46;
             drawIronIngot(iconCanvas.getContext("2d"), 46);
             card.appendChild(iconCanvas);
-        } else if (skin.isBasket || skin.isLunar) {
-            // Baskets/cratères : superposées sur l'image de base via un canvas
-            // transparent par-dessus (voir drawTrousse, même logique en jeu).
+        } else if (skin.isBasket || skin.isLunar || skin.isRocket || skin.isPlane) {
+            // Baskets/cratères/flamme/ailes : superposées sur l'image de base via
+            // un canvas transparent par-dessus (voir drawTrousse, même logique en jeu).
             const wrap = document.createElement("div");
             wrap.className = "skin-icon-wrap";
             const img = document.createElement("img");
@@ -3261,9 +3290,11 @@
             overlay.width = 46;
             overlay.height = 46;
             const octx = overlay.getContext("2d");
-            octx.translate(23, 23); // drawSneakers/drawCraters dessinent depuis le centre
+            octx.translate(23, 23); // drawSneakers/drawCraters/... dessinent depuis le centre
             if (skin.isBasket) drawSneakers(octx, 46);
             if (skin.isLunar) drawCraters(octx, 46);
+            if (skin.isRocket) drawRocketFlame(octx, 46);
+            if (skin.isPlane) drawPlaneWings(octx, 46);
             wrap.appendChild(overlay);
             card.appendChild(wrap);
         } else {
@@ -3452,6 +3483,10 @@
     let qteTargetRadius = QTE_RING_SIZES[0]; // taille de l'anneau-cible du round en cours (voir pickQteTargetRadius)
     let craterWorldX = null;       // position (world space) du cratère d'impact, null = aucun
     let trailPoints = [];          // positions récentes {x, y} pour dessiner la traînée derrière la trousse
+    // Trousse Fusée : vrai dès qu'elle a traversé le sol lunaire une fois sur
+    // ce lancer (voir gameLoop), pour ne pas retraverser en boucle si elle
+    // repasse par l'espace.
+    let rocketReturned = false;
 
     // Easter egg 💩 : caché derrière un arbre de la Cour d'école (dessiné
     // AVANT lui, voir drawBackground, donc entièrement recouvert par son
@@ -3522,6 +3557,7 @@
         trailSparks = [];
         didSkid = false;
         basketBounceCount = 0;
+        rocketReturned = false;
         // Le monde Plage est regénéré à chaque lancer : parasols, serviettes et
         // châteaux ne sont jamais deux fois au même endroit (voir section 9ter).
         if (save.currentWorld === "plage") {
@@ -3573,8 +3609,10 @@
         isPerfect = Math.abs(value) < perfectWindow;
 
         // Easter egg : puissance quasi max + précision verrouillée tout au
-        // début de la barre (zone verte) = décollage vers l'espace à l'apogée
-        spaceEggTriggered = lockedPower >= SPACE_EGG_POWER_MIN && value <= SPACE_EGG_ACCURACY_MAX;
+        // début de la barre (zone verte) = décollage vers l'espace à l'apogée.
+        // Boeing 747 : jamais d'apesanteur, même en visant pile cette zone.
+        spaceEggTriggered = lockedPower >= SPACE_EGG_POWER_MIN && value <= SPACE_EGG_ACCURACY_MAX
+            && !getSkin(save.equippedSkin).isPlane;
 
         const puissance = totalPuissance();
         const vitesse = totalVitesse();
@@ -3582,7 +3620,10 @@
         // Formule de tir : plus la Puissance est haute, plus v0 est grand ;
         // plus la Vitesse est haute, plus la gravité effective est faible
         // (la trousse "flotte" plus longtemps et va donc plus loin).
-        const v0 = BASE_V0 * (1 + puissance * 0.12) * lockedPower;
+        // Boeing 747 : +50% de vitesse initiale dans le monde en cours, en
+        // compensation de ne jamais pouvoir décoller vers l'espace.
+        const v0 = BASE_V0 * (1 + puissance * 0.12) * lockedPower
+            * (getSkin(save.equippedSkin).isPlane ? PLANE_WORLD_SPEED_MULT : 1);
         const angleDeg = 45 - value * 16; // 45° = angle optimal, la précision l'écarte de ±16°
         const angleRad = angleDeg * Math.PI / 180;
         currentG = BASE_G / (1 + vitesse * 0.09);
@@ -3694,8 +3735,10 @@
         document.getElementById("qte-wrap").classList.remove("show");
         const hits = qteResults.filter(Boolean).length;
         const boostFactor = 0.3 + 0.7 * (hits / currentQteRingCount());
-        vx = SPACE_BOOST_VX * boostFactor;
-        vy = SPACE_BOOST_VY;
+        // Trousse Fusée : 50% plus rapide une fois propulsée en apesanteur.
+        const spaceSpeedMult = getSkin(save.equippedSkin).isRocket ? ROCKET_SPACE_SPEED_MULT : 1;
+        vx = SPACE_BOOST_VX * boostFactor * spaceSpeedMult;
+        vy = SPACE_BOOST_VY * spaceSpeedMult;
         if (hits === currentQteRingCount()) {
             sfxRecord(); // combo parfait
             save.hasPerfectQte = true;
@@ -4867,6 +4910,77 @@
         targetCtx.restore();
     }
 
+    // Trousse Fusée ("projet-trousseXfusée-012") : deux ailerons gris et une
+    // flamme de propulseur (dégradé jaune -> orange -> rouge, longueur qui
+    // pulse avec le temps) collés sous la trousse, comme un vrai booster.
+    function drawRocketFlame(targetCtx, size) {
+        targetCtx.save();
+        // ailerons (un de chaque côté, pointant vers le bas-arrière)
+        [-1, 1].forEach((side) => {
+            targetCtx.beginPath();
+            targetCtx.moveTo(side * size * 0.30, size * 0.18);
+            targetCtx.lineTo(side * size * 0.50, size * 0.42);
+            targetCtx.lineTo(side * size * 0.24, size * 0.32);
+            targetCtx.closePath();
+            targetCtx.fillStyle = "#7d8a99";
+            targetCtx.fill();
+            targetCtx.strokeStyle = "#4a5560";
+            targetCtx.lineWidth = Math.max(1, size * 0.015);
+            targetCtx.stroke();
+        });
+        // flamme : la longueur pulse légèrement pour un effet "moteur allumé"
+        const flick = 0.85 + 0.15 * Math.abs(Math.sin(performance.now() / 90));
+        const flameLen = size * 0.5 * flick;
+        const baseY = size * 0.22;
+        const grad = targetCtx.createLinearGradient(0, baseY, 0, baseY + flameLen);
+        grad.addColorStop(0, "#fff6c8");
+        grad.addColorStop(0.4, "#ffcf4d");
+        grad.addColorStop(0.75, "#ff8a2e");
+        grad.addColorStop(1, "rgba(255,60,20,0)");
+        targetCtx.beginPath();
+        targetCtx.moveTo(-size * 0.14, baseY);
+        targetCtx.quadraticCurveTo(-size * 0.05, baseY + flameLen * 0.7, 0, baseY + flameLen);
+        targetCtx.quadraticCurveTo(size * 0.05, baseY + flameLen * 0.7, size * 0.14, baseY);
+        targetCtx.closePath();
+        targetCtx.fillStyle = grad;
+        targetCtx.fill();
+        targetCtx.restore();
+    }
+
+    // Boeing 747 : petites ailes en flèche de chaque côté + dérive verticale
+    // à l'arrière, gris métallisé pour rappeler la carlingue d'un avion de ligne.
+    function drawPlaneWings(targetCtx, size) {
+        targetCtx.save();
+        [-1, 1].forEach((side) => {
+            targetCtx.save();
+            targetCtx.scale(side, 1);
+            targetCtx.beginPath();
+            targetCtx.moveTo(size * 0.06, -size * 0.06);
+            targetCtx.lineTo(size * 0.52, size * 0.04);
+            targetCtx.lineTo(size * 0.44, size * 0.14);
+            targetCtx.lineTo(size * 0.08, size * 0.10);
+            targetCtx.closePath();
+            targetCtx.fillStyle = "#d8dee5";
+            targetCtx.fill();
+            targetCtx.strokeStyle = "#8992a0";
+            targetCtx.lineWidth = Math.max(1, size * 0.015);
+            targetCtx.stroke();
+            targetCtx.restore();
+        });
+        // dérive verticale (queue) à l'arrière
+        targetCtx.beginPath();
+        targetCtx.moveTo(-size * 0.06, size * 0.02);
+        targetCtx.lineTo(-size * 0.20, -size * 0.30);
+        targetCtx.lineTo(-size * 0.02, -size * 0.06);
+        targetCtx.closePath();
+        targetCtx.fillStyle = "#aab2bd";
+        targetCtx.fill();
+        targetCtx.strokeStyle = "#6b7280";
+        targetCtx.lineWidth = Math.max(1, size * 0.015);
+        targetCtx.stroke();
+        targetCtx.restore();
+    }
+
     function drawTrousse() {
         // petit flottement vertical purement visuel pendant la séquence spatiale
         let floatBob = 0;
@@ -4897,6 +5011,8 @@
             ctx.filter = "none";
             if (skin.isBasket) drawSneakers(ctx, size);
             if (skin.isLunar) drawCraters(ctx, size);
+            if (skin.isRocket) drawRocketFlame(ctx, size);
+            if (skin.isPlane) drawPlaneWings(ctx, size);
         }
         ctx.restore();
     }
@@ -4972,6 +5088,8 @@
                     // rebond sur un parasol : le lancer continue (voir section 9ter)
                 } else if (tryBasketBounce()) {
                     // le rebond a déjà remis l'état à "charging_power", rien d'autre à faire
+                } else if (tryRocketMoonTraversal()) {
+                    // la Fusée a traversé le sol lunaire : le lancer continue (voir plus bas)
                 } else if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
                     // Monde Volcan : la poussière rouge rend le sol glissant
                     startSkid();
@@ -5136,6 +5254,25 @@
         hintText.textContent = tr("hintBasketBounce");
         sfxRecord();
         showToast(tr("basketBounceToast"));
+        return true;
+    }
+
+    /* ---- Traversée lunaire de la Trousse Fusée ---- */
+    // Appelée juste après le rebond des baskets dans la même vérification
+    // d'atterrissage. Si elle se déclenche (uniquement en apesanteur, une
+    // seule fois par lancer), la trousse ne s'écrase pas sur la Lune : elle
+    // la traverse, repart vers le haut avec une partie de son élan, et
+    // retombe sur le décor du monde en cours (voir gameLoop, inSpaceMode qui
+    // repasse à false ici même) au lieu de finir le lancer.
+    function tryRocketMoonTraversal() {
+        if (!inSpaceMode) return false; // rien à traverser hors apesanteur
+        if (!getSkin(save.equippedSkin).isRocket) return false;
+        if (rocketReturned) return false; // une seule traversée par lancer
+        rocketReturned = true;
+        inSpaceMode = false;
+        vy = Math.abs(vy) * ROCKET_RETURN_BOUNCE;
+        sfxSpace();
+        showToast(tr("rocketReturnToast"));
         return true;
     }
 
@@ -5934,6 +6071,8 @@
             c.filter = "none";
             if (skin.isBasket) drawSneakers(c, size);
             if (skin.isLunar) drawCraters(c, size);
+            if (skin.isRocket) drawRocketFlame(c, size);
+            if (skin.isPlane) drawPlaneWings(c, size);
         }
         c.restore();
     }
@@ -8437,8 +8576,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.3.0";
+    const VERSION_NUMBER = "9.4.0";
     const CHANGELOG = [
+        {
+            version: "9.4.0",
+            major: [
+                { fr: "2 nouvelles trousses : projet-trousseXfusée-012 (50 000 $) — 50% plus rapide une fois propulsée en apesanteur, et traverse le sol de la Lune au lieu de s'y écraser, pour retomber directement sur le monde en cours — et Boeing 747 (100 000 $) — ne peut jamais décoller vers l'espace, même en visant la zone verte, mais 50% plus rapide dans le monde en cours", en: "2 new pencil cases: projet-trousseXfusée-012 ($50,000) — 50% faster once boosted in zero-g, and tunnels through the Moon's ground instead of crashing into it, landing straight back in the current world — and Boeing 747 ($100,000) — can never launch into zero-g, even aiming the green zone, but 50% faster in the current world" },
+            ],
+            minor: [],
+        },
         {
             version: "9.3.0",
             major: [],
