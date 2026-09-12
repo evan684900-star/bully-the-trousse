@@ -1031,9 +1031,6 @@
 
         #cine-ui { position: absolute; inset: 0; display: none; z-index: 40; pointer-events: none; }
         body.cine-mode #cine-ui { display: block; }
-        /* QTE des crottes de mouettes en pleine partie (monde Plage) : on a
-           besoin des mêmes repères (!, couloirs, vies) hors cinématique. */
-        body.gull-mode #cine-ui { display: block; }
 
         /* Panneau "!" du QTE des roches volcaniques */
         #cine-warn {
@@ -1097,19 +1094,6 @@
             display: none;
         }
         #cine-lives.show { display: block; }
-        /* Consigne du QTE des mouettes (monde Plage, en jeu comme en cinématique) */
-        #gull-prompt {
-            position: absolute;
-            top: calc(40px + env(safe-area-inset-top));
-            left: 0; right: 0;
-            text-align: center;
-            font-size: clamp(15px, 4vw, 20px);
-            font-weight: 800;
-            color: #fff;
-            text-shadow: 0 2px 8px rgba(0,0,0,0.7);
-            display: none;
-        }
-        #gull-prompt.show { display: block; }
         /* QTE de clics pendant la descente */
         #cine-clickqte {
             position: absolute;
@@ -1247,7 +1231,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v8.0.4</div>
+                <div class="version-tag" id="version-tag">v8.0.5</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1312,7 +1296,7 @@
             <div id="result-coin" style="display:none; color:var(--accent); font-size:13px; font-weight:800; max-width:280px; margin:6px auto 0;"></div>
             <!-- Message rouge affiché uniquement après un dérapage (monde Volcan) -->
             <div id="result-skid" style="display:none; color:#ff6b6b; font-size:12.5px; font-weight:700; line-height:1.45; max-width:280px; margin:8px auto 0;"></div>
-            <!-- Évènements du monde Plage (parasol, serviette, château, mouettes) -->
+            <!-- Évènements du monde Plage (parasol, serviette, château) -->
             <div id="result-beach" style="display:none; color:#6bffb0; font-size:12.5px; font-weight:700; line-height:1.45; max-width:280px; margin:8px auto 0;"></div>
             <div class="buttons">
                 <button class="btn" id="btn-throw-again" data-i18n="btnThrowAgain">🔁 Relancer</button>
@@ -1329,7 +1313,6 @@
         <!-- Surcouche de la cinématique du monde Volcan (voir section 9bis) -->
         <div id="cine-ui">
             <div id="cine-lives"></div>
-            <div id="gull-prompt" data-i18n="gullPrompt">🐦 ESQUIVE LES CROTTES !</div>
             <div id="cine-warn"><div class="tri"></div><div class="bang">!</div></div>
             <div id="cine-sides">
                 <div class="side left">◀</div>
@@ -1761,10 +1744,7 @@
         beachResultParasol: { fr: "⛱️ Rebond sur un parasol : le lancer a continué de plus belle !", en: "⛱️ Bounced off a parasol: the throw carried on even better!" },
         beachResultTowel: { fr: "🏖️ Atterrissage dans une serviette : +20 de santé mentale.", en: "🏖️ Landed in a towel: +20 mental health." },
         beachResultCastle: { fr: "🏰 Château de sable écroulé sur la trousse : le lancer s'arrête là.", en: "🏰 Sandcastle collapsed on the pencil case: the throw ends here." },
-        beachResultGulls: { fr: "🐦 Crottes de mouettes esquivées sans une égratignure !", en: "🐦 Seagull droppings dodged without a scratch!" },
-        beachResultGullsHit: { fr: "🐦 Touché par les mouettes : -{n} de santé mentale.", en: "🐦 Hit by the seagulls: -{n} mental health." },
         beachMentalLoss: { fr: "🧠 Le stress des crabes : -5 de santé mentale.", en: "🧠 Crab stress: -5 mental health." },
-        gullPrompt: { fr: "🐦 ESQUIVE LES CROTTES !", en: "🐦 DODGE THE DROPPINGS!" },
         plageTutoTitle1: { fr: "🏖️ Bienvenue à la Plage !", en: "🏖️ Welcome to the Beach!" },
         plageTutoText1: {
             fr: "Ici tout est réinitialisé (vu que t'as oublié tes affaires) : le monde de la cour et le volcan n'ont rien à voir avec celui-ci. Même le classement n'est pas le même, les skins non plus.",
@@ -1777,8 +1757,8 @@
         },
         plageTutoTitle3: { fr: "⛱️ Ce qui traîne sur le sable", en: "⛱️ What's lying around on the sand" },
         plageTutoText3: {
-            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (+20 de santé mentale), châteaux de sable (fin du lancer) et mouettes (esquive) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
-            en: "The sand is randomly generated on every throw: parasols (bounce), towels (+20 mental health), sandcastles (throw over) and seagulls (dodge) each show up with their own chance, but only past 100 m."
+            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (+20 de santé mentale) et châteaux de sable (fin du lancer) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
+            en: "The sand is randomly generated on every throw: parasols (bounce), towels (+20 mental health) and sandcastles (throw over) each show up with their own chance, but only past 100 m."
         },
         plageTutoTitle4: { fr: "🧠 Santé mentale", en: "🧠 Mental health" },
         plageTutoText4: {
@@ -1802,8 +1782,6 @@
         achvTowelsDesc: { fr: "Atterris 20 fois dans une serviette trouvée sur le sable.", en: "Land 20 times in a towel found on the sand." },
         achvCastlesName: { fr: "Démolisseur de châteaux", en: "Castle wrecker" },
         achvCastlesDesc: { fr: "Fais s'écrouler 15 châteaux de sable sur la trousse.", en: "Make 15 sandcastles collapse on the pencil case." },
-        achvGullsName: { fr: "Blanchi(e) de tout soupçon", en: "Squeaky clean" },
-        achvGullsDesc: { fr: "Esquive 5 nuées de mouettes sans te faire toucher une seule fois.", en: "Dodge 5 seagull flocks without being hit once." },
         achvBurnoutName: { fr: "Burn-out balnéaire", en: "Seaside burnout" },
         achvBurnoutDesc: { fr: "Tombe à 0 de santé mentale à cause de ces maudits crabes.", en: "Drop to 0 mental health thanks to those cursed crabs." },
         achvPlageName: { fr: "Sable entre les pages", en: "Sand between the pages" },
@@ -2108,15 +2086,12 @@
     const BEACH_FOUND_TOWEL_HEAL = 20;// ... et par une serviette trouvée pendant un lancer
     const MENTAL_MAX = 200;           // santé mentale maximale
     const MENTAL_COST_PER_THROW = 5;  // stress des crabes, perdu à chaque lancer
-    const MENTAL_GULL_HIT = 10;       // santé mentale perdue par crotte de mouette reçue
     // En dessous de cette distance, le lancer reste sur le "sable proche du
-    // bus" : ni évènement (parasol/serviette/château/mouettes) ni stress des
-    // crabes. Ça laisse une zone d'échauffement sans surprise ni pénalité.
+    // bus" : ni évènement (parasol/serviette/château) ni stress des crabes.
+    // Ça laisse une zone d'échauffement sans surprise ni pénalité.
     const BEACH_EVENT_MIN_DISTANCE = 100;
     // Chaque évènement du monde Plage est tiré au sort à chaque lancer.
-    const BEACH_EVENT_CHANCE = { parasol: 0.5, towel: 0.6, castle: 0.4, gulls: 0.6 };
-    const BEACH_GULL_COUNT = 5;       // crottes à esquiver en jeu (10 dans la cinématique)
-    const BEACH_GULL_LIVES = 3;
+    const BEACH_EVENT_CHANCE = { parasol: 0.5, towel: 0.6, castle: 0.4 };
 
     /* ============ 2. DONNÉES STATIQUES ============ */
     // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
@@ -2152,7 +2127,6 @@
         { id: "parasols25", emoji: "⛱️", nameKey: "achvParasolName", descKey: "achvParasolDesc", check: (s) => s.plageParasolBounces >= 25 },
         { id: "serviettes20", emoji: "🧺", nameKey: "achvTowelsName", descKey: "achvTowelsDesc", check: (s) => s.plageTowelsFound >= 20 },
         { id: "chateaux15", emoji: "🏰", nameKey: "achvCastlesName", descKey: "achvCastlesDesc", check: (s) => s.plageCastlesCrushed >= 15 },
-        { id: "mouettes5", emoji: "🐦", nameKey: "achvGullsName", descKey: "achvGullsDesc", check: (s) => s.plagePerfectGulls >= 5 },
         { id: "burnOut", emoji: "🧠", nameKey: "achvBurnoutName", descKey: "achvBurnoutDesc", check: (s) => s.hasBurnedOut },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
         { id: "collectionneur", emoji: "🎨", nameKey: "achvCollectorName", descKey: "achvCollectorDesc", check: (s) => s.ownedSkins.length >= SKINS.length },
@@ -2365,7 +2339,6 @@
             plageParasolBounces: 0,    // rebonds sur un parasol
             plageTowelsFound: 0,       // serviettes trouvées pendant un lancer
             plageCastlesCrushed: 0,    // châteaux de sable écroulés sur la trousse
-            plagePerfectGulls: 0,      // séquences de mouettes esquivées sans une seule touche
             hasBurnedOut: false,       // santé mentale déjà tombée à 0 au moins une fois
             // Profil mis de côté pendant qu'on joue dans l'autre monde : la
             // plage a son propre argent/niveaux/skins/record (voir swapProfile).
@@ -3557,7 +3530,6 @@
         } else {
             beachProps = [];
         }
-        if (gullActive) gullStop();
         document.getElementById("result-beach").style.display = "none";
         refreshMentalHud();
         document.getElementById("result-skid").style.display = "none";
@@ -3763,7 +3735,6 @@
     // gagné, met à jour le record éventuel et affiche le panneau de résultat
     function onLanded() {
         state = "landed";
-        if (gullActive) gullStop();
         const distanceMeters = worldX / SCALE;
         save.totalThrows++;
         // Monde Plage : serviette (soin) ou château (qui s'écroule), puis le
@@ -4738,12 +4709,9 @@
         }
         const { sx, sy } = worldToScreen(worldX, worldY + floatBob);
         const size = 60;
-        // Pendant le QTE des mouettes, la trousse se décale d'un couloir à
-        // l'autre (purement à l'écran, sa position monde ne change pas).
-        const dodgeX = gullActive ? gullDodgeX : 0;
         const skin = getSkin(save.equippedSkin);
         ctx.save();
-        ctx.translate(sx + dodgeX, sy);
+        ctx.translate(sx, sy);
         ctx.rotate(rotation); // rotation continue pendant le vol
         if (skin.isCoin) {
             ctx.translate(-size / 2, -size / 2); // drawPixelCoin dessine depuis (0,0)
@@ -4794,21 +4762,7 @@
             // gardant seulement les points assez récents pour rester visibles
             emitTrail(worldX, worldY, vx, vy, now, dt);
 
-            if (save.currentWorld === "plage" && beachEvents.gulls && !beachUsed.gulls
-                && !inSpaceMode && !spaceEggTriggered && vy <= 0 && worldY > 60) {
-                // apogée : une nuée de mouettes passe au-dessus de la trousse
-                beachUsed.gulls = true;
-                state = "gull";
-                gullStart(BEACH_GULL_COUNT, BEACH_GULL_LIVES, (ok) => {
-                    // "ok" = la séquence est allée au bout ; sans aucune touche,
-                    // c'est une esquive parfaite (voir le succès des mouettes).
-                    if (ok) {
-                        beachLog.push("gullsClean");
-                        if (gullHits === 0) save.plagePerfectGulls++;
-                    }
-                    state = "flying";
-                });
-            } else if (spaceEggTriggered && vy <= 0) {
+            if (spaceEggTriggered && vy <= 0) {
                 // on vient d'atteindre l'apogée avec la combinaison easter egg :
                 // on gèle la position et on bascule vers la séquence spatiale
                 spaceEggTriggered = false; // ne se déclenche qu'une fois par lancer
@@ -4881,10 +4835,6 @@
             if (phaseTimer >= QTE_DURATION) {
                 advanceQteRing(false); // cet anneau a fini de rétrécir sans qu'on ait cliqué = raté
             }
-        } else if (state === "gull") {
-            // Monde Plage : le vol est figé le temps d'esquiver les crottes
-            rotation += 0.8 * dt;
-            gullUpdate(dt, w);
         }
 
         updateMeterUI();
@@ -4910,14 +4860,6 @@
             drawCloudSweep(w, h, phaseTimer / CLOUD_TRANSITION_DURATION);
         } else if (state === "qte") {
             drawQteRing(w, h);
-        }
-        if (gullActive) {
-            // Position FIXE (sans gullDodgeX) : la crotte doit rester rivée au
-            // couloir qu'elle vise depuis le début, pas suivre la trousse quand
-            // elle esquive — sinon la cible se recentre sur toi à chaque
-            // déplacement et il devient impossible de s'en écarter.
-            const gs = worldToScreen(worldX, worldY);
-            gullDraw(ctx, w, h, gs.sx, gs.sy);
         }
 
         requestAnimationFrame(gameLoop);
@@ -5332,7 +5274,6 @@
     function cineTeardown() {
         cineActive = false;
         cineStopQuake();
-        if (gullActive) gullStop();
         document.body.classList.remove("cine-mode", "cine-aim", "cine-blackout");
         document.getElementById("bcine-dialog").classList.remove("show");
         document.getElementById("bcine-aim").classList.remove("show");
@@ -5803,17 +5744,9 @@
 
     /* ---- Entrées pendant la cinématique ---- */
     window.addEventListener("keydown", (e) => {
-        // QTE des mouettes en pleine partie (monde Plage) : mêmes touches
-        if (!cineActive && gullActive) {
-            if (e.code === "ArrowLeft") { e.preventDefault(); gullMove(-1); }
-            else if (e.code === "ArrowRight") { e.preventDefault(); gullMove(1); }
-            return;
-        }
         if (!cineActive) return;
         if (cineKind === "plage") {
-            if (e.code === "ArrowLeft") { e.preventDefault(); gullMove(-1); }
-            else if (e.code === "ArrowRight") { e.preventDefault(); gullMove(1); }
-            else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); bcTap(window.innerWidth / 2); }
+            if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); bcTap(window.innerWidth / 2); }
             return;
         }
         if (e.code === "ArrowLeft") { e.preventDefault(); cineMove(-1); }
@@ -5821,11 +5754,6 @@
         else if (e.code === "Space" || e.code === "Enter") { e.preventDefault(); cineAddClick(); }
     });
     window.addEventListener("pointerdown", (e) => {
-        if (!cineActive && gullActive) {
-            const r = canvas.getBoundingClientRect();
-            gullMove(e.clientX < r.left + r.width / 2 ? -1 : 1);
-            return;
-        }
         if (!cineActive) return;
         if (cineKind === "plage") { bcTap(e.clientX); return; }
         if (cinePhase === "descent") { cineAddClick(); return; }
@@ -5839,9 +5767,8 @@
        Tout ce qui concerne le monde Plage est regroupé ici :
          - les objets dessinés à la main (parasol, serviette, château, crabe, bus...)
          - le décor du monde (drawBeachBackground) et ses accessoires aléatoires
-         - les évènements d'un lancer (rebond, serviette, château, mouettes)
+         - les évènements d'un lancer (rebond, serviette, château)
          - la santé mentale
-         - le QTE des crottes de mouettes, partagé entre le jeu et la cinématique
          - la cinématique de déblocage (startBeachCinematic)
        Comme pour le volcan, la cinématique réutilise le canvas du jeu et sa
        propre boucle de rendu (voir cineLoop, qui aiguille selon cineKind). */
@@ -6151,46 +6078,6 @@
         c.restore();
     }
 
-    // Mouette stylisée (deux ailes en "m") qui bat des ailes avec le temps.
-    function drawSeagull(c, x, y, size, t) {
-        const k = size / 30;
-        const flap = Math.sin(t * 5) * 6 * k;
-        c.save();
-        c.translate(x, y);
-        c.strokeStyle = "rgba(250,250,255,0.95)";
-        c.lineWidth = 3 * k;
-        c.lineCap = "round";
-        c.beginPath();
-        c.moveTo(-18 * k, flap);
-        c.quadraticCurveTo(-9 * k, -8 * k, 0, 0);
-        c.quadraticCurveTo(9 * k, -8 * k, 18 * k, flap);
-        c.stroke();
-        c.fillStyle = "rgba(250,250,255,0.95)";
-        c.beginPath();
-        c.ellipse(0, 2 * k, 5 * k, 3.4 * k, 0, 0, Math.PI * 2);
-        c.fill();
-        c.restore();
-    }
-
-    // Crotte de mouette : une goutte blanchâtre avec une petite traînée.
-    function drawGullDrop(c, x, y, r) {
-        c.save();
-        c.translate(x, y);
-        c.fillStyle = "rgba(255,255,255,0.35)";
-        c.beginPath();
-        c.ellipse(0, -r * 2.2, r * 0.55, r * 1.7, 0, 0, Math.PI * 2);
-        c.fill();
-        c.fillStyle = "#f4f4ea";
-        c.beginPath();
-        c.ellipse(0, 0, r, r * 1.15, 0, 0, Math.PI * 2);
-        c.fill();
-        c.fillStyle = "rgba(190,195,170,0.9)";
-        c.beginPath();
-        c.ellipse(-r * 0.3, r * 0.25, r * 0.4, r * 0.45, 0, 0, Math.PI * 2);
-        c.fill();
-        c.restore();
-    }
-
     /* ---- Décor du monde Plage ---- */
     // Sable jaune, petites dunes, coquillages, mer à l'horizon, plus les
     // accessoires tirés au hasard pour ce lancer (voir beachProps).
@@ -6312,10 +6199,9 @@
     // regénérée à chaque lancer, donc rien n'est jamais deux fois au même
     // endroit (voir generateBeachDecor / beachPlaceLandingProp).
     let beachProps = [];
-    let beachEvents = { parasol: false, towel: false, castle: false, gulls: false };
-    let beachUsed = { parasol: false, towel: false, castle: false, gulls: false };
+    let beachEvents = { parasol: false, towel: false, castle: false };
+    let beachUsed = { parasol: false, towel: false, castle: false };
     let beachLog = [];        // évènements réellement vécus, affichés au résultat
-    let beachGullDamage = 0;  // santé mentale perdue aux mouettes sur ce lancer
 
     // Décor purement visuel semé un peu partout devant la trousse : c'est lui
     // qui donne l'impression d'une plage différente à chaque lancer.
@@ -6346,11 +6232,9 @@
             parasol: Math.random() < BEACH_EVENT_CHANCE.parasol,
             towel: Math.random() < BEACH_EVENT_CHANCE.towel,
             castle: Math.random() < BEACH_EVENT_CHANCE.castle,
-            gulls: Math.random() < BEACH_EVENT_CHANCE.gulls,
         };
-        beachUsed = { parasol: false, towel: false, castle: false, gulls: false };
+        beachUsed = { parasol: false, towel: false, castle: false };
         beachLog = [];
-        beachGullDamage = 0;
     }
 
     // Où la trousse va retomber si rien ne l'interrompt (balistique simple,
@@ -6382,10 +6266,9 @@
     // tirer au sort, sans quoi une chance non nulle finirait par en placer un.
     function beachOnLaunch() {
         if (predictLandingX() / SCALE < BEACH_EVENT_MIN_DISTANCE) {
-            beachEvents = { parasol: false, towel: false, castle: false, gulls: false };
-            beachUsed = { parasol: false, towel: false, castle: false, gulls: false };
+            beachEvents = { parasol: false, towel: false, castle: false };
+            beachUsed = { parasol: false, towel: false, castle: false };
             beachLog = [];
-            beachGullDamage = 0;
             return;
         }
         rollBeachEvents();
@@ -6439,8 +6322,6 @@
         if (beachLog.indexOf("parasol") >= 0) lines.push(tr("beachResultParasol"));
         if (beachLog.indexOf("towel") >= 0) lines.push(tr("beachResultTowel"));
         if (beachLog.indexOf("castle") >= 0) lines.push(tr("beachResultCastle"));
-        if (beachLog.indexOf("gullsClean") >= 0) lines.push(tr("beachResultGulls"));
-        if (beachGullDamage > 0) lines.push(tr("beachResultGullsHit").replace("{n}", beachGullDamage));
         if (stressed) lines.push(tr("beachMentalLoss"));
         return lines.join(" ");
     }
@@ -6465,156 +6346,6 @@
         const on = save.currentWorld === "plage";
         pill.style.display = on ? "" : "none";
         if (on) document.getElementById("game-mental").textContent = save.mentalHealth + " / " + MENTAL_MAX;
-    }
-
-    /* ---- QTE des crottes de mouettes ----
-       Partagé entre le jeu (BEACH_GULL_COUNT crottes) et la cinématique
-       (10 crottes) : trois couloirs, une crotte vise le couloir où se trouve
-       la trousse, il faut en changer avant qu'elle n'arrive. */
-    const GULL_WARN = 0.62;    // temps laissé pour réagir
-    const GULL_TRAVEL = 0.4;   // chute de la crotte une fois le sort réglé
-    const GULL_GAP = 0.32;     // respiration entre deux crottes
-    const GULL_LANE_SPREAD = 0.19;
-
-    let gullActive = false;
-    let gullTotal = 0, gullIdx = 0;
-    let gullState = "wait";     // "wait" | "warn" | "incoming" | "gap"
-    let gullT = 0;
-    let gullLane = 0, gullLaneAnim = 0, gullDropLane = 0;
-    let gullLives = 0, gullHits = 0;
-    let gullDodgeX = 0;         // décalage écran appliqué à la trousse (voir drawTrousse)
-    let gullOnDone = null;
-
-    function gullLaneX(lane, w) { return lane * w * GULL_LANE_SPREAD; }
-
-    function gullStart(total, lives, onDone) {
-        gullActive = true;
-        document.getElementById("gull-prompt").classList.add("show");
-        gullTotal = total;
-        gullLives = lives;
-        gullIdx = 0; gullHits = 0;
-        gullState = "wait"; gullT = 0; gullDodged = false;
-        gullLane = 0; gullLaneAnim = 0; gullDropLane = 0;
-        gullOnDone = onDone || null;
-        document.body.classList.add("gull-mode");
-        document.getElementById("cine-sides").classList.add("show");
-        document.getElementById("cine-lives").classList.add("show");
-        gullRefreshLives();
-    }
-
-    function gullRefreshLives() {
-        document.getElementById("cine-lives").textContent = "❤️".repeat(Math.max(0, gullLives)) + "🤍".repeat(Math.max(0, gullHits));
-    }
-
-    function gullStop() {
-        gullActive = false;
-        gullDodgeX = 0;
-        document.getElementById("gull-prompt").classList.remove("show");
-        document.body.classList.remove("gull-mode");
-        document.getElementById("cine-sides").classList.remove("show");
-        document.getElementById("cine-lives").classList.remove("show");
-        document.getElementById("cine-warn").classList.remove("show");
-    }
-
-    let gullDodged = false; // esquive déjà effectuée pour la crotte en cours (voir gullMove)
-
-    function gullNext() {
-        gullState = "warn";
-        gullT = 0;
-        gullDodged = false;
-        gullDropLane = gullLane; // la crotte vise le couloir actuel
-        document.getElementById("cine-warn").classList.add("show");
-    }
-
-    // Appelée UNE fois la chute terminée (fin de "incoming") : esquivé pendant
-    // "warn" OU "incoming" = ok, sinon touché. Voir gullMove : réagir une fois
-    // que la crotte est visiblement en train de tomber compte aussi, pas
-    // seulement pendant le court avertissement qui précède sa chute — sinon,
-    // le réflexe naturel ("j'attends de la voir tomber pour esquiver") arrive
-    // toujours trop tard et rien ne semble se passer quand on appuie.
-    function gullResolve() {
-        if (gullDodged) return;
-        gullHits++;
-        gullLives--;
-        gullRefreshLives();
-        if (!cineActive) {
-            beachGullDamage += MENTAL_GULL_HIT;
-            loseMental(MENTAL_GULL_HIT);
-        }
-    }
-
-    function gullMove(dir) {
-        if (!gullActive || gullDodged) return;
-        if (gullState !== "warn" && gullState !== "incoming") return;
-        let next = Math.max(-1, Math.min(1, gullLane + dir));
-        // Déjà collée à ce bord (ex: taper "gauche" alors qu'on est déjà tout
-        // à gauche) : on esquive quand même, de l'autre côté, plutôt que de ne
-        // rien faire — sinon la trousse semble bloquée pour le reste du QTE,
-        // la crotte suivante visant toujours le couloir où elle se trouve.
-        if (next === gullLane) next = gullLane - dir;
-        gullLane = next;
-        gullDodged = true;
-        document.getElementById("cine-warn").classList.remove("show");
-    }
-
-    function gullUpdate(dt, w) {
-        if (!gullActive) return;
-        gullT += dt;
-        gullLaneAnim += (gullLane - gullLaneAnim) * Math.min(1, dt * 11);
-        gullDodgeX = gullLaneX(gullLaneAnim, w);
-        if (gullState === "wait") {
-            if (gullT >= 0.4) gullNext();
-        } else if (gullState === "warn") {
-            if (gullT >= GULL_WARN) {
-                document.getElementById("cine-warn").classList.remove("show");
-                gullState = "incoming";
-                gullT = 0;
-            }
-        } else if (gullState === "incoming") {
-            if (gullT >= GULL_TRAVEL) {
-                gullResolve(); // dernière chance d'esquiver écoulée : verdict maintenant
-                gullIdx++;
-                gullState = "gap";
-                gullT = 0;
-            }
-        } else if (gullState === "gap") {
-            if (gullT >= GULL_GAP) {
-                if (gullIdx >= gullTotal || gullLives <= 0) {
-                    const failed = gullLives <= 0;
-                    const cb = gullOnDone;
-                    gullStop();
-                    if (cb) cb(!failed);
-                } else {
-                    gullNext();
-                }
-            }
-        }
-    }
-
-    // Crotte en approche + la mouette qui l'a lâchée, au-dessus de la trousse
-    function gullDraw(c, w, h, baseX, baseY) {
-        if (!gullActive) return;
-        let p = -1;
-        if (gullState === "warn") p = 0.4 * c01(gullT / GULL_WARN);
-        else if (gullState === "incoming") p = 0.4 + 0.6 * c01(gullT / GULL_TRAVEL);
-        // Écart (30 à 170 px) entre la mouette et la trousse : sur un lancer
-        // puissant, la trousse est suivie tout en haut de l'écran par la
-        // caméra (voir VERTICAL_SAFE_TOP) — l'ancienne formule (42% de la
-        // hauteur d'écran au-dessus) donnait alors systématiquement une valeur
-        // négative, clampée à 30px, DONC LA MÊME POSITION FIXE dans tous les
-        // cas : la mouette semblait figée sous le HUD au lieu de suivre la
-        // hauteur réelle de la trousse.
-        // "- 46" (pas "- 20") : la mouette elle-même est dessinée 26px au-dessus
-        // de topY (voir plus bas), donc il faut garder cette marge en plus pour
-        // que son propre sprite ne parte pas hors de l'écran par le haut.
-        const gap = Math.min(170, Math.max(30, baseY - 46));
-        const topY = baseY - gap;
-        drawSeagull(c, baseX + gullLaneX(gullDropLane, w), topY - 26, 34, performance.now() / 1000);
-        if (p >= 0) {
-            const dx = baseX + gullLaneX(gullDropLane, w);
-            const dy = topY + (baseY - topY) * p;
-            drawGullDrop(c, dx, dy, 7 + 7 * p);
-        }
     }
 
     /* ---- Cinématique de déblocage du monde Plage ----
@@ -6649,7 +6380,7 @@
         castle: 1.2,      // le château s'écroule sur la trousse
         fly3: 2.6,
         towel: 1.6,       // la trousse s'allonge dans la serviette
-        fly4: 1.8,        // une crotte frôle la trousse
+        fly4: 1.8,        // dernier vol avant l'arrivée
         outro: 4.5,       // "bref bienvenue dans le monde plage..."
     };
     const BCINE_AIM_FORBIDDEN = SPACE_EGG_ACCURACY_MAX; // la "zone verte" du début de barre
@@ -6747,13 +6478,6 @@
         if (name === "fly2") bcAddProp("castle", 200 * SCALE);
         if (name === "fly3") bcAddProp("towel", 620 * BCINE.fly3);
         if (name === "outro") bcMsg = { key: "bcineWelcome", fade: 1.2, t: 0 };
-        if (name === "gulls") {
-            bcMsg = null;
-            gullStart(10, 3, (ok) => {
-                if (ok) bcSetPhase("outro");
-                else bcShowDialogs(["bcineTutoAnyway"], "outro");
-            });
-        }
     }
 
     // Position (monde) de la trousse : elle reste à une fraction fixe de
@@ -6796,16 +6520,10 @@
 
     /* ---- Logique : enchaînement des phases ---- */
     function bcUpdate(dt) {
-        const w = canvas.width / devicePixelRatio;
         // Voir le commentaire CSS de body.cine-blackout : actif exactement
         // pendant que le diaphragme couvre l'écran (fermeture, noir, ouverture).
         document.body.classList.toggle("cine-blackout", bcIris < 0.999);
         if (bcMsg) bcMsg.t += dt;
-        if (gullActive) {
-            gullUpdate(dt, w);
-            bcScroll += 420 * dt;
-            return;
-        }
 
         switch (bcPhase) {
             case "fade":
@@ -6977,7 +6695,7 @@
                 const p = c01(bcT / BCINE.fly4);
                 bcScroll += 620 * dt;
                 bcAlt = 330 * cOut(p);
-                if (bcT >= BCINE.fly4) bcSetPhase("gulls");
+                if (bcT >= BCINE.fly4) bcSetPhase("outro");
                 break;
             }
             case "outro":
@@ -7188,7 +6906,6 @@
                 ctx.fillText("!", tx, ty - 66);
                 ctx.restore();
             }
-            if (gullActive) gullDraw(ctx, vw, vh, tx, ty);
         }
         ctx.restore();
     }
@@ -7209,15 +6926,10 @@
         }
     }
 
-    // Un appui pendant la cinématique de la plage : valide un dialogue, tire
-    // pendant la phase de visée, ou change de couloir pendant le QTE mouettes.
+    // Un appui pendant la cinématique de la plage : valide un dialogue, ou
+    // tire pendant la phase de visée.
     function bcTap(clientX) {
         if (bcPhase === "dialog") { bcDialogAdvance(); return; }
-        if (gullActive) {
-            const rect = canvas.getBoundingClientRect();
-            gullMove(clientX < rect.left + rect.width / 2 ? -1 : 1);
-            return;
-        }
         if (bcPhase === "aim") bcLaunchFromAim(true);
     }
 
@@ -8442,20 +8154,19 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.4";
+    const VERSION_NUMBER = "8.0.5";
     const CHANGELOG = [
         {
-            version: "8.0.4",
+            version: "8.0.5",
             major: [],
             minor: [
-                { fr: "Corrige le QTE des mouettes une bonne fois pour toutes : appuyer sur les flèches ne faisait rien si on attendait de VOIR la crotte tomber pour réagir (réflexe naturel) — seule la toute courte fenêtre d'avertissement, avant même la chute, comptait. Réagir pendant la chute visible esquive maintenant aussi", en: "Fixed the seagull QTE for good: pressing the arrows did nothing if you waited to actually SEE the dropping fall before reacting (the natural reflex) — only the very short warning window, before it even started falling, counted. Reacting during the visible fall now also dodges" },
+                { fr: "Rééquilibrage du monde Plage : trois évènements aléatoires par lancer (parasol, serviette, château de sable), tirés indépendamment au-delà de 100 m ; 11 succès liés à la plage", en: "Beach world rebalance: three random events per throw (parasol, towel, sandcastle), rolled independently past 100 m; 11 beach-related achievements" },
             ],
         },
         {
             version: "8.0.3",
             major: [],
             minor: [
-                { fr: "Corrige le vrai reste du bug des mouettes : la mouette et sa crotte étaient quasi toujours plaquées tout en haut de l'écran (souvent cachées sous le HUD), quelle que soit la hauteur réelle de la trousse, à cause d'une formule de position verticale mal calibrée", en: "Fixed the rest of the seagull bug: the seagull and its dropping were almost always pinned to the very top of the screen (often hidden behind the HUD), regardless of the pencil case's actual height, due to a miscalibrated vertical position formula" },
                 { fr: "Corrige un vrai bug de la cinématique (plage comme volcan) : cliquer pendant le fondu de sortie du menu (2,2 à 4 s) retombait sur les boutons du menu resté cliquable dessous — un clic malheureux sur la carte \"Volcans\" pouvait démarrer l'autre cinématique par-dessus", en: "Fixed a real cutscene bug (beach and volcano alike): clicking during the menu's fade-out (2.2 to 4 s) landed on the menu's buttons, which stayed clickable underneath — an unlucky tap on the \"Volcanoes\" card could start the other cutscene on top of it" },
             ],
         },
@@ -8463,8 +8174,7 @@
             version: "8.0.2",
             major: [],
             minor: [
-                { fr: "Corrige le QTE des crottes de mouettes en jeu : la crotte suivait la trousse quand on esquivait au lieu de rester fixée à son couloir d'origine, la rendant quasi impossible à esquiver", en: "Fixed the in-game seagull-dropping QTE: the dropping used to follow the pencil case when dodging instead of staying pinned to its original lane, making it nearly impossible to dodge" },
-                { fr: "Les parasols, serviettes, châteaux de sable et mouettes n'apparaissent plus que sur les lancers de plus de 100 m ; en dessous, le stress des crabes (-5 de santé mentale) ne s'applique plus non plus", en: "Parasols, towels, sandcastles and seagulls now only show up on throws past 100 m; below that, the crab stress (-5 mental health) no longer applies either" },
+                { fr: "Les parasols, serviettes et châteaux de sable n'apparaissent plus que sur les lancers de plus de 100 m ; en dessous, le stress des crabes (-5 de santé mentale) ne s'applique plus non plus", en: "Parasols, towels and sandcastles now only show up on throws past 100 m; below that, the crab stress (-5 mental health) no longer applies either" },
                 { fr: "Le billet de bus du retour ne coûte 250 000 $ que la toute première fois : une fois payé, revenir sur la plage puis en repartir est gratuit pour toujours (comme la Trousse à Claquettes à l'entrée)", en: "The return bus ticket only costs $250,000 the very first time: once paid, coming back to the beach and leaving again is free forever (like the Flip-Flop Pencil Case on the way in)" },
                 { fr: "Le classement n'est plus limité aux 15 meilleurs scores : il affiche maintenant tous les joueurs classés", en: "The leaderboard is no longer capped at the top 15 scores: it now shows every ranked player" },
             ],
@@ -8474,7 +8184,6 @@
             major: [],
             minor: [
                 { fr: "Corrige le soleil/la lune qui restait visible par-dessus le fondu au noir de la cinématique plage (fermeture en diaphragme)", en: "Fixed the sun/moon staying visible over the beach cutscene's fade to black (iris close)" },
-                { fr: "Corrige le QTE des crottes de mouettes qui pouvait sembler bloqué : rester collé à un bord ne permettait plus d'esquiver le coup suivant. N'importe quel appui à temps esquive maintenant, et une consigne \"ESQUIVE LES CROTTES !\" s'affiche pendant le QTE", en: "Fixed the seagull-dropping QTE which could feel stuck: being pinned at an edge lane made the next dodge impossible. Any timely tap now dodges, and a \"DODGE THE DROPPINGS!\" prompt shows during the QTE" },
                 { fr: "Ajout d'un bouton pour revoir le tutoriel (Réglages) : les bases du jeu, plus ceux du Volcan et de la Plage une fois ces mondes débloqués", en: "Added a button to replay the tutorial (Settings): the game basics, plus the Volcano and Beach ones once those worlds are unlocked" },
             ],
         },
@@ -8487,8 +8196,8 @@
             ],
             minor: [
                 { fr: "La plage est regénérée à chaque lancer : parasols, serviettes et châteaux de sable ne sont jamais deux fois au même endroit", en: "The beach is regenerated on every throw: parasols, towels and sandcastles are never twice in the same place" },
-                { fr: "Quatre évènements tirés au sort à chaque lancer : rebond sur un parasol (50%), serviette (60%), château de sable (40%) et esquive des crottes de mouettes (60%)", en: "Four events rolled on every throw: parasol bounce (50%), towel (60%), sandcastle (40%) and seagull-dropping dodge (60%)" },
-                { fr: "12 nouveaux succès liés à la plage : acheter les claquettes, débloquer le monde, rentrer en bus, 100 lancers sur le sable, records de 500 m et 2000 m, 250 000 $ gagnés là-bas, 25 rebonds sur parasol, 20 serviettes, 15 châteaux écroulés, 5 nuées de mouettes esquivées sans une touche, et le burn-out", en: "12 new beach achievements: buy the flip-flops, unlock the world, take the bus home, 100 throws on the sand, 500 m and 2000 m records, $250,000 earned there, 25 parasol bounces, 20 towels, 15 collapsed castles, 5 seagull flocks dodged without a hit, and the burnout" },
+                { fr: "Trois évènements tirés au sort à chaque lancer : rebond sur un parasol (50%), serviette (60%) et château de sable (40%)", en: "Three events rolled on every throw: parasol bounce (50%), towel (60%) and sandcastle (40%)" },
+                { fr: "11 nouveaux succès liés à la plage : acheter les claquettes, débloquer le monde, rentrer en bus, 100 lancers sur le sable, records de 500 m et 2000 m, 250 000 $ gagnés là-bas, 25 rebonds sur parasol, 20 serviettes, 15 châteaux écroulés, et le burn-out", en: "11 new beach achievements: buy the flip-flops, unlock the world, take the bus home, 100 throws on the sand, 500 m and 2000 m records, $250,000 earned there, 25 parasol bounces, 20 towels, 15 collapsed castles, and the burnout" },
             ],
         },
         {
