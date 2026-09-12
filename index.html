@@ -1255,7 +1255,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.1.0</div>
+                <div class="version-tag" id="version-tag">v9.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1899,6 +1899,7 @@
         linksWhatsappLabel: { fr: "Chaîne WhatsApp", en: "WhatsApp channel" },
         linksWhatsappDesc: { fr: "Actus de ce jeu", en: "Updates about this game" },
         settingsTitle: { fr: "⚙️ Réglages", en: "⚙️ Settings" },
+        gamePaused: { fr: "⏸️ Partie en pause", en: "⏸️ Game paused" },
         settingsTutoTitle: { fr: "📖 Revoir le tutoriel", en: "📖 Replay tutorial" },
         settingsTutoBasics: { fr: "Bases du jeu", en: "Game basics" },
         settingsTutoVolcan: { fr: "Monde Volcans", en: "Volcans world" },
@@ -3415,6 +3416,10 @@
     const VERTICAL_SAFE_TOP = 90; // marge (px) toujours laissée entre le haut de l'écran et la trousse une fois la caméra en action
     let t0 = 0;           // horodatage du début de la phase en cours (charge / précision)
     let lastFrameTime = 0;
+    // Pause : ouvrir les réglages pendant un lancer déjà parti fige la partie
+    // (voir pauseGame / resumeGame). Tant que c'est vrai, la boucle de rendu
+    // est arrêtée et les taps sont ignorés.
+    let gamePaused = false;
     let lockedPower = 0;    // puissance verrouillée (0.4 à 1.0) lors du 1er clic
     let lockedAccuracy = 0; // précision verrouillée (-1 à 1) lors du 2e clic
     let isPerfect = false;  // vrai si le lancer était quasi-parfait (bonus d'argent)
@@ -3482,6 +3487,7 @@
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
         state = "idle";
+        gamePaused = false; // au cas où on aurait quitté l'écran de jeu en pause
         worldX = 0;
         worldY = 0;
         vx = 0; vy = 0;
@@ -3617,6 +3623,7 @@
     });
 
     function handleTap() {
+        if (gamePaused) return; // partie figée : ni tap, ni touche Espace
         if (state === "idle") startChargingPower();
         else if (state === "charging_power") lockPower();
         else if (state === "charging_angle") lockAccuracyAndLaunch();
@@ -4700,10 +4707,40 @@
         ctx.restore();
     }
 
+    // Un lancer "en cours" = la trousse est déjà partie, le joueur n'a plus la
+    // main sur la puissance ni la précision : c'est là que mettre en pause a un
+    // sens (avant le lancer, il suffit de ne pas taper).
+    function throwInProgress() {
+        return state === "flying" || state === "skidding" || state === "space_transition"
+            || state === "space_floating" || state === "qte";
+    }
+
+    // Fige la partie : la boucle de rendu s'arrête sur l'image courante (donc
+    // physique, chronos du QTE et caméra ne bougent plus) et les taps sont
+    // ignorés. Sans effet si aucun lancer n'est en l'air.
+    function pauseGame() {
+        if (gamePaused || cineActive) return false;
+        if (!screens.game.classList.contains("active") || !throwInProgress()) return false;
+        gamePaused = true;
+        showToast(tr("gamePaused"));
+        return true;
+    }
+
+    // Reprend exactement où on s'était arrêté. lastFrameTime est remis à zéro
+    // pour que le temps passé en pause ne soit pas compté comme un dt géant,
+    // et c'est ici qu'on relance la boucle de rendu.
+    function resumeGame() {
+        if (!gamePaused) return;
+        gamePaused = false;
+        lastFrameTime = 0;
+        if (screens.game.classList.contains("active") && !cineActive) requestAnimationFrame(gameLoop);
+    }
+
     // Boucle principale : appelée à chaque frame tant que l'écran de jeu est actif
     function gameLoop(now) {
         if (!screens.game.classList.contains("active")) return;
         if (cineActive) return; // la cinématique a sa propre boucle de rendu
+        if (gamePaused) return; // en pause : c'est resumeGame() qui relancera la boucle
         if (!lastFrameTime) lastFrameTime = now;
         const dt = Math.min((now - lastFrameTime) / 1000, 0.032); // dt plafonné pour éviter les gros sauts
         lastFrameTime = now;
@@ -8005,6 +8042,7 @@
             persist();
         }
         tutorialSlides = TUTORIAL_SLIDES;
+        resumeGame(); // si le tutoriel a été relu depuis les réglages en pleine partie
     }
 
     function showTutorialIfNeeded() {
@@ -8049,6 +8087,9 @@
     // de diapos demandé (voir startTutorial). Ne modifient jamais les drapeaux
     // "déjà vu" (tutorialSeen/volcanTutorialSeen/plageTutorialSeen) : les revoir
     // n'enlève rien au fait qu'ils ont déjà été vus une première fois.
+    // Note : ces trois boutons referment la modale "à la main" plutôt que par
+    // closeSettingsModal(), pour que la partie reste en pause pendant qu'on
+    // relit le tutoriel (c'est closeTutorial qui la relancera).
     document.getElementById("btn-replay-tuto-basics").addEventListener("click", () => {
         document.getElementById("settings-modal").classList.remove("show");
         startTutorial(TUTORIAL_SLIDES);
@@ -8081,13 +8122,20 @@
         });
     }
 
+    // Toutes les fermetures des réglages passent par ici : une partie mise en
+    // pause à l'ouverture doit toujours repartir, quel que soit le chemin
+    // emprunté (bouton OK ou clic en dehors de la boîte).
+    function closeSettingsModal() {
+        document.getElementById("settings-modal").classList.remove("show");
+        resumeGame();
+    }
+
     document.getElementById("btn-settings").addEventListener("click", () => {
+        pauseGame(); // un lancer déjà parti est figé le temps des réglages
         refreshSettingsModal();
         document.getElementById("settings-modal").classList.add("show");
     });
-    document.getElementById("btn-settings-close").addEventListener("click", () => {
-        document.getElementById("settings-modal").classList.remove("show");
-    });
+    document.getElementById("btn-settings-close").addEventListener("click", closeSettingsModal);
 
     // Compte privé : les autres joueurs verront une banderole à la place du
     // profil (voir renderProfile), mais le score reste dans le classement.
@@ -8195,8 +8243,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.1.0";
+    const VERSION_NUMBER = "9.2.0";
     const CHANGELOG = [
+        {
+            version: "9.2.0",
+            major: [],
+            minor: [
+                { fr: "Une trousse déjà lancée peut maintenant être mise en pause : ouvrir les Réglages (⚙️) pendant le vol fige la partie, et la refermer la reprend exactement où elle en était", en: "A pencil case already in the air can now be paused: opening Settings (⚙️) mid-flight freezes the game, and closing it resumes exactly where you left off" },
+            ],
+        },
         {
             version: "9.1.0",
             major: [],
@@ -8661,9 +8716,13 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "profile-detail-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
+    });
+    // À part des autres : doit aussi relancer la partie mise en pause à l'ouverture.
+    document.getElementById("settings-modal").addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeSettingsModal();
     });
     // À part des autres : doit aussi arrêter le compte à rebours (voir closeChallengesModal).
     document.getElementById("challenges-modal").addEventListener("click", (e) => {
