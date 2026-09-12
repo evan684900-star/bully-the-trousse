@@ -1288,8 +1288,6 @@
         <div class="hud-top">
             <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
             <div class="money-pill" style="font-size:14px; padding:6px 14px; color:var(--text);">📏 <span id="game-distance">0</span> m</div>
-            <!-- Santé mentale : affichée seulement dans le monde Plage (voir refreshMentalHud) -->
-            <div class="money-pill" id="game-mental-pill" style="font-size:14px; padding:6px 14px; color:var(--text); display:none;">🧠 <span id="game-mental">200</span></div>
         </div>
         <div class="hint-text" id="hint-text" data-i18n="hintCharge">Clique / appuie pour charger la puissance !</div>
         <div id="qte-wrap">
@@ -1411,8 +1409,6 @@
             <div class="info-line"><span data-i18n="labelName">Nom</span><span id="info-name">-</span></div>
             <div class="info-line"><span data-i18n="labelPlaytime">Temps de jeu</span><span id="info-time">0 min</span></div>
             <div class="info-line"><span data-i18n="labelBest">Meilleur score</span><span id="info-best">0 m</span></div>
-            <!-- Affichée seulement dans le monde Plage (voir openTrousseModal) -->
-            <div class="info-line" id="info-mental-row" style="display:none;"><span id="info-mental-label">Santé mentale</span><span id="info-mental">200 / 200</span></div>
             <button class="btn" id="btn-trousse-close" data-i18n="btnOk">OK</button>
         </div>
     </div>
@@ -1434,15 +1430,6 @@
                 <button class="btn" id="btn-plage-replay-yes" data-i18n="plageReplayYes">🔁 Refaire</button>
                 <button class="btn secondary" id="btn-plage-replay-no" data-i18n="plageReplayNo">🏖️ Juste y aller</button>
             </div>
-        </div>
-    </div>
-
-    <!-- Santé mentale à zéro : impossible de lancer tant qu'on n'a pas de serviette -->
-    <div class="modal-overlay" id="mental-empty-modal">
-        <div class="info-box">
-            <h2 data-i18n="mentalEmptyTitle">🧠 Trop stressé !</h2>
-            <p data-i18n="mentalEmptyText">Ces maudits crabes ont eu raison de tes nerfs : ta santé mentale est à 0. Achète une serviette de plage à la boutique pour te reposer un peu.</p>
-            <button class="btn" id="btn-mental-empty-go" data-i18n="btnGoTowel">🏖️ Aller à la boutique</button>
         </div>
     </div>
 
@@ -1720,20 +1707,6 @@
             en: "You've already paid for this trip once: the ride back to the normal world is now free, every time you come back to the beach."
         },
         busTicketFreeBtn: { fr: "🚌 Reprendre (gratuit)", en: "🚌 Take it (free)" },
-        towelName: { fr: "Serviette de plage", en: "Beach towel" },
-        towelDesc: {
-            fr: "Utilisable une seule fois : rend 5 de santé mentale (contre 20 pour une serviette trouvée pendant un lancer).",
-            en: "Single use: restores 5 mental health (versus 20 for a towel found during a throw)."
-        },
-        towelBought: { fr: "🏖️ Petite sieste : +5 de santé mentale.", en: "🏖️ Quick nap: +5 mental health." },
-        towelFull: { fr: "Au top", en: "Maxed out" },
-        labelMental: { fr: "Santé mentale", en: "Mental health" },
-        mentalEmptyTitle: { fr: "🧠 Trop stressé !", en: "🧠 Too stressed out!" },
-        mentalEmptyText: {
-            fr: "Ces maudits crabes ont eu raison de tes nerfs : ta santé mentale est à 0. Achète une serviette de plage à la boutique pour te reposer un peu.",
-            en: "Those cursed crabs got the better of your nerves: your mental health is at 0. Buy a beach towel in the shop to rest a little."
-        },
-        btnGoTowel: { fr: "🏖️ Aller à la boutique", en: "🏖️ Go to the shop" },
         stuckOnBeach: { fr: "🚌 Pas assez d'argent pour le bus ! Il te faut un billet à 250 000 $ en boutique.", en: "🚌 Not enough money for the bus! You need a $250,000 ticket from the shop." },
         plageReplayTitle: { fr: "🏖️ Reprendre le bus ?", en: "🏖️ Take the bus again?" },
         plageReplayText: { fr: "Tu peux revivre la cinématique du voyage, ou repartir directement à la Plage.", en: "You can relive the trip cutscene, or head straight back to the Beach." },
@@ -1743,42 +1716,36 @@
         bcineContinue: { fr: "appuyer n'importe où pour continuer", en: "press anywhere to continue" },
         bcineNotGreen: { fr: "Pas dans la zone verte !", en: "Not in the green zone!" },
         bcineForgot: {
-            fr: "Vous avez oublié vos affaires vous devriez en trouvez sur le chemin... (oui toutes meme les ameliorations)",
-            en: "You forgot your stuff, you should find some along the way... (yes all of it, even the upgrades)"
+            fr: "Par contre... vous avez oublié votre argent !",
+            en: "But... you forgot your money!"
         },
         bcineCheh: { fr: "cheh tom", en: "cheh tom" },
         bcineUnlocked: { fr: "monde plage debloqué, voici les bases", en: "beach world unlocked, here are the basics" },
         bcineParasol1: { fr: "les parasols sont tres utiles pour rebondir dessus !", en: "parasols are very handy to bounce off of!" },
         bcineParasol2: { fr: "leurs apparitions sont aleatoires n'essayer pas de reperer l'endroit et d'y y aller a chaque fois 😝", en: "they show up at random, don't try to memorise the spot and aim for it every time 😝" },
         bcineTutoAnyway: { fr: "en temps normal ça se serait arreté là mais vu que c'est un tuto...", en: "normally it would have ended right there, but since this is a tutorial..." },
-        bcineTowel1: { fr: "les serviettes sont utiles contre l'epuisement CAR OUI il y a de la fatigue causé par le stress de ces maudits crabes", en: "towels are useful against exhaustion BECAUSE YES there is fatigue, caused by the stress of those cursed crabs" },
-        bcineTowel2: { fr: "mais certes vous vous assouplissez un peu dans cette serviette jusqu'a vous endormir et vous vous reveillerez au debut", en: "sure, you relax a bit in that towel until you fall asleep, and you wake up back at the start" },
+        bcineTowel1: { fr: "les serviettes, elles, n'ont aucun effet particulier : juste de la déco sur le sable", en: "the towels, though, have no particular effect: just decoration on the sand" },
+        bcineTowel2: { fr: "on continue notre lancée sans s'arrêter dessus, promis", en: "we keep going without stopping there, promise" },
         bcineTowel3: { fr: "mais c'est toujours un tuto !", en: "but it's still a tutorial!" },
         bcineWelcome: { fr: "bref bienvenue dans le monde plage...", en: "anyway, welcome to the beach world..." },
         beachParasolToast: { fr: "⛱️ Rebond sur un parasol !", en: "⛱️ Bounced off a parasol!" },
         beachResultParasol: { fr: "⛱️ Rebond sur un parasol : le lancer a continué de plus belle !", en: "⛱️ Bounced off a parasol: the throw carried on even better!" },
-        beachResultTowel: { fr: "🏖️ Atterrissage dans une serviette : +20 de santé mentale.", en: "🏖️ Landed in a towel: +20 mental health." },
+        beachResultTowel: { fr: "🏖️ Atterrissage dans une serviette (juste pour le style).", en: "🏖️ Landed in a towel (just for style)." },
         beachResultCastle: { fr: "🏰 Château de sable écroulé sur la trousse : le lancer s'arrête là.", en: "🏰 Sandcastle collapsed on the pencil case: the throw ends here." },
-        beachMentalLoss: { fr: "🧠 Le stress des crabes : -5 de santé mentale.", en: "🧠 Crab stress: -5 mental health." },
         plageTutoTitle1: { fr: "🏖️ Bienvenue à la Plage !", en: "🏖️ Welcome to the Beach!" },
         plageTutoText1: {
-            fr: "Ici tout est réinitialisé (vu que t'as oublié tes affaires) : le monde de la cour et le volcan n'ont rien à voir avec celui-ci. Même le classement n'est pas le même, les skins non plus.",
-            en: "Everything is reset here (since you forgot your stuff): the schoolyard and volcano worlds have nothing to do with this one. Even the leaderboard is different, and so are the skins."
+            fr: "Tes améliorations, tes skins, tes traînées et ta trousse restent exactement les mêmes qu'ailleurs. Par contre... tu as oublié ton argent en chemin : tu repars de 0 $. Le classement de la plage, lui, reste séparé de celui du monde normal.",
+            en: "Your upgrades, skins, trails and pencil case stay exactly the same as elsewhere. But... you forgot your money on the way: you're starting back at $0. The beach leaderboard, though, stays separate from the normal world's."
         },
-        plageTutoTitle2: { fr: "😈 Reparti(e) de zéro", en: "😈 Starting from scratch" },
+        plageTutoTitle2: { fr: "😈 Sans un sou", en: "😈 Not a penny to your name" },
         plageTutoText2: {
-            fr: "Les améliorations sont à zéro et pas moyen d'en avoir à moins de farmer. Et la mauvaise nouvelle ? Vous n'avez pas assez d'argent pour reprendre le bus et retourner dans le monde normal 😈 Vous devez farmer jusqu'à 250 000 pour un billet de bus dans la boutique ! Bonne chance....",
-            en: "Upgrades are back to zero, and there's no way to get any without farming. And the bad news? You don't have enough money to take the bus back to the normal world 😈 You'll have to farm up to 250,000 for a bus ticket in the shop! Good luck...."
+            fr: "Et la mauvaise nouvelle ? Vous n'avez pas assez d'argent pour reprendre le bus et retourner dans le monde normal 😈 Vous devez farmer jusqu'à 250 000 pour un billet de bus dans la boutique ! Bonne chance....",
+            en: "And the bad news? You don't have enough money to take the bus back to the normal world 😈 You'll have to farm up to 250,000 for a bus ticket in the shop! Good luck...."
         },
         plageTutoTitle3: { fr: "⛱️ Ce qui traîne sur le sable", en: "⛱️ What's lying around on the sand" },
         plageTutoText3: {
-            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (+20 de santé mentale) et châteaux de sable (fin du lancer) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
-            en: "The sand is randomly generated on every throw: parasols (bounce), towels (+20 mental health) and sandcastles (throw over) each show up with their own chance, but only past 100 m."
-        },
-        plageTutoTitle4: { fr: "🧠 Santé mentale", en: "🧠 Mental health" },
-        plageTutoText4: {
-            fr: "Un lancer qui dépasse 100 m coûte 5 de santé mentale (sur 200) à cause du stress des crabes ; en dessous, rien à craindre. À zéro, impossible de lancer : il faut une serviette trouvée pendant un lancer (+20) ou achetée en boutique (+5, à usage unique).",
-            en: "A throw past 100 m costs 5 mental health (out of 200) because of crab stress; below that, nothing to worry about. At zero you can't throw: you need a towel found during a throw (+20) or bought in the shop (+5, single use)."
+            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (juste pour le style) et châteaux de sable (fin du lancer) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
+            en: "The sand is randomly generated on every throw: parasols (bounce), towels (just for style) and sandcastles (throw over) each show up with their own chance, but only past 100 m."
         },
         leaderboardTitlePlage: { fr: "🏖️ Classement Plage", en: "🏖️ Beach leaderboard" },
         achvClaquettesName: { fr: "Pieds nus dans le sable", en: "Barefoot in the sand" },
@@ -1797,8 +1764,6 @@
         achvTowelsDesc: { fr: "Atterris 20 fois dans une serviette trouvée sur le sable.", en: "Land 20 times in a towel found on the sand." },
         achvCastlesName: { fr: "Démolisseur de châteaux", en: "Castle wrecker" },
         achvCastlesDesc: { fr: "Fais s'écrouler 15 châteaux de sable sur la trousse.", en: "Make 15 sandcastles collapse on the pencil case." },
-        achvBurnoutName: { fr: "Burn-out balnéaire", en: "Seaside burnout" },
-        achvBurnoutDesc: { fr: "Tombe à 0 de santé mentale à cause de ces maudits crabes.", en: "Drop to 0 mental health thanks to those cursed crabs." },
         achvPlageName: { fr: "Sable entre les pages", en: "Sand between the pages" },
         achvPlageDesc: { fr: "Débloque le monde Plage.", en: "Unlock the Beach world." },
         achvBusName: { fr: "Retour de vacances", en: "Back from holiday" },
@@ -2113,14 +2078,9 @@
     /* ---- Monde Plage (voir section 9ter) ---- */
     const CLAQUETTES_COST = 100000;   // "Trousse à Claquettes" : ticket d'entrée du monde Plage
     const BUS_TICKET_COST = 250000;   // billet de bus du retour vers le monde normal
-    const BEACH_TOWEL_COST = 600;     // serviette de boutique, à usage unique
-    const BEACH_TOWEL_HEAL = 5;       // santé mentale rendue par une serviette achetée
-    const BEACH_FOUND_TOWEL_HEAL = 20;// ... et par une serviette trouvée pendant un lancer
-    const MENTAL_MAX = 200;           // santé mentale maximale
-    const MENTAL_COST_PER_THROW = 5;  // stress des crabes, perdu à chaque lancer
     // En dessous de cette distance, le lancer reste sur le "sable proche du
-    // bus" : ni évènement (parasol/serviette/château) ni stress des crabes.
-    // Ça laisse une zone d'échauffement sans surprise ni pénalité.
+    // bus" : aucun évènement (parasol/serviette/château) ne peut apparaître.
+    // Ça laisse une zone d'échauffement sans surprise.
     const BEACH_EVENT_MIN_DISTANCE = 100;
     // Chaque évènement du monde Plage est tiré au sort à chaque lancer.
     const BEACH_EVENT_CHANCE = { parasol: 0.5, towel: 0.6, castle: 0.4 };
@@ -2159,7 +2119,6 @@
         { id: "parasols25", emoji: "⛱️", nameKey: "achvParasolName", descKey: "achvParasolDesc", check: (s) => s.plageParasolBounces >= 25 },
         { id: "serviettes20", emoji: "🧺", nameKey: "achvTowelsName", descKey: "achvTowelsDesc", check: (s) => s.plageTowelsFound >= 20 },
         { id: "chateaux15", emoji: "🏰", nameKey: "achvCastlesName", descKey: "achvCastlesDesc", check: (s) => s.plageCastlesCrushed >= 15 },
-        { id: "burnOut", emoji: "🧠", nameKey: "achvBurnoutName", descKey: "achvBurnoutDesc", check: (s) => s.hasBurnedOut },
         { id: "trousseCassee", emoji: "💥", nameKey: "achvBrokenName", descKey: "achvBrokenDesc", check: (s) => s.hasBrokenDurability },
         { id: "collectionneur", emoji: "🎨", nameKey: "achvCollectorName", descKey: "achvCollectorDesc", check: (s) => s.ownedSkins.length >= SKINS.length },
         { id: "riche5000", emoji: "💰", nameKey: "achvRichName", descKey: "achvRichDesc", check: (s) => s.money >= 5000 },
@@ -2359,23 +2318,19 @@
             hasClaquettes: false,      // "Trousse à Claquettes" achetée : donne accès à la cinématique
             plageUnlocked: false,      // devient true une fois la cinématique terminée
             plageTutorialSeen: false,  // tutoriel spécifique au monde Plage
-            inPlage: false,            // le joueur est "coincé" sur la plage (profil plage actif)
+            inPlage: false,            // le joueur est "coincé" sur la plage tant qu'il n'a pas repris le bus
             hasTakenBusBack: false,    // a déjà payé le billet de bus du retour au moins une fois
-            mentalHealth: MENTAL_MAX,  // santé mentale (0 à MENTAL_MAX), n'est consommée que sur la plage
-            // Compteurs de la plage : volontairement HORS du profil échangé
-            // (voir PROFILE_FIELDS) pour que les succès ne repartent pas de
-            // zéro à chaque aller-retour en bus.
+            hasForgottenMoney: false,  // l'argent a déjà été remis à 0 à l'arrivée sur la plage (une seule fois, voir enterBeachProfile)
+            // Compteurs propres à la plage : le record y est distinct de
+            // celui du monde normal (voir onLanded), mais l'argent, les
+            // améliorations, les skins/traînées et la durabilité sont
+            // désormais partagés entre les deux mondes.
             plageThrows: 0,            // lancers effectués sur la plage
-            plageBestDistance: 0,      // meilleur lancer sur la plage (le record du profil, lui, est échangé)
+            plageBestDistance: 0,      // meilleur lancer sur la plage
             plageMoneyEarned: 0,       // argent gagné sur la plage depuis le début
             plageParasolBounces: 0,    // rebonds sur un parasol
-            plageTowelsFound: 0,       // serviettes trouvées pendant un lancer
+            plageTowelsFound: 0,       // serviettes trouvées pendant un lancer (purement décoratif)
             plageCastlesCrushed: 0,    // châteaux de sable écroulés sur la trousse
-            hasBurnedOut: false,       // santé mentale déjà tombée à 0 au moins une fois
-            // Profil mis de côté pendant qu'on joue dans l'autre monde : la
-            // plage a son propre argent/niveaux/skins/record (voir swapProfile).
-            stashedMainProfile: null,  // profil "monde normal" pendant qu'on est sur la plage
-            stashedBeachProfile: null, // profil "plage" pendant qu'on est dans le monde normal
             // --- Succès ---
             unlockedAchievements: [],  // ids des succès déjà débloqués (voir ACHIEVEMENTS)
             totalThrows: 0,            // nombre total de lancers effectués
@@ -2417,59 +2372,25 @@
         return merged;
     }
 
-    // --- Profils séparés monde normal / monde Plage ---
-    // Sur la plage, "tout est réinitialisé" : argent, niveaux, skins, traînées,
-    // record... La plage a donc son propre jeu de champs. Plutôt que de rendre
-    // tout le code conscient du monde courant, on ÉCHANGE ces champs dans
-    // "save" au moment de partir/revenir, et on met l'autre profil de côté
-    // dans save.stashedMainProfile / save.stashedBeachProfile.
-    const PROFILE_FIELDS = [
-        "money", "puissanceLevel", "vitesseLevel", "bestDistance",
-        "ownedSkins", "equippedSkin", "ownedTrails", "equippedTrail",
-        "milestoneReached", "durability", "mentalHealth",
-    ];
-
-    function snapshotProfile() {
-        const out = {};
-        PROFILE_FIELDS.forEach((k) => { out[k] = save[k]; });
-        return out;
-    }
-
-    function applyProfile(p) {
-        const base = defaultSave();
-        PROFILE_FIELDS.forEach((k) => {
-            save[k] = (p && p[k] !== undefined && p[k] !== null) ? p[k] : base[k];
-        });
-    }
-
-    // Profil tout neuf de la plage : on n'arrive avec rien du tout, comme promis.
-    function freshBeachProfile() {
-        const p = {};
-        const base = defaultSave();
-        PROFILE_FIELDS.forEach((k) => { p[k] = base[k]; });
-        p.ownedSkins = ["classique"];
-        p.ownedTrails = ["blanche"];
-        return p;
-    }
-
-    // Départ pour la plage : le profil normal part au frigo, celui de la plage
-    // (ou un tout neuf au premier voyage) prend sa place.
+    // --- Entrée/sortie du monde Plage ---
+    // L'argent, les améliorations, les skins/traînées et la durabilité sont
+    // partagés en permanence entre le monde normal et la plage : ces
+    // fonctions ne font que basculer le monde courant. Seul l'argent est
+    // remis à 0 à l'arrivée, une seule fois (voir save.hasForgottenMoney et
+    // la cinématique, "vous avez oublié votre argent").
     function enterBeachProfile() {
         if (save.inPlage) return;
-        save.stashedMainProfile = snapshotProfile();
-        applyProfile(save.stashedBeachProfile || freshBeachProfile());
-        save.stashedBeachProfile = null;
+        if (!save.hasForgottenMoney) {
+            save.money = 0;
+            save.hasForgottenMoney = true;
+        }
         save.inPlage = true;
         save.currentWorld = "plage";
     }
 
-    // Retour en bus : l'inverse, et la progression plage est gardée au chaud
-    // pour un éventuel deuxième voyage.
+    // Retour en bus : simple retour au monde normal, rien à échanger.
     function leaveBeachProfile() {
         if (!save.inPlage) return;
-        save.stashedBeachProfile = snapshotProfile();
-        applyProfile(save.stashedMainProfile || defaultSave());
-        save.stashedMainProfile = null;
         save.inPlage = false;
         save.currentWorld = "cour";
     }
@@ -2738,7 +2659,8 @@
         document.getElementById("menu-money").textContent = save.money;
         document.getElementById("menu-puissance").textContent = totalPuissance();
         document.getElementById("menu-vitesse").textContent = totalVitesse();
-        document.getElementById("menu-record").textContent = save.bestDistance.toFixed(1) + " m";
+        document.getElementById("menu-record").textContent =
+            (save.currentWorld === "plage" ? save.plageBestDistance : save.bestDistance).toFixed(1) + " m";
         document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
         // "tu veux de l'aide ?" n'apparaît qu'après un échec dans la cinématique
         document.getElementById("menu-help").classList.toggle("show", !!save.volcanHelpAvailable);
@@ -3077,7 +2999,6 @@
             // sur la plage, où rien n'abîme la trousse.
             if (save.volcanUnlocked && !save.inPlage) body.appendChild(buildRepairCard());
             if (save.inPlage) {
-                body.appendChild(buildTowelCard());
                 body.appendChild(buildBusTicketCard());
             } else if (!save.hasClaquettes) {
                 body.appendChild(buildClaquettesCard());
@@ -3116,43 +3037,6 @@
             playPurchasePop();
             buildWorldsRow();
         });
-        card.appendChild(btn);
-        return card;
-    }
-
-    // Serviette de plage achetée : à usage unique, donc consommée tout de suite
-    // (elle rend BEACH_TOWEL_HEAL de santé mentale au moment de l'achat).
-    function buildTowelCard() {
-        const card = document.createElement("div");
-        card.className = "upgrade-card";
-        card.innerHTML =
-            '<div class="icon">🏖️</div>' +
-            '<div class="info"><h3>' + tr("towelName") + ' <span class="level-badge">' + save.mentalHealth + ' / ' + MENTAL_MAX + '</span></h3>' +
-            '<p>' + tr("towelDesc") + '</p></div>';
-        const btn = document.createElement("button");
-        const full = save.mentalHealth >= MENTAL_MAX;
-        btn.className = "btn small" + (full ? " secondary" : "");
-        if (full) {
-            btn.textContent = tr("towelFull");
-            btn.disabled = true;
-        } else {
-            btn.textContent = BEACH_TOWEL_COST + " $";
-            btn.addEventListener("click", () => {
-                if (save.money < BEACH_TOWEL_COST) {
-                    sfxError();
-                    showToast(tr("notEnoughMoney"));
-                    return;
-                }
-                save.money -= BEACH_TOWEL_COST;
-                healMental(BEACH_TOWEL_HEAL);
-                bumpDailyChallenge("spend", BEACH_TOWEL_COST, "add");
-                persist();
-                sfxBuy();
-                showToast(tr("towelBought"));
-                refreshShop();
-                playPurchasePop();
-            });
-        }
         card.appendChild(btn);
         return card;
     }
@@ -3563,7 +3447,6 @@
             beachProps = [];
         }
         document.getElementById("result-beach").style.display = "none";
-        refreshMentalHud();
         document.getElementById("result-skid").style.display = "none";
         document.getElementById("result-coin").style.display = "none";
         document.getElementById("qte-wrap").classList.remove("show");
@@ -3769,18 +3652,13 @@
         state = "landed";
         const distanceMeters = worldX / SCALE;
         save.totalThrows++;
-        // Monde Plage : serviette (soin) ou château (qui s'écroule), puis le
-        // stress des crabes qui grignote la santé mentale — mais seulement au
-        // delà de BEACH_EVENT_MIN_DISTANCE (voir beachOnLaunch) : un petit
-        // lancer raté ne coûte rien.
+        // Monde Plage : serviette (déco) ou château (qui s'écroule) selon les
+        // évènements tirés au lancer (voir beachOnLaunch).
         const beachEl = document.getElementById("result-beach");
         if (save.currentWorld === "plage") {
             beachFinalizeLanding();
             save.plageThrows++;
-            if (distanceMeters > save.plageBestDistance) save.plageBestDistance = distanceMeters;
-            const stressed = distanceMeters >= BEACH_EVENT_MIN_DISTANCE;
-            if (stressed) loseMental(MENTAL_COST_PER_THROW);
-            const beachText = beachResultText(stressed);
+            const beachText = beachResultText();
             beachEl.textContent = beachText;
             beachEl.style.display = beachText ? "block" : "none";
         } else {
@@ -3798,8 +3676,11 @@
         } else {
             skidEl.style.display = "none";
         }
-        if (distanceMeters > save.bestDistance) {
-            save.bestDistance = distanceMeters;
+        // Record par monde : le monde normal et la plage ont chacun leur
+        // propre record (et leur propre classement, voir scoresCollection).
+        const recordField = save.currentWorld === "plage" ? "plageBestDistance" : "bestDistance";
+        if (distanceMeters > save[recordField]) {
+            save[recordField] = distanceMeters;
             document.getElementById("result-record").style.display = "block";
             sfxRecord();
             pushScoreIfRecord(distanceMeters);
@@ -3916,13 +3797,6 @@
     document.getElementById("btn-shop-back").addEventListener("click", () => showScreen("menu"));
     document.getElementById("btn-shop-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-play").addEventListener("click", () => {
-        // Monde Plage : plus de santé mentale = plus moyen de lancer tant
-        // qu'on n'a pas acheté une serviette (voir section 9ter).
-        if (save.currentWorld === "plage" && save.mentalHealth <= 0) {
-            sfxError();
-            document.getElementById("mental-empty-modal").classList.add("show");
-            return;
-        }
         if (save.durability <= 0) {
             sfxError();
             document.getElementById("repair-broken-modal").classList.add("show");
@@ -6323,14 +6197,13 @@
         return true;
     }
 
-    // Atterrissage final : serviette (soin) ou château (qui s'écroule).
+    // Atterrissage final : serviette (purement décorative) ou château (qui s'écroule).
     function beachFinalizeLanding() {
         if (inSpaceMode) return;
         if (beachEvents.towel && !beachUsed.towel) {
             beachUsed.towel = true;
             beachLog.push("towel");
             save.plageTowelsFound++;
-            healMental(BEACH_FOUND_TOWEL_HEAL);
         } else if (beachEvents.castle && !beachUsed.castle) {
             beachUsed.castle = true;
             beachLog.push("castle");
@@ -6346,38 +6219,13 @@
         }
     }
 
-    // Récapitulatif des évènements du lancer, affiché dans le panneau de
-    // résultat. "stressed" = ce lancer a dépassé BEACH_EVENT_MIN_DISTANCE
-    // (voir onLanded) : en dessous, ni évènement ni ligne de stress à afficher.
-    function beachResultText(stressed) {
+    // Récapitulatif des évènements du lancer, affiché dans le panneau de résultat.
+    function beachResultText() {
         const lines = [];
         if (beachLog.indexOf("parasol") >= 0) lines.push(tr("beachResultParasol"));
         if (beachLog.indexOf("towel") >= 0) lines.push(tr("beachResultTowel"));
         if (beachLog.indexOf("castle") >= 0) lines.push(tr("beachResultCastle"));
-        if (stressed) lines.push(tr("beachMentalLoss"));
         return lines.join(" ");
-    }
-
-    /* ---- Santé mentale ---- */
-    // Le stress des crabes grignote la santé mentale à chaque lancer. À zéro,
-    // plus moyen de lancer : il faut une serviette (trouvée ou achetée).
-    function healMental(amount) {
-        save.mentalHealth = Math.min(MENTAL_MAX, save.mentalHealth + amount);
-        refreshMentalHud();
-    }
-
-    function loseMental(amount) {
-        save.mentalHealth = Math.max(0, save.mentalHealth - amount);
-        if (save.mentalHealth <= 0) save.hasBurnedOut = true;
-        refreshMentalHud();
-    }
-
-    // Pastille 🧠 du HUD : visible seulement dans le monde Plage
-    function refreshMentalHud() {
-        const pill = document.getElementById("game-mental-pill");
-        const on = save.currentWorld === "plage";
-        pill.style.display = on ? "" : "none";
-        if (on) document.getElementById("game-mental").textContent = save.mentalHealth + " / " + MENTAL_MAX;
     }
 
     /* ---- Cinématique de déblocage du monde Plage ----
@@ -6943,7 +6791,7 @@
     }
 
     // Fin de la cinématique : le monde Plage est débloqué et le joueur y est
-    // "déposé" (profil plage actif, voir enterBeachProfile), puis le tutoriel.
+    // déposé (voir enterBeachProfile), puis le tutoriel.
     function bcFinish() {
         cineTeardown();
         save.plageUnlocked = true;
@@ -7136,11 +6984,6 @@
     // classement) sans jamais exposer le document "users" complet (privé).
     function pushPublicProfile() {
         if (!db || !currentUser) return;
-        // Pendant le séjour à la plage, "save" contient le profil plage (argent
-        // et niveaux repartis de zéro) : on laisse le profil public sur la
-        // dernière photo du monde normal plutôt que de le vider (le classement
-        // de la plage, lui, a sa propre collection, voir scoresCollection).
-        if (save.inPlage) return;
         db.collection("profiles").doc(currentUser.uid).set({
             pseudo: save.pseudo || "Anonyme",
             avatarEmoji: save.avatarEmoji || "",
@@ -8007,12 +7850,9 @@
             buildWorldsRow();
             refreshMenu();
             // Pousse tout de suite les deux classements avec les records
-            // récupérés (sans attendre un nouveau lancer qui les batte à
-            // nouveau) : le profil actif alimente "scores" ou "scoresPlage"
-            // selon inPlage, l'autre profil (mis de côté) alimente le second.
-            pushScoreTo(save.inPlage ? "scoresPlage" : "scores", save.bestDistance);
-            const otherProfile = save.inPlage ? save.stashedMainProfile : save.stashedBeachProfile;
-            if (otherProfile) pushScoreTo(save.inPlage ? "scores" : "scoresPlage", otherProfile.bestDistance);
+            // récupérés, sans attendre un nouveau lancer qui les batte à nouveau.
+            pushScoreTo("scores", save.bestDistance);
+            pushScoreTo("scoresPlage", save.plageBestDistance);
             retireOldLeaderboardEntry(data.uid, data.retireToken);
             showToast(tr("recoveryDone"));
             document.getElementById("auth-modal").classList.remove("show");
@@ -8123,7 +7963,6 @@
         { icon: "🏖️", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle1", "plageTutoText1"] },
         { icon: "😈", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle2", "plageTutoText2"] },
         { icon: "⛱️", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle3", "plageTutoText3"] },
-        { icon: "🧠", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle4", "plageTutoText4"] },
     ];
 
     let tutorialStep = 0;
@@ -8273,16 +8112,8 @@
         document.getElementById("info-dura-bar").style.width = (save.durability / maxDurability() * 100) + "%";
         document.getElementById("info-name").textContent = save.pseudo || "Trousse";
         document.getElementById("info-time").textContent = formatPlayTime(save.playTime);
-        document.getElementById("info-best").textContent = save.bestDistance.toFixed(1) + " m";
-        // Ligne "Santé mentale" : seulement sur la plage, où elle est consommée
-        const mentalRow = document.getElementById("info-mental-row");
-        if (save.currentWorld === "plage") {
-            mentalRow.style.display = "";
-            document.getElementById("info-mental-label").textContent = tr("labelMental");
-            document.getElementById("info-mental").textContent = save.mentalHealth + " / " + MENTAL_MAX;
-        } else {
-            mentalRow.style.display = "none";
-        }
+        document.getElementById("info-best").textContent =
+            (save.currentWorld === "plage" ? save.plageBestDistance : save.bestDistance).toFixed(1) + " m";
         document.getElementById("trousse-modal").classList.add("show");
     }
 
@@ -8313,11 +8144,6 @@
         buildWorldsRow();
         refreshMenu();
     });
-    document.getElementById("btn-mental-empty-go").addEventListener("click", () => {
-        document.getElementById("mental-empty-modal").classList.remove("show");
-        showScreen("shop");
-        switchShopTab("upgrades");
-    });
 
     document.getElementById("btn-volcan-replay-yes").addEventListener("click", () => {
         document.getElementById("volcan-replay-modal").classList.remove("show");
@@ -8342,8 +8168,24 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.5";
+    const VERSION_NUMBER = "8.0.7";
     const CHANGELOG = [
+        {
+            version: "8.0.7",
+            major: [],
+            minor: [
+                { fr: "Plus de double économie sur la plage : l'argent, les améliorations, les skins/traînées et la durabilité sont désormais partagés avec le monde normal. Seul l'argent est remis à 0 à l'arrivée, une seule fois (le classement de la plage reste séparé, avec son propre record)", en: "No more separate beach economy: money, upgrades, skins/trails and durability are now shared with the normal world. Only your money is reset to 0 on arrival, once (the beach leaderboard stays separate, with its own record)" },
+                { fr: "Suppression de la santé mentale : les serviettes trouvées pendant un lancer restent, mais sont désormais purement décoratives ; la carte serviette a disparu de la boutique", en: "Removed the mental health system: towels found during a throw remain, but are now purely decorative; the towel card is gone from the shop" },
+            ],
+        },
+        {
+            version: "8.0.6",
+            major: [],
+            minor: [
+                { fr: "Système de code de récupération : récupère ta partie sur un autre appareil grâce à un code secret à 16 chiffres, sans email ni mot de passe (Réglages > Compte)", en: "Recovery code system: get your save back on another device with a secret 16-digit code, no email or password needed (Settings > Account)" },
+                { fr: "Le classement Plage suit désormais le même mécanisme de retrait d'ancienne entrée que le classement normal, en cas de récupération de partie", en: "The Beach leaderboard now follows the same old-entry retirement mechanism as the normal leaderboard when a save is recovered" },
+            ],
+        },
         {
             version: "8.0.5",
             major: [],
@@ -8759,7 +8601,7 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "mental-empty-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal", "auth-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "settings-modal", "profile-detail-modal", "auth-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
@@ -8836,8 +8678,7 @@
             save.plageUnlocked = false;
             save.plageTutorialSeen = false;
             save.hasClaquettes = false;
-            save.stashedBeachProfile = null;
-            save.mentalHealth = MENTAL_MAX;
+            save.hasForgottenMoney = false;
             const plageWorld = WORLDS.find(w => w.id === "plage");
             if (plageWorld) plageWorld.unlocked = false;
             persist();
@@ -8845,7 +8686,7 @@
             refreshMenu();
             console.log("🏖️ Monde Plage remis à zéro");
         },
-        // Va directement à la plage (profil plage actif), sans cinématique
+        // Va directement à la plage, sans cinématique
         goPlage() {
             save.hasClaquettes = true;
             save.plageUnlocked = true;
@@ -8855,7 +8696,7 @@
             persist();
             buildWorldsRow();
             refreshMenu();
-            console.log("🏖️ Direction la plage (profil plage actif)");
+            console.log("🏖️ Direction la plage");
         },
         // Reprend le bus du retour sans payer
         retourBus() {
@@ -8865,13 +8706,6 @@
             buildWorldsRow();
             refreshMenu();
             console.log("🚌 Retour au monde normal");
-        },
-        setMental(v) {
-            save.mentalHealth = Math.max(0, Math.min(MENTAL_MAX, v));
-            if (save.mentalHealth <= 0) save.hasBurnedOut = true; // même effet qu'un vrai craquage
-            persist();
-            refreshMentalHud();
-            console.log("🧠 Santé mentale :", save.mentalHealth);
         },
         // Remet le monde Volcan à l'état "pas encore découvert"
         resetVolcan() {
@@ -8985,9 +8819,8 @@
                 "%cMonde / thème%c\n" +
                 "  resetVolcan()            — remet le monde Volcans à \"pas encore débloqué\"\n" +
                 "  resetPlage()             — remet le monde Plage à \"pas encore débloqué\"\n" +
-                "  goPlage()                — part à la plage sans cinématique (profil plage)\n" +
+                "  goPlage()                — part à la plage sans cinématique\n" +
                 "  retourBus()              — revient de la plage sans payer le billet\n" +
-                "  setMental(n)             — fixe la santé mentale (0-200, monde Plage)\n" +
                 "  toggleTheme()            — bascule thème clair / sombre",
                 "color:#6bffb0; font-weight:bold;", "color:inherit;"
             );
@@ -9054,7 +8887,6 @@
     }
     if (save.inPlage) save.currentWorld = "plage";
     else if (save.currentWorld === "plage") save.currentWorld = "cour";
-    refreshMentalHud();
     // Compteur de temps de jeu (écrit sur le disque toutes les 30 s seulement)
     setInterval(() => {
         save.playTime++;
