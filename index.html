@@ -675,6 +675,13 @@
         .leaderboard-row .dist { color: var(--money); font-weight: 800; }
         .leaderboard-row.you { border-color: var(--accent); }
         .leaderboard-row.clickable { cursor: pointer; }
+        /* Ma propre ligne rappelée en bas quand je ne suis pas dans le top 15
+           (voir loadLeaderboard) : détachée du reste par un trait pointillé pour
+           qu'on voie bien qu'il y a un "trou" de classement entre les deux. */
+        .leaderboard-row.outside-top {
+            margin-top: 14px;
+            border-top-style: dashed;
+        }
 
         /* ---------- ÉCRAN PROFIL ---------- */
         #screen-profile { background: var(--shop-bg); flex-direction: column; }
@@ -1176,7 +1183,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v7.1.1</div>
+                <div class="version-tag" id="version-tag">v7.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -5735,11 +5742,14 @@
         db.collection("scores").orderBy("bestDistance", "desc").limit(15).get().then((snapshot) => {
             body.innerHTML = "";
             let rank = 0;
+            let foundMe = false;
             snapshot.forEach((doc) => {
                 rank++;
                 const data = doc.data();
+                const isMe = !!(currentUser && doc.id === currentUser.uid);
+                if (isMe) foundMe = true;
                 const row = document.createElement("div");
-                row.className = "leaderboard-row clickable" + (currentUser && doc.id === currentUser.uid ? " you" : "");
+                row.className = "leaderboard-row clickable" + (isMe ? " you" : "");
                 row.innerHTML =
                     '<span class="rank">#' + rank + '</span>' +
                     '<span class="pseudo">' + escapeHtml(data.pseudo || "???") + '</span>' +
@@ -5759,11 +5769,39 @@
             });
             if (rank === 0) {
                 body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardEmpty") + '</p>';
+                return;
             }
+            // Hors du top 15, ma ligne n'apparaissait nulle part : impossible de
+            // savoir où je me situe, et le halo doré "c'est toi" semblait avoir
+            // disparu (il n'y avait simplement aucune ligne à moi à l'écran).
+            // On rappelle donc ma propre ligne en bas, avec mon vrai rang.
+            if (!foundMe) appendOwnLeaderboardRow(body);
         }).catch((err) => {
             console.error("Chargement du classement impossible :", err);
             body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardError") + '</p>';
         });
+    }
+
+    // Ma ligne rappelée en bas du classement quand je suis hors du top 15.
+    // Best-effort : si le calcul du rang échoue (hors ligne...), on n'affiche
+    // rien plutôt que d'inventer une position.
+    function appendOwnLeaderboardRow(body) {
+        if (!currentUser || !save.bestDistance) return; // pas encore classé
+        computeRank(save.bestDistance).then((myRank) => {
+            if (!myRank) return;
+            const row = document.createElement("div");
+            row.className = "leaderboard-row clickable you outside-top";
+            row.innerHTML =
+                '<span class="rank">#' + myRank + '</span>' +
+                '<span class="pseudo">' + escapeHtml(save.pseudo || "???") + '</span>' +
+                '<span class="dist">' + save.bestDistance.toFixed(1) + ' m</span>';
+            row.addEventListener("click", () => {
+                Object.values(screens).forEach((s) => s.classList.remove("active"));
+                screens.profile.classList.add("active");
+                renderProfile();
+            });
+            body.appendChild(row);
+        }).catch((err) => console.error("Calcul de mon rang impossible :", err));
     }
 
     /* ============ 15. ÉCRAN PROFIL (compte, abonnés, progression) ============ */
@@ -6489,8 +6527,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "7.1.1";
+    const VERSION_NUMBER = "7.2.0";
     const CHANGELOG = [
+        {
+            version: "7.2.0",
+            major: [],
+            minor: [
+                { fr: "Classement : quand tu n'es pas dans le top 15, ta propre ligne est maintenant rappelée en bas avec ton vrai rang (et son halo doré), au lieu de n'apparaître nulle part", en: "Leaderboard: when you're not in the top 15, your own row is now shown at the bottom with your real rank (and its gold halo), instead of not appearing at all" },
+            ],
+        },
         {
             version: "7.1.1",
             major: [],
