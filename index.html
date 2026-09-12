@@ -985,11 +985,7 @@
         }
         .avatar-grid button.selected { border-color: var(--accent); background: rgba(255,210,63,0.15); }
 
-        /* ---------- SÉCURISATION DE COMPTE (email/mot de passe) ---------- */
-        .account-linked-badge {
-            display: flex; align-items: center; gap: 8px; margin: 8px 0 4px;
-            font-size: 13px; font-weight: 700; color: #6bffb0;
-        }
+        /* ---------- CODE DE RÉCUPÉRATION (réglages) ---------- */
         .account-form { margin-top: 8px; }
         .account-form input {
             display: block; width: 100%; box-sizing: border-box;
@@ -1001,10 +997,15 @@
             font-size: 12px; color: #ff6b6b; margin: -2px 0 8px; display: none;
         }
         .account-form-error.show { display: block; }
-        .account-toggle-link {
-            background: none; border: none; padding: 0; margin-top: 4px;
-            font-size: 12.5px; color: var(--accent); text-decoration: underline;
-            cursor: pointer; font-weight: 700;
+        /* Code de récupération affiché en gros, en chiffres espacés : il doit
+           être lisible pour être recopié à la main sans se tromper. */
+        .recovery-code {
+            margin: 10px 0 8px; padding: 12px 10px;
+            border: 2px dashed var(--accent); border-radius: 10px;
+            background: var(--card-bg); text-align: center;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 17px; font-weight: 800; letter-spacing: 1px;
+            user-select: all; -webkit-user-select: all;
         }
 
         /* ---------- MODALE DE CONFLIT DE COMPTES ---------- */
@@ -1183,7 +1184,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v7.2.0</div>
+                <div class="version-tag" id="version-tag">v8.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1424,6 +1425,9 @@
                     <div id="merge-choice-other-stats"></div>
                 </div>
             </div>
+            <!-- Affiché seulement quand annuler a un sens, ex. code mal saisi
+                 (voir showMergeChoice(..., allowCancel)) -->
+            <button class="btn small secondary" id="btn-merge-cancel" data-i18n="btnCancel" hidden>Annuler</button>
         </div>
     </div>
 
@@ -1482,26 +1486,20 @@
             </div>
             <p class="settings-hint" data-i18n="settingsPrivateHint">Les autres joueurs verront une banderole "Ce compte est privé" au lieu de ton profil. Ton score reste visible dans le classement.</p>
 
-            <h3 class="settings-section-title" data-i18n="settingsSecurityTitle">🔐 Sécuriser mon compte</h3>
-            <p class="settings-hint" data-i18n="settingsSecurityHint">Ta partie est liée à cet appareil/navigateur : si tu l'effaces ou changes de téléphone, tout est perdu. Ajoute un email + mot de passe pour pouvoir la retrouver.</p>
-            <div id="account-linked-badge" class="account-linked-badge" hidden>✅ <span id="account-linked-email"></span></div>
+            <h3 class="settings-section-title" data-i18n="settingsRecoveryTitle">🔑 Code de récupération</h3>
+            <p class="settings-hint" data-i18n="settingsRecoveryHint">Ta partie est liée à cet appareil : si tu changes de téléphone ou que le navigateur efface ses données, tout est perdu. Note ce code quelque part : il permet de récupérer ta partie n'importe où.</p>
 
-            <div id="account-link-form" class="account-form">
-                <input type="email" id="account-link-email" data-i18n-placeholder="settingsEmailPlaceholder" placeholder="Email" autocomplete="email">
-                <input type="password" id="account-link-password" data-i18n-placeholder="settingsPasswordPlaceholder" placeholder="Mot de passe (6 caractères min.)" autocomplete="new-password">
-                <p id="account-link-error" class="account-form-error"></p>
-                <button class="btn small" id="btn-account-link" data-i18n="btnSecureAccount">🔐 Sécuriser mon compte</button>
-                <br>
-                <button type="button" class="account-toggle-link" id="btn-account-show-login" data-i18n="settingsAlreadyHaveAccount">Déjà un compte ? Se connecter</button>
+            <button class="btn small" id="btn-recovery-reveal" data-i18n="btnRecoveryReveal">🔑 Afficher mon code</button>
+            <div id="recovery-code-wrap" hidden>
+                <div class="recovery-code" id="recovery-code-value"></div>
+                <button class="btn small secondary" id="btn-recovery-copy" data-i18n="btnRecoveryCopy">📋 Copier</button>
+                <p class="settings-hint" data-i18n="settingsRecoveryWarn">⚠️ Garde-le pour toi : qui a ce code peut récupérer ta partie.</p>
             </div>
 
-            <div id="account-login-form" class="account-form" hidden>
-                <input type="email" id="account-login-email" data-i18n-placeholder="settingsEmailPlaceholder" placeholder="Email" autocomplete="email">
-                <input type="password" id="account-login-password" data-i18n-placeholder="settingsPasswordPlaceholder" placeholder="Mot de passe" autocomplete="current-password">
-                <p id="account-login-error" class="account-form-error"></p>
-                <button class="btn small" id="btn-account-login" data-i18n="btnLoginAccount">🔑 Se connecter</button>
-                <br>
-                <button type="button" class="account-toggle-link" id="btn-account-show-link" data-i18n="settingsBackToSecure">← Retour</button>
+            <div class="account-form">
+                <input type="text" id="recovery-input" inputmode="numeric" data-i18n-placeholder="settingsRecoveryPlaceholder" placeholder="J'ai déjà un code (16 chiffres)">
+                <p id="recovery-error" class="account-form-error"></p>
+                <button class="btn small" id="btn-recovery-submit" data-i18n="btnRecoverySubmit">📥 Récupérer ma partie</button>
             </div>
 
             <h3 class="settings-section-title" data-i18n="settingsAvatarTitle">🖼️ Photo de profil</h3>
@@ -1721,35 +1719,34 @@
         settingsAvatarTitle: { fr: "🖼️ Photo de profil", en: "🖼️ Profile picture" },
         settingsAvatarPickHint: { fr: "Choisis une icône :", en: "Pick an icon:" },
         btnCancel: { fr: "Annuler", en: "Cancel" },
-        settingsSecurityTitle: { fr: "🔐 Sécuriser mon compte", en: "🔐 Secure my account" },
-        settingsSecurityHint: {
-            fr: "Ta partie est liée à cet appareil/navigateur : si tu l'effaces ou changes de téléphone, tout est perdu. Ajoute un email + mot de passe pour pouvoir la retrouver.",
-            en: "Your save is tied to this device/browser: erase it or switch phones and it's all gone. Add an email + password so you can get it back."
+        settingsRecoveryTitle: { fr: "🔑 Code de récupération", en: "🔑 Recovery code" },
+        settingsRecoveryHint: {
+            fr: "Ta partie est liée à cet appareil : si tu changes de téléphone ou que le navigateur efface ses données, tout est perdu. Note ce code quelque part : il permet de récupérer ta partie n'importe où.",
+            en: "Your save is tied to this device: switch phones or let the browser clear its data and it's all gone. Write this code down somewhere: it gets your save back anywhere."
         },
-        settingsEmailPlaceholder: { fr: "Email", en: "Email" },
-        settingsPasswordPlaceholder: { fr: "Mot de passe (6 caractères min.)", en: "Password (6 characters min.)" },
-        btnSecureAccount: { fr: "🔐 Sécuriser mon compte", en: "🔐 Secure my account" },
-        settingsAlreadyHaveAccount: { fr: "Déjà un compte ? Se connecter", en: "Already have an account? Log in" },
-        settingsBackToSecure: { fr: "← Retour", en: "← Back" },
-        btnLoginAccount: { fr: "🔑 Se connecter", en: "🔑 Log in" },
-        settingsAccountSecured: { fr: "🔐 Compte sécurisé !", en: "🔐 Account secured!" },
-        settingsErrInvalidEmail: { fr: "Email invalide.", en: "Invalid email." },
-        settingsErrWeakPassword: { fr: "Le mot de passe doit faire au moins 6 caractères.", en: "Password must be at least 6 characters." },
-        settingsErrWrongPassword: { fr: "Email ou mot de passe incorrect.", en: "Wrong email or password." },
-        settingsErrNotEnabled: {
-            fr: "Connexion par email pas encore activée côté serveur.",
-            en: "Email sign-in isn't enabled on the server yet."
+        btnRecoveryReveal: { fr: "🔑 Afficher mon code", en: "🔑 Show my code" },
+        btnRecoveryCopy: { fr: "📋 Copier", en: "📋 Copy" },
+        settingsRecoveryWarn: {
+            fr: "⚠️ Garde-le pour toi : qui a ce code peut récupérer ta partie.",
+            en: "⚠️ Keep it to yourself: anyone with this code can take your save."
         },
-        settingsErrGeneric: { fr: "Une erreur est survenue, réessaie.", en: "Something went wrong, try again." },
+        settingsRecoveryPlaceholder: { fr: "J'ai déjà un code (16 chiffres)", en: "I already have a code (16 digits)" },
+        btnRecoverySubmit: { fr: "📥 Récupérer ma partie", en: "📥 Restore my save" },
+        recoveryCopied: { fr: "📋 Code copié !", en: "📋 Code copied!" },
+        recoverySelectToCopy: { fr: "Code sélectionné, il ne reste qu'à copier", en: "Code selected, just copy it" },
+        recoveryDone: { fr: "✅ Partie récupérée", en: "✅ Save restored" },
+        recoveryErrFormat: { fr: "Le code doit faire 16 chiffres.", en: "The code must be 16 digits." },
+        recoveryErrUnknown: { fr: "Aucune partie trouvée pour ce code.", en: "No save found for this code." },
+        recoveryErrSameAccount: { fr: "C'est déjà le code de cette partie.", en: "That's already this save's code." },
+        recoveryErrOffline: { fr: "Indisponible hors ligne.", en: "Unavailable offline." },
         statLevel: { fr: "Niveau", en: "Level" },
-        mergeChoiceTitle: { fr: "🔀 Deux comptes trouvés", en: "🔀 Two accounts found" },
+        mergeChoiceTitle: { fr: "🔀 Deux parties trouvées", en: "🔀 Two saves found" },
         mergeChoiceHint: {
             fr: "Choisis la partie à garder — l'autre sera définitivement remplacée par celle-ci.",
             en: "Choose which save to keep — the other one will be permanently replaced by it."
         },
         mergeChoiceCurrentTitle: { fr: "Partie actuelle", en: "Current save" },
-        mergeChoiceOtherTitle: { fr: "Autre compte", en: "Other account" },
-        mergeChoiceDone: { fr: "✅ Comptes fusionnés", en: "✅ Accounts merged" },
+        mergeChoiceOtherTitle: { fr: "Partie du code", en: "The code's save" },
         btnProfile: { fr: "👤 Profil", en: "👤 Profile" },
         profileFollowing: { fr: "Abonnements", en: "Following" },
         profileFollowers: { fr: "Abonnés", en: "Followers" },
@@ -2146,6 +2143,9 @@
             dailyBestDistance: {},     // { "AAAA-MM-JJ": mètres } meilleur lancer du jour, sur 7 jours
             isPrivate: false,          // compte privé : les autres voient une banderole au lieu du profil
             avatarEmoji: "",           // icône de profil choisie dans AVATAR_EMOJIS, vide = avatar par défaut
+            // --- Code de récupération (voir revealRecoveryCode) ---
+            recoveryCode: "",          // 16 chiffres, généré à la première demande ; vide = jamais demandé
+            recoveryRetireToken: "",   // second secret, sert seulement à retirer l'ancienne entrée du classement
             // --- Défis quotidiens (voir CHALLENGE_POOL et ensureDailyChallenges) ---
             dailyChallengeDate: "",    // "AAAA-MM-JJ" du jour où dailyChallenges a été généré
             dailyChallenges: [],       // [{ kind, target, progress, reward, claimed }, ...]
@@ -5304,12 +5304,6 @@
         if (el) el.textContent = text;
     }
 
-    // Mis à true juste avant un signInWithEmailAndPassword() déclenché par le
-    // flux de connexion/fusion de comptes (voir loginToEmailAccount) : ce
-    // changement de uid a son propre traitement (comparaison + choix), donc
-    // onAuthStateChanged ne doit PAS lancer syncCloudSaveOnLogin() par-dessus.
-    let suppressNextAutoSync = false;
-
     function initFirebase() {
         if (!FIREBASE_ENABLED) {
             updateOnlineStatus(tr("onlineOfflineNoConfig"));
@@ -5322,8 +5316,7 @@
             if (!user) return;
             currentUser = user;
             updateOnlineStatus(tr("onlineConnected"));
-            refreshAccountLinkUI();
-            if (suppressNextAutoSync) { suppressNextAutoSync = false; return; }
+            refreshRecoveryUI();
             // checkIncomingGifts() doit partir d'un save.money déjà synchronisé
             // avec le cloud, donc seulement une fois syncCloudSaveOnLogin terminé.
             // Rafraîchit aussi l'écran Profil s'il est ouvert (pseudo, stats...) :
@@ -5337,8 +5330,8 @@
         // Persistance explicite (déjà la valeur par défaut du SDK web, mais le
         // préciser évite toute mauvaise surprise) : garde la connexion d'une
         // visite à l'autre sur le même navigateur. Ça ne protège PAS contre un
-        // changement d'appareil ou un nettoyage des données du site — seul un
-        // compte sécurisé par email/mot de passe (voir plus bas) le permet.
+        // changement d'appareil ou un nettoyage des données du site — c'est le
+        // rôle du code de récupération (voir revealRecoveryCode plus bas).
         firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
         firebase.auth().signInAnonymously().catch((err) => {
             console.error("Connexion Firebase échouée :", err);
@@ -5379,36 +5372,165 @@
         if (!db || !currentUser) return;
         db.collection("users").doc(currentUser.uid).set(save, { merge: true })
             .catch((err) => console.error("Sauvegarde cloud impossible :", err));
+        // Garde la copie liée au code de récupération à jour (no-op tant que le
+        // joueur n'a pas demandé de code, voir pushRecoverySnapshot).
+        pushRecoverySnapshot();
     }
 
-    /* ---- Sécurisation de compte (email/mot de passe) et fusion ---- */
-    // But : un compte anonyme perd tout si le navigateur efface ses données
-    // (changement d'appareil, nettoyage, purge automatique de Safari...).
-    // Attacher un email/mot de passe permet de retrouver le MÊME compte
-    // (même uid Firebase) ensuite, sans rien perdre.
+    /* ---- Code de récupération (partie transférable, sans email) ---- */
+    // Problème : un compte anonyme Firebase disparaît dès que le navigateur
+    // efface ses données (changement de téléphone, nettoyage manuel, purge
+    // automatique de Safari au bout de quelques jours). Et sans email/mot de
+    // passe, rien ne permet de prouver "cette partie est la mienne".
+    //
+    // Solution : un code secret de 16 chiffres que le joueur note/copie. Ce
+    // code est l'IDENTIFIANT d'un document "recoveryCodes/{code}" qui contient
+    // une copie de la sauvegarde, remise à jour à chaque sauvegarde cloud.
+    // Entrer ce code sur un autre appareil suffit à récupérer la partie.
+    //
+    // Sécurité (voir firestore.rules) : "recoveryCodes" se lit document par
+    // document (allow get) mais ne se liste PAS (allow list: if false). Sans
+    // le code exact on ne peut donc rien lire, et 16 chiffres (10^16
+    // combinaisons) rendent la recherche au hasard sans espoir. Qui a le code
+    // a la partie : c'est le principe même, comme une clé de maison.
+    const RECOVERY_CODE_DIGITS = 16;
 
-    function hasEmailLinked() {
-        return !!(currentUser && currentUser.providerData.some((p) => p.providerId === "password"));
+    // crypto.getRandomValues et pas Math.random : c'est un secret, il ne doit
+    // pas être devinable à partir de l'heure de génération.
+    function generateRecoveryCode() {
+        const bytes = new Uint8Array(RECOVERY_CODE_DIGITS);
+        crypto.getRandomValues(bytes);
+        return Array.from(bytes, (b) => String(b % 10)).join("");
     }
 
-    // (Ré)affiche soit le badge "compte sécurisé", soit les formulaires,
-    // selon l'état actuel de currentUser. Appelée après chaque changement de
-    // uid et à l'ouverture des réglages.
-    function refreshAccountLinkUI() {
-        const badge = document.getElementById("account-linked-badge");
-        const linkForm = document.getElementById("account-link-form");
-        const loginForm = document.getElementById("account-login-form");
-        if (!badge || !linkForm) return; // DOM pas encore prêt (tout premier appel)
-        if (hasEmailLinked()) {
-            badge.hidden = false;
-            document.getElementById("account-linked-email").textContent = currentUser.email;
-            linkForm.hidden = true;
-            loginForm.hidden = true;
+    // "1234567890123456" -> "1234 5678 9012 3456" (plus facile à recopier)
+    function formatRecoveryCode(code) {
+        return (code || "").replace(/(\d{4})(?=\d)/g, "$1 ");
+    }
+
+    // Ne garde que les chiffres : le joueur peut coller son code avec des
+    // espaces, des tirets, ou rien du tout.
+    function normalizeRecoveryCode(input) {
+        return (input || "").replace(/\D/g, "");
+    }
+
+    // Copie la sauvegarde dans le document du code, pour qu'un autre appareil
+    // puisse la récupérer. Best-effort, au même rythme que pushCloudSave.
+    // "retireToken" est un second secret, de faible valeur : il ne donne pas
+    // accès à la partie, il autorise seulement à retirer du classement
+    // l'entrée de l'ancien compte après une récupération (voir
+    // retireOldLeaderboardEntry et la règle "allow update" sur /scores).
+    function pushRecoverySnapshot() {
+        if (!db || !currentUser || !save.recoveryCode) return;
+        db.collection("recoveryCodes").doc(save.recoveryCode).set({
+            uid: currentUser.uid,
+            pseudo: save.pseudo || "",
+            retireToken: save.recoveryRetireToken || "",
+            save: save,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        }).catch((err) => console.error("Copie de récupération impossible :", err));
+        // Miroir lisible uniquement par les règles Firestore (allow read: false),
+        // pour qu'elles puissent vérifier un retrait de classement sans que le
+        // token n'ait jamais besoin d'être public.
+        db.collection("recoveryTokens").doc(currentUser.uid)
+            .set({ token: save.recoveryRetireToken || "" })
+            .catch((err) => console.error("Enregistrement du token impossible :", err));
+    }
+
+    // Génère le code à la première demande : il ne sert à rien tant que le
+    // joueur ne l'a pas vu, donc pas la peine d'en créer un pour quelqu'un qui
+    // n'ouvre jamais les réglages.
+    function revealRecoveryCode() {
+        if (!save.recoveryCode) {
+            save.recoveryCode = generateRecoveryCode();
+            save.recoveryRetireToken = generateRecoveryCode();
+            persist(); // local + cloud + copie de récupération
         } else {
-            badge.hidden = true;
-            linkForm.hidden = false;
-            loginForm.hidden = true;
+            pushRecoverySnapshot(); // s'assure que la copie est à jour
         }
+        refreshRecoveryUI();
+    }
+
+    function refreshRecoveryUI() {
+        const wrap = document.getElementById("recovery-code-wrap");
+        if (!wrap) return; // DOM pas encore prêt (tout premier appel)
+        const revealBtn = document.getElementById("btn-recovery-reveal");
+        const hasCode = !!save.recoveryCode;
+        wrap.hidden = !hasCode;
+        revealBtn.hidden = hasCode;
+        if (hasCode) {
+            document.getElementById("recovery-code-value").textContent = formatRecoveryCode(save.recoveryCode);
+        }
+    }
+
+    // Retire du classement l'entrée de l'ancien compte après récupération :
+    // sans ça son pseudo y resterait affiché en double (le record récupéré est
+    // republié sous le compte courant juste après). bestDistance à 0 la fait
+    // sortir du top, et le retireToken prouve aux règles Firestore qu'on a bien
+    // récupéré CE compte-là.
+    function retireOldLeaderboardEntry(oldUid, retireToken, pseudo) {
+        if (!db || !oldUid || !retireToken || oldUid === currentUser.uid) return Promise.resolve();
+        return db.collection("scores").doc(oldUid).set({
+            pseudo: pseudo || "",
+            bestDistance: 0,
+            retireToken: retireToken,
+        }).catch((err) => console.error("Retrait de l'ancienne entrée impossible :", err));
+    }
+
+    // Récupère la partie associée à un code saisi par le joueur.
+    function recoverFromCode(rawInput) {
+        clearAccountFormError("recovery-error");
+        const code = normalizeRecoveryCode(rawInput);
+        if (code.length !== RECOVERY_CODE_DIGITS) {
+            showAccountFormError("recovery-error", tr("recoveryErrFormat"));
+            return;
+        }
+        if (!db || !currentUser) {
+            showAccountFormError("recovery-error", tr("recoveryErrOffline"));
+            return;
+        }
+        if (code === save.recoveryCode) {
+            showAccountFormError("recovery-error", tr("recoveryErrSameAccount"));
+            return;
+        }
+        const btn = document.getElementById("btn-recovery-submit");
+        btn.disabled = true;
+        db.collection("recoveryCodes").doc(code).get().then((doc) => {
+            if (!doc.exists || !doc.data().save) {
+                showAccountFormError("recovery-error", tr("recoveryErrUnknown"));
+                return;
+            }
+            const data = doc.data();
+            const otherSave = migrateLegacyVolcanFields(Object.assign(defaultSave(), data.save), data.save);
+            const currentSave = JSON.parse(JSON.stringify(save));
+            // Le choix laisse la partie actuelle intacte si on annule, et ne
+            // fusionne jamais champ par champ : c'est l'une OU l'autre, en entier.
+            return showMergeChoice(summarizeSaveStats(currentSave), summarizeSaveStats(otherSave), true).then((choice) => {
+                if (!choice) return; // annulé, rien ne change
+                return retireOldLeaderboardEntry(data.uid, data.retireToken, otherSave.pseudo).then(() => {
+                    save = choice === "other" ? otherSave : currentSave;
+                    save.recoveryCode = code; // le code suit le joueur d'un appareil à l'autre
+                    if (!save.recoveryRetireToken) save.recoveryRetireToken = generateRecoveryCode();
+                    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+                    if (save.volcanUnlocked) {
+                        const volcanWorld = WORLDS.find((w) => w.id === "volcans");
+                        if (volcanWorld) volcanWorld.unlocked = true;
+                    }
+                    persist(); // envoie la partie choisie (+ la copie de récupération)
+                    // Republie l'entrée de classement tout de suite au lieu
+                    // d'attendre le prochain record (voir pushScoreIfRecord).
+                    pushScoreIfRecord(save.bestDistance);
+                    buildWorldsRow();
+                    refreshMenu();
+                    refreshSettingsModal();
+                    if (screens.profile.classList.contains("active")) renderProfile();
+                    showToast(tr("recoveryDone"));
+                });
+            });
+        }).catch((err) => {
+            console.error("Récupération impossible :", err);
+            showAccountFormError("recovery-error", tr("recoveryErrUnknown"));
+        }).then(() => { btn.disabled = false; });
     }
 
     function showAccountFormError(id, message) {
@@ -5441,121 +5563,32 @@
     }
 
     // Affiche la modale "quelle partie garder ?" et résout avec "current" ou
-    // "other" selon la carte cliquée.
-    function showMergeChoice(currentStats, otherStats) {
+    // "other" selon la carte cliquée, ou null si le joueur annule (utile quand
+    // il s'est trompé de code : rien ne doit alors bouger).
+    function showMergeChoice(currentStats, otherStats, allowCancel) {
         return new Promise((resolve) => {
             document.getElementById("merge-choice-current-stats").innerHTML = renderMergeStatsHtml(currentStats);
             document.getElementById("merge-choice-other-stats").innerHTML = renderMergeStatsHtml(otherStats);
             const modal = document.getElementById("merge-choice-modal");
             const curCard = document.getElementById("merge-choice-current");
             const otherCard = document.getElementById("merge-choice-other");
+            const cancelBtn = document.getElementById("btn-merge-cancel");
+            cancelBtn.hidden = !allowCancel;
             function cleanup(choice) {
                 modal.classList.remove("show");
                 curCard.removeEventListener("click", onCur);
                 otherCard.removeEventListener("click", onOther);
+                cancelBtn.removeEventListener("click", onCancel);
                 resolve(choice);
             }
             function onCur() { cleanup("current"); }
             function onOther() { cleanup("other"); }
+            function onCancel() { cleanup(null); }
             curCard.addEventListener("click", onCur);
             otherCard.addEventListener("click", onOther);
+            cancelBtn.addEventListener("click", onCancel);
             modal.classList.add("show");
         });
-    }
-
-    // Traduit les codes d'erreur Firebase Auth courants (le SDK ne renvoie que
-    // de l'anglais technique par défaut).
-    function firebaseAuthErrorMessage(err) {
-        const map = {
-            "auth/invalid-email": "settingsErrInvalidEmail",
-            "auth/weak-password": "settingsErrWeakPassword",
-            "auth/wrong-password": "settingsErrWrongPassword",
-            "auth/user-not-found": "settingsErrWrongPassword",
-            "auth/invalid-credential": "settingsErrWrongPassword",
-            "auth/operation-not-allowed": "settingsErrNotEnabled",
-        };
-        return tr(map[err.code] || "settingsErrGeneric");
-    }
-
-    // Attache un email/mot de passe au compte anonyme actuel (le rend
-    // récupérable plus tard). Si cet email appartient déjà à un autre compte,
-    // ce n'est pas vraiment une inscription mais une connexion déguisée : on
-    // bascule automatiquement vers loginToEmailAccount (avec le même mot de
-    // passe tapé) pour lancer la fusion.
-    function linkEmailAccount(email, password) {
-        clearAccountFormError("account-link-error");
-        if (!currentUser) return;
-        currentUser.linkWithCredential(firebase.auth.EmailAuthProvider.credential(email, password))
-            .then(() => {
-                showToast(tr("settingsAccountSecured"));
-                refreshAccountLinkUI();
-                pushPublicProfile();
-            })
-            .catch((err) => {
-                if (err.code === "auth/email-already-in-use" || err.code === "auth/credential-already-in-use") {
-                    loginToEmailAccount(email, password, "account-link-error");
-                    return;
-                }
-                showAccountFormError("account-link-error", firebaseAuthErrorMessage(err));
-            });
-    }
-
-    // Connexion à un compte email/mot de passe déjà existant. Capture la
-    // partie actuelle AVANT de basculer (signInWithEmailAndPassword change le
-    // uid actif sous nos pieds), puis laisse le joueur choisir laquelle des
-    // deux parties garder si elles sont différentes (voir showMergeChoice).
-    function loginToEmailAccount(email, password, errorElId) {
-        clearAccountFormError(errorElId);
-        const previousUid = currentUser ? currentUser.uid : null;
-        const previousSave = JSON.parse(JSON.stringify(save));
-        suppressNextAutoSync = true;
-        // Une fois basculé sur newUid, on n'a plus le droit d'écrire (donc de
-        // supprimer) les documents publics de previousUid (voir firestore.rules :
-        // "auth.uid == uid"). Il faut donc nettoyer AVANT de changer de compte,
-        // sinon son entrée reste pour toujours en double dans le classement.
-        const cleanupPreviousPublicDocs = () => {
-            if (!previousUid || previousUid === "") return Promise.resolve();
-            return Promise.all([
-                db.collection("scores").doc(previousUid).delete().catch(() => {}),
-                db.collection("profiles").doc(previousUid).delete().catch(() => {}),
-            ]);
-        };
-        cleanupPreviousPublicDocs().then(() => firebase.auth().signInWithEmailAndPassword(email, password))
-            .then(() => {
-                const newUid = currentUser.uid;
-                if (newUid === previousUid) {
-                    syncCloudSaveOnLogin();
-                    return;
-                }
-                return db.collection("users").doc(newUid).get().then((doc) => {
-                    const otherSave = doc.exists
-                        ? migrateLegacyVolcanFields(Object.assign(defaultSave(), doc.data()), doc.data())
-                        : defaultSave();
-                    return showMergeChoice(summarizeSaveStats(previousSave), summarizeSaveStats(otherSave)).then((choice) => {
-                        save = choice === "other" ? otherSave : previousSave;
-                        localStorage.setItem(SAVE_KEY, JSON.stringify(save));
-                        if (save.volcanUnlocked) {
-                            const volcanWorld = WORLDS.find((w) => w.id === "volcans");
-                            if (volcanWorld) volcanWorld.unlocked = true;
-                        }
-                        persist(); // envoie la partie choisie vers le compte désormais actif
-                        // Remet à jour l'entrée du classement (pseudo/record) tout de suite
-                        // au lieu d'attendre le prochain record battu (voir pushScoreIfRecord) :
-                        // sinon le classement affiche encore l'ancien pseudo/record de newUid.
-                        pushScoreIfRecord(save.bestDistance);
-                        buildWorldsRow();
-                        refreshMenu();
-                        refreshAccountLinkUI();
-                        refreshSettingsModal();
-                        if (screens.profile.classList.contains("active")) renderProfile();
-                        showToast(tr("mergeChoiceDone"));
-                    });
-                });
-            })
-            .catch((err) => {
-                suppressNextAutoSync = false;
-                showAccountFormError(errorElId, firebaseAuthErrorMessage(err));
-            });
     }
 
     // --- Statistiques publiques des succès (% de joueurs) ---
@@ -6406,9 +6439,8 @@
         document.getElementById("chk-private-account").checked = !!save.isPrivate;
         document.getElementById("settings-avatar-placeholder").textContent = save.avatarEmoji || "🎒";
         renderAvatarGrid();
-        refreshAccountLinkUI();
-        clearAccountFormError("account-link-error");
-        clearAccountFormError("account-login-error");
+        refreshRecoveryUI();
+        clearAccountFormError("recovery-error");
     }
 
     // Construit la grille d'icônes au choix (voir AVATAR_EMOJIS) ; celle
@@ -6444,34 +6476,34 @@
         showToast(save.isPrivate ? tr("settingsPrivateOn") : tr("settingsPrivateOff"));
     });
 
-    // Sécurisation de compte : bascule entre le formulaire "sécuriser" et
-    // "se connecter" (voir showMergeChoice pour la suite si les 2 parties diffèrent).
-    document.getElementById("btn-account-show-login").addEventListener("click", () => {
-        document.getElementById("account-link-form").hidden = true;
-        document.getElementById("account-login-form").hidden = false;
-    });
-    document.getElementById("btn-account-show-link").addEventListener("click", () => {
-        document.getElementById("account-login-form").hidden = true;
-        document.getElementById("account-link-form").hidden = false;
-    });
-    document.getElementById("btn-account-link").addEventListener("click", () => {
-        const email = document.getElementById("account-link-email").value.trim();
-        const password = document.getElementById("account-link-password").value;
-        if (!email || password.length < 6) {
-            showAccountFormError("account-link-error", tr("settingsErrWeakPassword"));
-            return;
+    // Code de récupération : afficher / copier / récupérer une autre partie
+    // (voir revealRecoveryCode et recoverFromCode).
+    document.getElementById("btn-recovery-reveal").addEventListener("click", revealRecoveryCode);
+    document.getElementById("btn-recovery-copy").addEventListener("click", () => {
+        const code = save.recoveryCode || "";
+        // navigator.clipboard n'existe pas partout (et exige HTTPS) : en secours
+        // on sélectionne le code pour que le joueur n'ait plus qu'à copier.
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(code)
+                .then(() => showToast(tr("recoveryCopied")))
+                .catch(() => selectRecoveryCodeText());
+        } else {
+            selectRecoveryCodeText();
         }
-        linkEmailAccount(email, password);
     });
-    document.getElementById("btn-account-login").addEventListener("click", () => {
-        const email = document.getElementById("account-login-email").value.trim();
-        const password = document.getElementById("account-login-password").value;
-        if (!email || !password) {
-            showAccountFormError("account-login-error", tr("settingsErrGeneric"));
-            return;
-        }
-        loginToEmailAccount(email, password, "account-login-error");
+    document.getElementById("btn-recovery-submit").addEventListener("click", () => {
+        recoverFromCode(document.getElementById("recovery-input").value);
     });
+
+    function selectRecoveryCodeText() {
+        const el = document.getElementById("recovery-code-value");
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+        showToast(tr("recoverySelectToCopy"));
+    }
 
     /* ============ 13bis. FICHE TROUSSE ET AIDE ============ */
     // Petit récapitulatif ouvert en cliquant sur la trousse de l'écran d'accueil
@@ -6527,8 +6559,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "7.2.0";
+    const VERSION_NUMBER = "8.0.0";
     const CHANGELOG = [
+        {
+            version: "8.0.0",
+            major: [
+                { fr: "Le compte email/mot de passe est remplacé par un code de récupération : dans Réglages, affiche ton code de 16 chiffres et note-le. Sur un autre téléphone (ou après un nettoyage du navigateur), il suffit de le saisir pour récupérer ta partie — avec le choix de garder la partie actuelle ou celle du code si les deux ont de la progression", en: "The email/password account is replaced by a recovery code: in Settings, show your 16-digit code and write it down. On another phone (or after a browser cleanup), just enter it to restore your save — with a choice between keeping the current save or the code's one if both have progress" },
+            ],
+            minor: [],
+        },
         {
             version: "7.2.0",
             major: [],

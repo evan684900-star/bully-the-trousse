@@ -27,6 +27,44 @@ service cloud.firestore {
                    && request.resource.data.bestDistance is number
                    && request.resource.data.bestDistance >= 0
                    && request.resource.data.bestDistance <= 100000;
+      // Retrait après récupération de partie (voir retireOldLeaderboardEntry) :
+      // quand un joueur récupère sa partie sur un nouvel appareil, son ancien
+      // compte garderait sinon son entrée ici, en double avec la nouvelle.
+      // Le "retireToken" prouve qu'on a bien récupéré CE compte : il est
+      // comparé à /recoveryTokens/{uid}, que personne ne peut lire côté client
+      // (les règles, elles, y ont accès via get()). Le token n'ouvre rien
+      // d'autre : il permet seulement de remettre cette entrée à 0.
+      allow update: if request.auth != null
+                    && request.resource.data.bestDistance == 0
+                    && request.resource.data.retireToken is string
+                    && exists(/databases/$(database)/documents/recoveryTokens/$(uid))
+                    && get(/databases/$(database)/documents/recoveryTokens/$(uid)).data.token
+                       == request.resource.data.retireToken;
+    }
+
+    // Code de récupération : permet de retrouver sa partie sur un autre
+    // appareil sans email ni mot de passe (voir revealRecoveryCode). L'id du
+    // document EST le code secret de 16 chiffres, et le document contient une
+    // copie de la sauvegarde.
+    // "get" est public mais "list" est refusé : sans connaître le code exact,
+    // impossible de lire quoi que ce soit (et 10^16 combinaisons rendent la
+    // recherche au hasard sans espoir). Seul le propriétaire du compte pointé
+    // peut écrire/écraser le document.
+    match /recoveryCodes/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow create, update: if request.auth != null
+                            && request.resource.data.uid == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.uid == request.auth.uid;
+    }
+
+    // Miroir du "retireToken" de chaque compte, uniquement pour que les règles
+    // du classement puissent le vérifier (get() côté règles fonctionne même
+    // avec "allow read: if false"). Jamais lisible par un client : sinon
+    // n'importe qui pourrait retirer l'entrée de classement de n'importe qui.
+    match /recoveryTokens/{uid} {
+      allow read: if false;
+      allow write: if request.auth != null && request.auth.uid == uid;
     }
 
     // Statistiques publiques du système de succès (% de joueurs par succès,
