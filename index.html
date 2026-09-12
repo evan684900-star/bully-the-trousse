@@ -1242,7 +1242,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v8.0.1</div>
+                <div class="version-tag" id="version-tag">v8.0.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1712,6 +1712,11 @@
             en: "The bus back to the normal world. You'll find your pre-beach progress exactly where you left it (and your beach progress will wait for you if you come back)."
         },
         busTicketBought: { fr: "🚌 Bus pris ! Te revoilà dans le monde normal.", en: "🚌 Bus taken! You're back in the normal world." },
+        busTicketFreeDesc: {
+            fr: "Tu as déjà payé ce trajet une fois : le retour vers le monde normal est maintenant gratuit, à chaque fois que tu reviens sur la plage.",
+            en: "You've already paid for this trip once: the ride back to the normal world is now free, every time you come back to the beach."
+        },
+        busTicketFreeBtn: { fr: "🚌 Reprendre (gratuit)", en: "🚌 Take it (free)" },
         towelName: { fr: "Serviette de plage", en: "Beach towel" },
         towelDesc: {
             fr: "Utilisable une seule fois : rend 5 de santé mentale (contre 20 pour une serviette trouvée pendant un lancer).",
@@ -1767,13 +1772,13 @@
         },
         plageTutoTitle3: { fr: "⛱️ Ce qui traîne sur le sable", en: "⛱️ What's lying around on the sand" },
         plageTutoText3: {
-            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (+20 de santé mentale), châteaux de sable (fin du lancer) et mouettes (esquive) apparaissent chacun avec leur propre chance.",
-            en: "The sand is randomly generated on every throw: parasols (bounce), towels (+20 mental health), sandcastles (throw over) and seagulls (dodge) each show up with their own chance."
+            fr: "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (+20 de santé mentale), châteaux de sable (fin du lancer) et mouettes (esquive) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
+            en: "The sand is randomly generated on every throw: parasols (bounce), towels (+20 mental health), sandcastles (throw over) and seagulls (dodge) each show up with their own chance, but only past 100 m."
         },
         plageTutoTitle4: { fr: "🧠 Santé mentale", en: "🧠 Mental health" },
         plageTutoText4: {
-            fr: "Chaque lancer coûte 5 de santé mentale (sur 200) à cause du stress des crabes. À zéro, impossible de lancer : il faut une serviette trouvée pendant un lancer (+20) ou achetée en boutique (+5, à usage unique).",
-            en: "Each throw costs 5 mental health (out of 200) because of crab stress. At zero you can't throw: you need a towel found during a throw (+20) or bought in the shop (+5, single use)."
+            fr: "Un lancer qui dépasse 100 m coûte 5 de santé mentale (sur 200) à cause du stress des crabes ; en dessous, rien à craindre. À zéro, impossible de lancer : il faut une serviette trouvée pendant un lancer (+20) ou achetée en boutique (+5, à usage unique).",
+            en: "A throw past 100 m costs 5 mental health (out of 200) because of crab stress; below that, nothing to worry about. At zero you can't throw: you need a towel found during a throw (+20) or bought in the shop (+5, single use)."
         },
         leaderboardTitlePlage: { fr: "🏖️ Classement Plage", en: "🏖️ Beach leaderboard" },
         achvClaquettesName: { fr: "Pieds nus dans le sable", en: "Barefoot in the sand" },
@@ -2099,6 +2104,10 @@
     const MENTAL_MAX = 200;           // santé mentale maximale
     const MENTAL_COST_PER_THROW = 5;  // stress des crabes, perdu à chaque lancer
     const MENTAL_GULL_HIT = 10;       // santé mentale perdue par crotte de mouette reçue
+    // En dessous de cette distance, le lancer reste sur le "sable proche du
+    // bus" : ni évènement (parasol/serviette/château/mouettes) ni stress des
+    // crabes. Ça laisse une zone d'échauffement sans surprise ni pénalité.
+    const BEACH_EVENT_MIN_DISTANCE = 100;
     // Chaque évènement du monde Plage est tiré au sort à chaque lancer.
     const BEACH_EVENT_CHANCE = { parasol: 0.5, towel: 0.6, castle: 0.4, gulls: 0.6 };
     const BEACH_GULL_COUNT = 5;       // crottes à esquiver en jeu (10 dans la cinématique)
@@ -3139,24 +3148,31 @@
     }
 
     // Billet de bus : la seule sortie de la plage (voir leaveBeachProfile).
+    // Ne coûte les 250 000 $ que la toute première fois — comme la Trousse à
+    // Claquettes à l'entrée, c'est un déblocage permanent (save.hasTakenBusBack),
+    // pas un péage à chaque aller-retour : une fois payé, le trajet retour est
+    // gratuit pour toujours.
     function buildBusTicketCard() {
         const card = document.createElement("div");
         card.className = "upgrade-card";
+        const free = save.hasTakenBusBack;
         card.innerHTML =
             '<div class="icon">🚌</div>' +
-            '<div class="info"><h3>' + tr("busTicketName") + '</h3><p>' + tr("busTicketDesc") + '</p></div>';
+            '<div class="info"><h3>' + tr("busTicketName") + '</h3><p>' + tr(free ? "busTicketFreeDesc" : "busTicketDesc") + '</p></div>';
         const btn = document.createElement("button");
-        btn.className = "btn small";
-        btn.textContent = BUS_TICKET_COST + " $";
+        btn.className = "btn small" + (free ? " secondary" : "");
+        btn.textContent = free ? tr("busTicketFreeBtn") : (BUS_TICKET_COST + " $");
         btn.addEventListener("click", () => {
-            if (save.money < BUS_TICKET_COST) {
-                sfxError();
-                showToast(tr("notEnoughMoney"));
-                return;
+            if (!free) {
+                if (save.money < BUS_TICKET_COST) {
+                    sfxError();
+                    showToast(tr("notEnoughMoney"));
+                    return;
+                }
+                save.money -= BUS_TICKET_COST;
+                bumpDailyChallenge("spend", BUS_TICKET_COST, "add");
+                save.hasTakenBusBack = true;
             }
-            save.money -= BUS_TICKET_COST;
-            bumpDailyChallenge("spend", BUS_TICKET_COST, "add");
-            save.hasTakenBusBack = true;
             leaveBeachProfile();
             persist();
             sfxBuy();
@@ -3746,15 +3762,19 @@
         const distanceMeters = worldX / SCALE;
         save.totalThrows++;
         // Monde Plage : serviette (soin) ou château (qui s'écroule), puis le
-        // stress des crabes qui grignote la santé mentale à chaque lancer.
+        // stress des crabes qui grignote la santé mentale — mais seulement au
+        // delà de BEACH_EVENT_MIN_DISTANCE (voir beachOnLaunch) : un petit
+        // lancer raté ne coûte rien.
         const beachEl = document.getElementById("result-beach");
         if (save.currentWorld === "plage") {
             beachFinalizeLanding();
             save.plageThrows++;
             if (distanceMeters > save.plageBestDistance) save.plageBestDistance = distanceMeters;
-            loseMental(MENTAL_COST_PER_THROW);
-            beachEl.textContent = beachResultText();
-            beachEl.style.display = "block";
+            const stressed = distanceMeters >= BEACH_EVENT_MIN_DISTANCE;
+            if (stressed) loseMental(MENTAL_COST_PER_THROW);
+            const beachText = beachResultText(stressed);
+            beachEl.textContent = beachText;
+            beachEl.style.display = beachText ? "block" : "none";
         } else {
             beachEl.style.display = "none";
         }
@@ -4887,8 +4907,12 @@
             drawQteRing(w, h);
         }
         if (gullActive) {
+            // Position FIXE (sans gullDodgeX) : la crotte doit rester rivée au
+            // couloir qu'elle vise depuis le début, pas suivre la trousse quand
+            // elle esquive — sinon la cible se recentre sur toi à chaque
+            // déplacement et il devient impossible de s'en écarter.
             const gs = worldToScreen(worldX, worldY);
-            gullDraw(ctx, w, h, gs.sx + gullDodgeX, gs.sy);
+            gullDraw(ctx, w, h, gs.sx, gs.sy);
         }
 
         requestAnimationFrame(gameLoop);
@@ -6347,8 +6371,18 @@
         beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1, depth: 0, event: true });
     }
 
-    // Appelé juste après le lancer (voir lockAccuracyAndLaunch)
+    // Appelé juste après le lancer (voir lockAccuracyAndLaunch). En dessous de
+    // BEACH_EVENT_MIN_DISTANCE (distance prédite, avant tout rebond), aucun
+    // évènement ne peut se déclencher : on force tout à faux plutôt que de
+    // tirer au sort, sans quoi une chance non nulle finirait par en placer un.
     function beachOnLaunch() {
+        if (predictLandingX() / SCALE < BEACH_EVENT_MIN_DISTANCE) {
+            beachEvents = { parasol: false, towel: false, castle: false, gulls: false };
+            beachUsed = { parasol: false, towel: false, castle: false, gulls: false };
+            beachLog = [];
+            beachGullDamage = 0;
+            return;
+        }
         rollBeachEvents();
         beachPlaceLandingProp();
     }
@@ -6392,15 +6426,17 @@
         }
     }
 
-    // Récapitulatif des évènements du lancer, affiché dans le panneau de résultat
-    function beachResultText() {
+    // Récapitulatif des évènements du lancer, affiché dans le panneau de
+    // résultat. "stressed" = ce lancer a dépassé BEACH_EVENT_MIN_DISTANCE
+    // (voir onLanded) : en dessous, ni évènement ni ligne de stress à afficher.
+    function beachResultText(stressed) {
         const lines = [];
         if (beachLog.indexOf("parasol") >= 0) lines.push(tr("beachResultParasol"));
         if (beachLog.indexOf("towel") >= 0) lines.push(tr("beachResultTowel"));
         if (beachLog.indexOf("castle") >= 0) lines.push(tr("beachResultCastle"));
         if (beachLog.indexOf("gullsClean") >= 0) lines.push(tr("beachResultGulls"));
         if (beachGullDamage > 0) lines.push(tr("beachResultGullsHit").replace("{n}", beachGullDamage));
-        lines.push(tr("beachMentalLoss"));
+        if (stressed) lines.push(tr("beachMentalLoss"));
         return lines.join(" ");
     }
 
@@ -7432,7 +7468,8 @@
         loadLeaderboard();
     }
 
-    // Charge et affiche le top 15 des meilleures distances, tous joueurs confondus
+    // Charge et affiche TOUTES les meilleures distances, tous joueurs confondus
+    // (pas de limite : voir la demande explicite, contrairement au top 15 d'avant).
     function loadLeaderboard() {
         const body = document.getElementById("leaderboard-body");
         if (!FIREBASE_ENABLED || !db) {
@@ -7440,7 +7477,7 @@
             return;
         }
         body.innerHTML = '<p style="text-align:center; color: var(--text-dim);">' + tr("leaderboardLoading") + '</p>';
-        db.collection(scoresCollection()).orderBy("bestDistance", "desc").limit(15).get().then((snapshot) => {
+        db.collection(scoresCollection()).orderBy("bestDistance", "desc").get().then((snapshot) => {
             body.innerHTML = "";
             let rank = 0;
             snapshot.forEach((doc) => {
@@ -8376,8 +8413,18 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.1";
+    const VERSION_NUMBER = "8.0.2";
     const CHANGELOG = [
+        {
+            version: "8.0.2",
+            major: [],
+            minor: [
+                { fr: "Corrige le QTE des crottes de mouettes en jeu : la crotte suivait la trousse quand on esquivait au lieu de rester fixée à son couloir d'origine, la rendant quasi impossible à esquiver", en: "Fixed the in-game seagull-dropping QTE: the dropping used to follow the pencil case when dodging instead of staying pinned to its original lane, making it nearly impossible to dodge" },
+                { fr: "Les parasols, serviettes, châteaux de sable et mouettes n'apparaissent plus que sur les lancers de plus de 100 m ; en dessous, le stress des crabes (-5 de santé mentale) ne s'applique plus non plus", en: "Parasols, towels, sandcastles and seagulls now only show up on throws past 100 m; below that, the crab stress (-5 mental health) no longer applies either" },
+                { fr: "Le billet de bus du retour ne coûte 250 000 $ que la toute première fois : une fois payé, revenir sur la plage puis en repartir est gratuit pour toujours (comme la Trousse à Claquettes à l'entrée)", en: "The return bus ticket only costs $250,000 the very first time: once paid, coming back to the beach and leaving again is free forever (like the Flip-Flop Pencil Case on the way in)" },
+                { fr: "Le classement n'est plus limité aux 15 meilleurs scores : il affiche maintenant tous les joueurs classés", en: "The leaderboard is no longer capped at the top 15 scores: it now shows every ranked player" },
+            ],
+        },
         {
             version: "8.0.1",
             major: [],
