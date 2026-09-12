@@ -1176,7 +1176,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v7.1.0</div>
+                <div class="version-tag" id="version-tag">v7.1.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -5502,7 +5502,18 @@
         const previousUid = currentUser ? currentUser.uid : null;
         const previousSave = JSON.parse(JSON.stringify(save));
         suppressNextAutoSync = true;
-        firebase.auth().signInWithEmailAndPassword(email, password)
+        // Une fois basculé sur newUid, on n'a plus le droit d'écrire (donc de
+        // supprimer) les documents publics de previousUid (voir firestore.rules :
+        // "auth.uid == uid"). Il faut donc nettoyer AVANT de changer de compte,
+        // sinon son entrée reste pour toujours en double dans le classement.
+        const cleanupPreviousPublicDocs = () => {
+            if (!previousUid || previousUid === "") return Promise.resolve();
+            return Promise.all([
+                db.collection("scores").doc(previousUid).delete().catch(() => {}),
+                db.collection("profiles").doc(previousUid).delete().catch(() => {}),
+            ]);
+        };
+        cleanupPreviousPublicDocs().then(() => firebase.auth().signInWithEmailAndPassword(email, password))
             .then(() => {
                 const newUid = currentUser.uid;
                 if (newUid === previousUid) {
@@ -5521,6 +5532,10 @@
                             if (volcanWorld) volcanWorld.unlocked = true;
                         }
                         persist(); // envoie la partie choisie vers le compte désormais actif
+                        // Remet à jour l'entrée du classement (pseudo/record) tout de suite
+                        // au lieu d'attendre le prochain record battu (voir pushScoreIfRecord) :
+                        // sinon le classement affiche encore l'ancien pseudo/record de newUid.
+                        pushScoreIfRecord(save.bestDistance);
                         buildWorldsRow();
                         refreshMenu();
                         refreshAccountLinkUI();
@@ -6474,8 +6489,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "7.1.0";
+    const VERSION_NUMBER = "7.1.1";
     const CHANGELOG = [
+        {
+            version: "7.1.1",
+            major: [],
+            minor: [
+                { fr: "Correctif : après une fusion de comptes, l'ancien compte abandonné n'apparaît plus en double dans le classement, et le halo doré \"c'est toi\" s'affiche de nouveau correctement", en: "Fix: after merging accounts, the abandoned account no longer shows up twice on the leaderboard, and the \"this is you\" gold halo shows up correctly again" },
+            ],
+        },
         {
             version: "7.1.0",
             major: [
