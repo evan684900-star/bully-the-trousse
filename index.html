@@ -1010,7 +1010,12 @@
         /* ---------- CINÉMATIQUE DU MONDE VOLCAN ---------- */
         /* La cinématique réutilise le canvas et les décors du jeu : on masque
            simplement le HUD (body.cine-mode) et on superpose #cine-ui. */
-        .screen.cine-fading { z-index: 5; opacity: 1; transition: opacity 2.2s ease; }
+        /* pointer-events: none dès le début du fondu (pas seulement une fois
+           invisible) : sans ça, le menu reste cliquable pendant toute sa durée
+           (2,2 s / 4 s) puisque seule son opacité change — un clic pendant ce
+           délai retombait sur un bouton du menu dessous (ex: la carte
+           "Volcans", qui démarrait ALORS l'autre cinématique par-dessus). */
+        .screen.cine-fading { z-index: 5; opacity: 1; transition: opacity 2.2s ease; pointer-events: none; }
         .screen.cine-fading.cine-gone { opacity: 0; }
         body.cine-mode .hud-top,
         body.cine-mode .hint-text,
@@ -1242,7 +1247,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v8.0.2</div>
+                <div class="version-tag" id="version-tag">v8.0.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -6579,7 +6584,18 @@
         let p = -1;
         if (gullState === "warn") p = 0.4 * c01(gullT / GULL_WARN);
         else if (gullState === "incoming") p = 0.4 + 0.6 * c01(gullT / GULL_TRAVEL);
-        const topY = Math.max(30, baseY - h * 0.42);
+        // Écart (30 à 170 px) entre la mouette et la trousse : sur un lancer
+        // puissant, la trousse est suivie tout en haut de l'écran par la
+        // caméra (voir VERTICAL_SAFE_TOP) — l'ancienne formule (42% de la
+        // hauteur d'écran au-dessus) donnait alors systématiquement une valeur
+        // négative, clampée à 30px, DONC LA MÊME POSITION FIXE dans tous les
+        // cas : la mouette semblait figée sous le HUD au lieu de suivre la
+        // hauteur réelle de la trousse.
+        // "- 46" (pas "- 20") : la mouette elle-même est dessinée 26px au-dessus
+        // de topY (voir plus bas), donc il faut garder cette marge en plus pour
+        // que son propre sprite ne parte pas hors de l'écran par le haut.
+        const gap = Math.min(170, Math.max(30, baseY - 46));
+        const topY = baseY - gap;
         drawSeagull(c, baseX + gullLaneX(gullDropLane, w), topY - 26, 34, performance.now() / 1000);
         if (p >= 0) {
             const dx = baseX + gullLaneX(gullDropLane, w);
@@ -8413,8 +8429,16 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.2";
+    const VERSION_NUMBER = "8.0.3";
     const CHANGELOG = [
+        {
+            version: "8.0.3",
+            major: [],
+            minor: [
+                { fr: "Corrige le vrai reste du bug des mouettes : la mouette et sa crotte étaient quasi toujours plaquées tout en haut de l'écran (souvent cachées sous le HUD), quelle que soit la hauteur réelle de la trousse, à cause d'une formule de position verticale mal calibrée", en: "Fixed the rest of the seagull bug: the seagull and its dropping were almost always pinned to the very top of the screen (often hidden behind the HUD), regardless of the pencil case's actual height, due to a miscalibrated vertical position formula" },
+                { fr: "Corrige un vrai bug de la cinématique (plage comme volcan) : cliquer pendant le fondu de sortie du menu (2,2 à 4 s) retombait sur les boutons du menu resté cliquable dessous — un clic malheureux sur la carte \"Volcans\" pouvait démarrer l'autre cinématique par-dessus", en: "Fixed a real cutscene bug (beach and volcano alike): clicking during the menu's fade-out (2.2 to 4 s) landed on the menu's buttons, which stayed clickable underneath — an unlucky tap on the \"Volcanoes\" card could start the other cutscene on top of it" },
+            ],
+        },
         {
             version: "8.0.2",
             major: [],
