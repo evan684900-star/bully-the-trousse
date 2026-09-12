@@ -1247,7 +1247,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v8.0.3</div>
+                <div class="version-tag" id="version-tag">v8.0.4</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -6493,7 +6493,7 @@
         gullTotal = total;
         gullLives = lives;
         gullIdx = 0; gullHits = 0;
-        gullState = "wait"; gullT = 0;
+        gullState = "wait"; gullT = 0; gullDodged = false;
         gullLane = 0; gullLaneAnim = 0; gullDropLane = 0;
         gullOnDone = onDone || null;
         document.body.classList.add("gull-mode");
@@ -6516,18 +6516,24 @@
         document.getElementById("cine-warn").classList.remove("show");
     }
 
+    let gullDodged = false; // esquive déjà effectuée pour la crotte en cours (voir gullMove)
+
     function gullNext() {
         gullState = "warn";
         gullT = 0;
+        gullDodged = false;
         gullDropLane = gullLane; // la crotte vise le couloir actuel
         document.getElementById("cine-warn").classList.add("show");
     }
 
-    function gullResolve(dodged) {
-        document.getElementById("cine-warn").classList.remove("show");
-        gullState = "incoming";
-        gullT = 0;
-        if (dodged) return;
+    // Appelée UNE fois la chute terminée (fin de "incoming") : esquivé pendant
+    // "warn" OU "incoming" = ok, sinon touché. Voir gullMove : réagir une fois
+    // que la crotte est visiblement en train de tomber compte aussi, pas
+    // seulement pendant le court avertissement qui précède sa chute — sinon,
+    // le réflexe naturel ("j'attends de la voir tomber pour esquiver") arrive
+    // toujours trop tard et rien ne semble se passer quand on appuie.
+    function gullResolve() {
+        if (gullDodged) return;
         gullHits++;
         gullLives--;
         gullRefreshLives();
@@ -6538,7 +6544,8 @@
     }
 
     function gullMove(dir) {
-        if (!gullActive || gullState !== "warn") return;
+        if (!gullActive || gullDodged) return;
+        if (gullState !== "warn" && gullState !== "incoming") return;
         let next = Math.max(-1, Math.min(1, gullLane + dir));
         // Déjà collée à ce bord (ex: taper "gauche" alors qu'on est déjà tout
         // à gauche) : on esquive quand même, de l'autre côté, plutôt que de ne
@@ -6546,7 +6553,8 @@
         // la crotte suivante visant toujours le couloir où elle se trouve.
         if (next === gullLane) next = gullLane - dir;
         gullLane = next;
-        gullResolve(true);
+        gullDodged = true;
+        document.getElementById("cine-warn").classList.remove("show");
     }
 
     function gullUpdate(dt, w) {
@@ -6557,9 +6565,14 @@
         if (gullState === "wait") {
             if (gullT >= 0.4) gullNext();
         } else if (gullState === "warn") {
-            if (gullT >= GULL_WARN) gullResolve(false);
+            if (gullT >= GULL_WARN) {
+                document.getElementById("cine-warn").classList.remove("show");
+                gullState = "incoming";
+                gullT = 0;
+            }
         } else if (gullState === "incoming") {
             if (gullT >= GULL_TRAVEL) {
+                gullResolve(); // dernière chance d'esquiver écoulée : verdict maintenant
                 gullIdx++;
                 gullState = "gap";
                 gullT = 0;
@@ -8429,8 +8442,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "8.0.3";
+    const VERSION_NUMBER = "8.0.4";
     const CHANGELOG = [
+        {
+            version: "8.0.4",
+            major: [],
+            minor: [
+                { fr: "Corrige le QTE des mouettes une bonne fois pour toutes : appuyer sur les flèches ne faisait rien si on attendait de VOIR la crotte tomber pour réagir (réflexe naturel) — seule la toute courte fenêtre d'avertissement, avant même la chute, comptait. Réagir pendant la chute visible esquive maintenant aussi", en: "Fixed the seagull QTE for good: pressing the arrows did nothing if you waited to actually SEE the dropping fall before reacting (the natural reflex) — only the very short warning window, before it even started falling, counted. Reacting during the visible fall now also dodges" },
+            ],
+        },
         {
             version: "8.0.3",
             major: [],
