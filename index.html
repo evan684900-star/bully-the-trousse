@@ -799,6 +799,21 @@
         .auth-error { color: var(--accent-2); font-size: 12.5px; margin: 8px 0 0; min-height: 15px; }
         .auth-connected { text-align: center; }
         .auth-connected .email { font-weight: 800; word-break: break-all; }
+        /* Section "code de récupération" (voir revealRecoveryCode/redeemRecoveryCode) */
+        .auth-recovery { margin-top: 18px; padding-top: 14px; border-top: 1px solid rgba(128,128,128,0.18); }
+        .auth-recovery .settings-section-title { margin-top: 0; }
+        #recovery-code-display {
+            margin-top: 10px; padding: 12px; border-radius: 10px;
+            background: var(--app-bg); border: 2px dashed var(--accent);
+            text-align: center; font-size: 21px; font-weight: 800; letter-spacing: 2px;
+            word-break: break-all; user-select: all;
+        }
+        .recovery-redeem-row { display: flex; gap: 8px; margin-top: 12px; }
+        .recovery-redeem-row .auth-input { margin-top: 0; flex: 1; }
+        /* 3 classes : plus spécifique que ".info-box .btn" (2 classes, plus
+           bas dans la feuille de style, voir ligne ~1200) qui sinon repasserait
+           ce bouton en pleine largeur et écraserait le champ à côté. */
+        .info-box .recovery-redeem-row .btn { width: auto; margin-top: 0; flex: none; padding: 0 16px; }
         /* Détail "Puissance / Vitesse" (modale ouverte depuis la tuile Niveau) */
         .level-detail-row {
             display: flex; justify-content: space-between; align-items: center;
@@ -1919,6 +1934,23 @@
         authConnectedAs: { fr: "Connecté en tant que :", en: "Logged in as:" },
         authLogoutBtn: { fr: "🚪 Se déconnecter", en: "🚪 Log out" },
         authLogoutConfirm: { fr: "Te déconnecter ? Une nouvelle session anonyme prendra le relais.", en: "Log out? A new anonymous session will take over." },
+        recoveryTitle: { fr: "🔑 Code de récupération", en: "🔑 Recovery code" },
+        recoveryHint: {
+            fr: "Un code à 16 chiffres qui contient toute ta progression (monde normal ET plage). Note-le pour la retrouver sur un autre appareil, sans email ni mot de passe.",
+            en: "A 16-digit code containing all your progress (normal world AND beach). Note it down to find it again on another device, no email or password needed."
+        },
+        recoveryRevealBtn: { fr: "🎲 Obtenir mon code", en: "🎲 Get my code" },
+        recoveryInputPlaceholder: { fr: "Code à 16 chiffres", en: "16-digit code" },
+        recoveryRedeemBtn: { fr: "Récupérer", en: "Recover" },
+        recoveryGenError: { fr: "Impossible de générer un code, réessaie.", en: "Couldn't generate a code, try again." },
+        recoveryInvalidCode: { fr: "Entre les 16 chiffres du code.", en: "Enter the code's 16 digits." },
+        recoveryNotFound: { fr: "Code introuvable.", en: "Code not found." },
+        recoverySameAccount: { fr: "C'est déjà ce compte-ci !", en: "That's already this account!" },
+        recoveryOverwriteConfirm: {
+            fr: "Récupérer ce code va remplacer ta progression actuelle par celle du code (l'actuelle reste sauvegardée sous ce compte, mais tu la quittes). Continuer ?",
+            en: "Recovering this code will replace your current progress with the code's (the current one stays saved under this account, but you're leaving it). Continue?"
+        },
+        recoveryDone: { fr: "✅ Progression récupérée !", en: "✅ Progress recovered!" },
         btnProfile: { fr: "👤 Profil", en: "👤 Profile" },
         profileFollowing: { fr: "Abonnements", en: "Following" },
         profileFollowers: { fr: "Abonnés", en: "Followers" },
@@ -7190,15 +7222,24 @@
         return save.inPlage ? "scoresPlage" : "scores";
     }
 
-    // Met à jour l'entrée du classement (un seul document par joueur, écrasé
-    // à chaque nouveau record, jamais à chaque lancer pour limiter les écritures)
-    function pushScoreIfRecord(distanceMeters) {
-        if (!db || !currentUser) return;
-        db.collection(scoresCollection()).doc(currentUser.uid).set({
+    // Écrit un score dans une collection de classement donnée (un seul
+    // document par joueur, écrasé à chaque appel). Factorisé pour être
+    // réutilisé par pushScoreIfRecord (lancer normal) ET par la récupération
+    // de sauvegarde (voir redeemRecoveryCode, qui doit pousser les DEUX
+    // classements d'un coup sans attendre un nouveau record).
+    function pushScoreTo(col, distanceMeters) {
+        if (!db || !currentUser || !(distanceMeters > 0)) return;
+        db.collection(col).doc(currentUser.uid).set({
             pseudo: save.pseudo || "Anonyme",
             bestDistance: distanceMeters,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         }, { merge: true }).catch((err) => console.error("Envoi du score impossible :", err));
+    }
+
+    // Met à jour l'entrée du classement (un seul document par joueur, écrasé
+    // à chaque nouveau record, jamais à chaque lancer pour limiter les écritures)
+    function pushScoreIfRecord(distanceMeters) {
+        pushScoreTo(scoresCollection(), distanceMeters);
     }
 
     // Affiche le pseudo actuel et (re)charge le classement à l'ouverture de l'écran
@@ -7756,6 +7797,8 @@
 
     // Reconstruit le contenu de la modale selon l'état du compte : formulaire
     // email/mot de passe si anonyme, sinon "connecté en tant que..." + déconnexion.
+    // Le bloc "code de récupération" (voir plus bas) est commun aux deux cas :
+    // il ne dépend pas d'avoir un email/mot de passe.
     function renderAuthModalBody() {
         const body = document.getElementById("auth-modal-body");
         if (currentUser && !currentUser.isAnonymous) {
@@ -7765,7 +7808,8 @@
                     '<p class="email">' + escapeHtml(currentUser.email || "") + '</p>' +
                     '<button class="btn secondary" id="btn-auth-logout">' + tr("authLogoutBtn") + '</button>' +
                 '</div>' +
-                '<p id="auth-error" class="auth-error"></p>';
+                '<p id="auth-error" class="auth-error"></p>' +
+                recoveryModalHtml();
             document.getElementById("btn-auth-logout").addEventListener("click", doLogOut);
         } else {
             body.innerHTML =
@@ -7776,10 +7820,35 @@
                 '<div class="replay-buttons">' +
                     '<button class="btn" id="btn-auth-signup">' + tr("authSignupBtn") + '</button>' +
                     '<button class="btn secondary" id="btn-auth-login">' + tr("authLoginBtn") + '</button>' +
-                '</div>';
+                '</div>' +
+                recoveryModalHtml();
             document.getElementById("btn-auth-signup").addEventListener("click", doSignUp);
             document.getElementById("btn-auth-login").addEventListener("click", doLogIn);
         }
+        wireRecoveryButtons();
+    }
+
+    // Markup du bloc "code de récupération" (voir revealRecoveryCode/
+    // redeemRecoveryCode) : un code à 16 chiffres qui permet de retrouver sa
+    // progression (monde normal ET plage, c'est la même sauvegarde) sur un
+    // autre appareil, sans email ni mot de passe.
+    function recoveryModalHtml() {
+        return '<div class="auth-recovery">' +
+            '<h3 class="settings-section-title">' + tr("recoveryTitle") + '</h3>' +
+            '<p class="settings-hint">' + tr("recoveryHint") + '</p>' +
+            '<button class="btn secondary" id="btn-recovery-reveal">' + tr("recoveryRevealBtn") + '</button>' +
+            '<div id="recovery-code-display" style="display:none;"></div>' +
+            '<div class="recovery-redeem-row">' +
+                '<input type="text" id="recovery-code-input" class="auth-input" maxlength="16" inputmode="numeric" autocomplete="off" placeholder="' + escapeHtml(tr("recoveryInputPlaceholder")) + '">' +
+                '<button class="btn small" id="btn-recovery-redeem">' + tr("recoveryRedeemBtn") + '</button>' +
+            '</div>' +
+            '<p id="recovery-error" class="auth-error"></p>' +
+        '</div>';
+    }
+
+    function wireRecoveryButtons() {
+        document.getElementById("btn-recovery-reveal").addEventListener("click", revealRecoveryCode);
+        document.getElementById("btn-recovery-redeem").addEventListener("click", redeemRecoveryCode);
     }
 
     function readAuthInputs() {
@@ -7845,6 +7914,125 @@
         }).catch((err) => {
             console.error("Déconnexion impossible :", err);
             authSetError(mapAuthError(err));
+        });
+    }
+
+    /* ---- Code de récupération (voir firestore.rules : recoveryCodes/recoveryTokens) ----
+       Alternative à l'email/mot de passe pour retrouver sa partie sur un autre
+       appareil : un code à 16 chiffres, généré par CE compte, qui contient une
+       copie complète de la sauvegarde (monde normal ET plage, c'est le même
+       objet "save"). Aucune inscription requise côté nouvel appareil : il
+       suffit de connaître le code. */
+
+    // 16 chiffres, tirés un par un (pas juste un entier aléatoire : au-delà de
+    // Number.MAX_SAFE_INTEGER, un Math.random() classique perdrait en
+    // uniformité sur les derniers chiffres).
+    function generateRecoveryCode() {
+        let code = "";
+        for (let i = 0; i < 16; i++) code += Math.floor(Math.random() * 10);
+        return code;
+    }
+
+    // Jeton de retrait (voir la règle "allow update" de scores/scoresPlage) :
+    // n'a pas besoin d'être aussi imprévisible qu'un mot de passe (il n'ouvre
+    // qu'un retrait à 0 d'une entrée de classement), une chaîne aléatoire
+    // suffisamment longue suffit.
+    function generateRetireToken() {
+        let token = "";
+        for (let i = 0; i < 32; i++) token += Math.floor(Math.random() * 36).toString(36);
+        return token;
+    }
+
+    // Génère un nouveau code, l'affiche, et enregistre en parallèle le jeton
+    // de retrait (recoveryTokens/{uid}) qui permettra à qui récupère ce code
+    // de nettoyer l'ancienne entrée de classement (voir redeemRecoveryCode).
+    function revealRecoveryCode() {
+        if (!db || !currentUser) { showToast(tr("authUnavailable")); return; }
+        const btn = document.getElementById("btn-recovery-reveal");
+        const errEl = document.getElementById("recovery-error");
+        errEl.textContent = "";
+        btn.disabled = true;
+        const code = generateRecoveryCode();
+        const token = generateRetireToken();
+        // Copie figée de "save" : les écritures suivantes ne doivent pas être
+        // affectées par un lancer qui se terminerait entre-temps.
+        const snapshot = JSON.parse(JSON.stringify(save));
+        Promise.all([
+            db.collection("recoveryTokens").doc(currentUser.uid).set({ token }),
+            db.collection("recoveryCodes").doc(code).set({
+                uid: currentUser.uid,
+                save: snapshot,
+                retireToken: token,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+            }),
+        ]).then(() => {
+            const display = document.getElementById("recovery-code-display");
+            display.textContent = code;
+            display.style.display = "block";
+        }).catch((err) => {
+            console.error("Génération du code de récupération impossible :", err);
+            errEl.textContent = tr("recoveryGenError");
+        }).finally(() => { btn.disabled = false; });
+    }
+
+    // Récupère la sauvegarde liée à un code : remplace la progression locale
+    // (garde le compte Firebase courant — pas besoin de connaître les
+    // identifiants de l'ancien compte), puis retire l'ancienne entrée de
+    // classement pour éviter un doublon.
+    function redeemRecoveryCode() {
+        if (!db || !currentUser) { showToast(tr("authUnavailable")); return; }
+        const input = document.getElementById("recovery-code-input");
+        const errEl = document.getElementById("recovery-error");
+        errEl.textContent = "";
+        const code = (input.value || "").trim();
+        if (!/^\d{16}$/.test(code)) { errEl.textContent = tr("recoveryInvalidCode"); return; }
+        const btn = document.getElementById("btn-recovery-redeem");
+        btn.disabled = true;
+        db.collection("recoveryCodes").doc(code).get().then((doc) => {
+            if (!doc.exists) { errEl.textContent = tr("recoveryNotFound"); return; }
+            const data = doc.data();
+            if (data.uid === currentUser.uid) { errEl.textContent = tr("recoverySameAccount"); return; }
+            if (save.totalThrows > 0 && !confirm(tr("recoveryOverwriteConfirm"))) return;
+            save = migrateLegacyVolcanFields(Object.assign(defaultSave(), data.save), data.save);
+            localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+            if (save.volcanUnlocked) {
+                const volcanWorld = WORLDS.find(w => w.id === "volcans");
+                if (volcanWorld) volcanWorld.unlocked = true;
+            }
+            if (save.plageUnlocked) {
+                const plageWorld = WORLDS.find(w => w.id === "plage");
+                if (plageWorld) plageWorld.unlocked = true;
+            }
+            persist();
+            buildWorldsRow();
+            refreshMenu();
+            // Pousse tout de suite les deux classements avec les records
+            // récupérés (sans attendre un nouveau lancer qui les batte à
+            // nouveau) : le profil actif alimente "scores" ou "scoresPlage"
+            // selon inPlage, l'autre profil (mis de côté) alimente le second.
+            pushScoreTo(save.inPlage ? "scoresPlage" : "scores", save.bestDistance);
+            const otherProfile = save.inPlage ? save.stashedMainProfile : save.stashedBeachProfile;
+            if (otherProfile) pushScoreTo(save.inPlage ? "scores" : "scoresPlage", otherProfile.bestDistance);
+            retireOldLeaderboardEntry(data.uid, data.retireToken);
+            showToast(tr("recoveryDone"));
+            document.getElementById("auth-modal").classList.remove("show");
+            if (screens.profile.classList.contains("active")) renderProfile();
+        }).catch((err) => {
+            console.error("Récupération du code impossible :", err);
+            errEl.textContent = tr("authGenericError");
+        }).finally(() => { btn.disabled = false; });
+    }
+
+    // Remet à 0 l'ancienne entrée de classement (monde normal ET plage) une
+    // fois la sauvegarde récupérée ailleurs. Best-effort : un compte qui n'a
+    // jamais battu de record n'a pas d'entrée à retirer (update() échoue
+    // silencieusement sur un document inexistant), ça ne doit jamais bloquer
+    // la récupération elle-même.
+    function retireOldLeaderboardEntry(oldUid, retireToken) {
+        if (!db || !oldUid || !retireToken) return;
+        ["scores", "scoresPlage"].forEach((col) => {
+            db.collection(col).doc(oldUid).update({ bestDistance: 0, retireToken })
+                .catch((err) => console.error("Retrait de l'ancienne entrée (" + col + ") impossible :", err));
         });
     }
 
