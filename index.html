@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.5</div>
+                <div class="version-tag" id="version-tag">v9.7.6</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1404,9 +1404,6 @@
             <div class="money-pill" style="font-size:14px; padding:6px 14px;">💰 <span id="game-money">0</span> $</div>
             <div class="money-pill" style="font-size:14px; padding:6px 14px; color:var(--text);">📏 <span id="game-distance">0</span> m</div>
         </div>
-        <!-- Debug temporaire : diagnostic du bug "bouton vampire sur une autre
-             trousse" (à retirer une fois la cause confirmée) -->
-        <div id="debug-skin-tag" style="position:absolute; top:calc(100px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); background:rgba(0,0,0,0.7); color:#0f0; font-size:11px; padding:3px 8px; border-radius:6px; z-index:30; font-family:monospace;"></div>
         <div class="hint-text" id="hint-text" data-i18n="hintCharge">Clique / appuie pour charger la puissance !</div>
         <div id="qte-wrap">
             <div id="qte-prompt" data-i18n="qtePrompt">🚀 CLIQUE QUAND ÇA S'ALIGNE !</div>
@@ -5553,13 +5550,6 @@
         // Pas de lune à faire "lever" quand on est déjà dessus (easter egg espace)
         screens.game.classList.toggle("in-space", inSpaceMode);
 
-        // Debug temporaire : voir le diagnostic de savoir pourquoi le bouton
-        // vampire s'affiche parfois avec une autre trousse équipée.
-        document.getElementById("debug-skin-tag").textContent =
-            "skin=" + save.equippedSkin + " isVampire=" + !!getSkin(save.equippedSkin).isVampire + " state=" + state +
-            " memo=" + vampireBtnShown + " domShow=" + document.getElementById("btn-vampire-boost").classList.contains("show") +
-            " used=" + vampireBoostUsed;
-
         // Trousse Vampire : recalculé à CHAQUE frame (pas seulement pendant
         // "flying") pour ne jamais laisser le bouton visible par erreur lors
         // d'une transition d'état (atterrissage, rebond, séquence spatiale...).
@@ -9167,8 +9157,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.5";
+    const VERSION_NUMBER = "9.7.6";
     const CHANGELOG = [
+        {
+            version: "9.7.6",
+            major: [],
+            minor: [
+                { fr: "Corrige (pour de bon) le bouton 🦇 de la trousse Vampire qui restait affiché sur d'autres trousses sur Chrome iOS : classList.toggle(nom, force) est remplacé par des add()/remove() explicites, le paramètre \"force\" ayant un historique de support inégal sur Safari/WebKit", en: "Properly fixed the Vampire pencil case's 🦇 button staying shown on other pencil cases on Chrome iOS: classList.toggle(name, force) replaced with explicit add()/remove(), since the \"force\" parameter has an inconsistent support history on Safari/WebKit" },
+            ],
+        },
         {
             version: "9.7.5",
             major: [],
