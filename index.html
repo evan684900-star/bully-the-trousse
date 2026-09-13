@@ -463,11 +463,13 @@
         }
         #qte-wrap.show { display: block; }
         /* Trousse Vampire : bouton d'accélération maintenu pendant le vol
-           (voir gameLoop, section "flying"). En bas à droite pour ne jamais
-           chevaucher #meter-wrap (centré) ni les icônes flottantes du bas. */
+           (voir gameLoop, section "flying"). Centré en bas comme #meter-wrap,
+           mais jamais affiché en même temps (l'un pendant la charge, l'autre
+           pendant le vol) donc pas de chevauchement réel. */
         #btn-vampire-boost {
             position: absolute;
-            right: calc(16px + env(safe-area-inset-right));
+            left: 50%;
+            transform: translateX(-50%);
             bottom: calc(80px + env(safe-area-inset-bottom));
             width: 64px; height: 64px;
             border-radius: 50%;
@@ -481,7 +483,7 @@
             touch-action: none;
         }
         #btn-vampire-boost.show { display: block; }
-        #btn-vampire-boost:active { transform: scale(0.9); }
+        #btn-vampire-boost:active { transform: translateX(-50%) scale(0.9); }
         /* Vignette violette pulsante pendant le boost : retour visuel clair
            que l'accélération est bien active, en plus du chiffre de distance
            qui grimpe plus vite (voir vampireBoosting dans gameLoop). */
@@ -1359,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.2</div>
+                <div class="version-tag" id="version-tag">v9.7.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -9137,8 +9139,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.2";
+    const VERSION_NUMBER = "9.7.3";
     const CHANGELOG = [
+        {
+            version: "9.7.3",
+            major: [],
+            minor: [
+                { fr: "Le bouton 🦇 de la trousse Vampire est déplacé en bas au centre de l'écran (au lieu d'en bas à droite)", en: "The Vampire pencil case's 🦇 button moved to bottom-center of the screen (instead of bottom-right)" },
+            ],
+        },
         {
             version: "9.7.2",
             major: [],
