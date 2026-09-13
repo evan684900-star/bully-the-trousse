@@ -1267,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.4.0</div>
+                <div class="version-tag" id="version-tag">v9.5.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -8612,8 +8612,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.4.0";
+    const VERSION_NUMBER = "9.5.0";
     const CHANGELOG = [
+        {
+            version: "9.5.0",
+            major: [],
+            minor: [
+                { fr: "Les cadeaux d'argent entre joueurs arrivent maintenant en temps réel : si le destinataire est déjà en ligne, il reçoit l'argent et une notification (\"🎁 X vous a envoyé N $\") instantanément, sans avoir besoin de recharger la page", en: "Money gifts between players now arrive in real time: if the recipient is already online, they get the money and a notification (\"🎁 X sent you $N\") instantly, without needing to reload the page" },
+            ],
+        },
         {
             version: "9.4.0",
             major: [
