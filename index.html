@@ -482,6 +482,21 @@
         }
         #btn-vampire-boost.show { display: block; }
         #btn-vampire-boost:active { transform: scale(0.9); }
+        /* Vignette violette pulsante pendant le boost : retour visuel clair
+           que l'accélération est bien active, en plus du chiffre de distance
+           qui grimpe plus vite (voir vampireBoosting dans gameLoop). */
+        #screen-game.vampire-boosting::after {
+            content: "";
+            position: absolute; inset: 0;
+            box-shadow: inset 0 0 90px 20px rgba(160,40,220,0.55);
+            animation: vampire-boost-pulse 0.5s ease-in-out infinite alternate;
+            pointer-events: none;
+            z-index: 17;
+        }
+        @keyframes vampire-boost-pulse {
+            from { opacity: 0.6; }
+            to { opacity: 1; }
+        }
         #qte-prompt {
             font-size: clamp(20px, 5vw, 32px);
             font-weight: 900;
@@ -1344,7 +1359,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.1</div>
+                <div class="version-tag" id="version-tag">v9.7.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2243,7 +2258,7 @@
     // Bouton 🦇 : accélère la trousse tant qu'il est maintenu, jusqu'à ce
     // temps cumulé (voir gameLoop, section "flying"), une seule fois par lancer.
     const VAMPIRE_BOOST_MAX_SECONDS = 3;
-    const VAMPIRE_BOOST_GROWTH_PER_SEC = 1.35; // vx multiplié par ce facteur à chaque seconde maintenue
+    const VAMPIRE_BOOST_GROWTH_PER_SEC = 1.8; // vx multiplié par ce facteur à chaque seconde maintenue (x1.8 s'il est maintenu 1s pile, jusqu'à x5.8 sur les 3s cumulées)
 
     // Rééquilibrage : la distance (donc l'argent) augmente déjà avec la
     // Puissance/Vitesse, mais de moins en moins vite à haut niveau (la formule
@@ -3982,6 +3997,7 @@
         vampireBoostSecondsLeft = VAMPIRE_BOOST_MAX_SECONDS;
         vampireBoostUsed = false;
         document.getElementById("btn-vampire-boost").classList.remove("show");
+        screens.game.classList.remove("vampire-boosting");
         // Le monde Plage est regénéré à chaque lancer : parasols, serviettes et
         // châteaux ne sont jamais deux fois au même endroit (voir section 9ter).
         if (save.currentWorld === "plage") {
@@ -5531,6 +5547,9 @@
         // d'une transition d'état (atterrissage, rebond, séquence spatiale...).
         document.getElementById("btn-vampire-boost").classList.toggle("show",
             state === "flying" && getSkin(save.equippedSkin).isVampire && !vampireBoostUsed);
+        // Vignette violette pulsante tant que le boost est activement maintenu
+        // (voir #screen-game.vampire-boosting) : retour visuel immédiat.
+        screens.game.classList.toggle("vampire-boosting", vampireBoosting);
 
         if (state === "flying") {
             // intégration physique simple (méthode d'Euler) :
@@ -9118,8 +9137,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.1";
+    const VERSION_NUMBER = "9.7.2";
     const CHANGELOG = [
+        {
+            version: "9.7.2",
+            major: [],
+            minor: [
+                { fr: "Boost 🦇 de la trousse Vampire nettement plus fort et plus visible : vitesse quasi x6 sur les 3s cumulées (au lieu de x2,5), avec une vignette violette pulsante à l'écran tant qu'il est maintenu", en: "The Vampire pencil case's 🦇 boost is now much stronger and more visible: nearly x6 speed over the full 3s (up from x2.5), with a pulsing purple screen vignette while it's held" },
+            ],
+        },
         {
             version: "9.7.1",
             major: [],
