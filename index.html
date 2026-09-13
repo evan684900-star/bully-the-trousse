@@ -866,6 +866,9 @@
             z-index: 50;
         }
         .modal-overlay.show { display: flex; }
+        /* S'affiche PAR-DESSUS la modale Réglages (même z-index de base, donc
+           l'ordre du DOM déciderait sinon lequel des deux gagne) */
+        #logout-confirm-modal { z-index: 55; }
 
         /* ---------- TUTORIEL (affiché une seule fois pour les nouveaux joueurs) ---------- */
         .tutorial-box {
@@ -1321,7 +1324,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.6.4</div>
+                <div class="version-tag" id="version-tag">v9.6.5</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1523,6 +1526,18 @@
         </div>
     </div>
 
+    <!-- Confirmation avant déconnexion (voir btn-logout dans les Réglages) -->
+    <div class="modal-overlay" id="logout-confirm-modal">
+        <div class="info-box">
+            <h2 data-i18n="logoutConfirmTitle">🚪 Se déconnecter ?</h2>
+            <p data-i18n="logoutConfirmText">Tu vas repartir de zéro sur cet appareil, avec un compte tout neuf. Sans ton code de récupération, cette partie sera perdue pour de bon.</p>
+            <div class="replay-buttons">
+                <button class="btn" id="btn-logout-confirm-yes" data-i18n="logoutConfirmYes">🚪 Se déconnecter</button>
+                <button class="btn secondary" id="btn-logout-confirm-no" data-i18n="btnCancel">Annuler</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Bloque le clic sur "Jouer" quand la durabilité est à 0 -->
     <div class="modal-overlay" id="repair-broken-modal">
         <div class="info-box">
@@ -1683,6 +1698,9 @@
                 <p id="recovery-error" class="account-form-error"></p>
                 <button class="btn small" id="btn-recovery-submit" data-i18n="btnRecoverySubmit">📥 Récupérer ma partie</button>
             </div>
+
+            <button class="btn small secondary" id="btn-logout" data-i18n="btnLogout">🚪 Se déconnecter</button>
+            <p class="settings-hint" data-i18n="settingsLogoutHint">Repart de zéro sur cet appareil avec un compte tout neuf. Assure-toi d'avoir noté ton code de récupération ci-dessus, sinon cette partie est perdue pour de bon.</p>
 
             <h3 class="settings-section-title" data-i18n="settingsAvatarTitle">🖼️ Photo de profil</h3>
             <div class="settings-avatar-row">
@@ -2023,6 +2041,17 @@
         },
         settingsRecoveryPlaceholder: { fr: "J'ai déjà un code (16 chiffres)", en: "I already have a code (16 digits)" },
         btnRecoverySubmit: { fr: "📥 Récupérer ma partie", en: "📥 Restore my save" },
+        btnLogout: { fr: "🚪 Se déconnecter", en: "🚪 Log out" },
+        settingsLogoutHint: {
+            fr: "Repart de zéro sur cet appareil avec un compte tout neuf. Assure-toi d'avoir noté ton code de récupération ci-dessus, sinon cette partie est perdue pour de bon.",
+            en: "Starts fresh on this device with a brand new account. Make sure you've noted your recovery code above, or this save is lost for good."
+        },
+        logoutConfirmTitle: { fr: "🚪 Se déconnecter ?", en: "🚪 Log out?" },
+        logoutConfirmText: {
+            fr: "Tu vas repartir de zéro sur cet appareil, avec un compte tout neuf. Sans ton code de récupération, cette partie sera perdue pour de bon.",
+            en: "You're about to start fresh on this device, with a brand new account. Without your recovery code, this save will be lost for good."
+        },
+        logoutConfirmYes: { fr: "🚪 Se déconnecter", en: "🚪 Log out" },
         recoveryCopied: { fr: "📋 Code copié !", en: "📋 Code copied!" },
         recoverySelectToCopy: { fr: "Code sélectionné, il ne reste qu'à copier", en: "Code selected, just copy it" },
         recoveryDone: { fr: "✅ Partie récupérée", en: "✅ Save restored" },
@@ -8873,6 +8902,26 @@
         recoverFromCode(document.getElementById("recovery-input").value);
     });
 
+    // Déconnexion : repart avec un compte anonyme tout neuf sur cet appareil.
+    // Pas de mot de passe dans ce jeu (auth anonyme + code de récupération),
+    // donc "se déconnecter" = effacer la sauvegarde locale et quitter la
+    // session Firebase actuelle, pour qu'au rechargement onAuthStateChanged
+    // en crée une toute neuve (voir initFirebase).
+    document.getElementById("btn-logout").addEventListener("click", () => {
+        document.getElementById("logout-confirm-modal").classList.add("show");
+    });
+    document.getElementById("btn-logout-confirm-no").addEventListener("click", () => {
+        document.getElementById("logout-confirm-modal").classList.remove("show");
+    });
+    document.getElementById("btn-logout-confirm-yes").addEventListener("click", () => {
+        localStorage.removeItem(SAVE_KEY);
+        if (FIREBASE_ENABLED && firebase.auth().currentUser) {
+            firebase.auth().signOut().catch(() => {}).then(() => location.reload());
+        } else {
+            location.reload();
+        }
+    });
+
     function selectRecoveryCodeText() {
         const el = document.getElementById("recovery-code-value");
         const range = document.createRange();
@@ -8952,8 +9001,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.6.4";
+    const VERSION_NUMBER = "9.6.5";
     const CHANGELOG = [
+        {
+            version: "9.6.5",
+            major: [],
+            minor: [
+                { fr: "Nouveau bouton \"Se déconnecter\" dans les Réglages (avec confirmation) : repart avec un compte tout neuf sur cet appareil", en: "New \"Log out\" button in Settings (with confirmation): starts fresh with a brand new account on this device" },
+            ],
+        },
         {
             version: "9.6.4",
             major: [],
@@ -9506,7 +9562,7 @@
         document.getElementById("profile-detail-modal").classList.remove("show");
     });
 
-    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "profile-detail-modal"].forEach((id) => {
+    ["trousse-modal", "help-modal", "volcan-replay-modal", "plage-replay-modal", "changelog-modal", "repair-broken-modal", "achv-modal", "links-modal", "profile-detail-modal", "logout-confirm-modal"].forEach((id) => {
         const el = document.getElementById(id);
         el.addEventListener("click", (e) => { if (e.target === el) el.classList.remove("show"); });
     });
