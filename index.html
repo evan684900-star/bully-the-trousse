@@ -1267,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.5.3</div>
+                <div class="version-tag" id="version-tag">v9.6.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2614,8 +2614,17 @@
     // depuis le début (le farm devenait interminable). Base à 1.40 : même
     // forme de courbe (toujours plus cher à mesure qu'on monte), mais un
     // niveau 30 coûte environ 20 fois moins cher.
+    // Au-delà du niveau 25 la courbe passe en linéaire plutôt que de rester
+    // exponentielle à l'infini : les joueurs de très haut niveau se
+    // retrouvaient à payer plusieurs centaines de millions, voire des
+    // milliards, par palier (niveau 50 ≈ 506M, niveau 60 ≈ 14,6 milliards).
+    // Toujours plus cher à mesure qu'on monte, mais sans exploser.
+    const UPGRADE_COST_CAP_LEVEL = 25;
+    const UPGRADE_COST_LINEAR_STEP = 15000;
     function upgradeCost(level) {
-        return Math.round(25 * Math.pow(1.40, level));
+        if (level <= UPGRADE_COST_CAP_LEVEL) return Math.round(25 * Math.pow(1.40, level));
+        const capCost = Math.round(25 * Math.pow(1.40, UPGRADE_COST_CAP_LEVEL));
+        return capCost + (level - UPGRADE_COST_CAP_LEVEL) * UPGRADE_COST_LINEAR_STEP;
     }
 
     /* ============ 4. NOTIFICATION "TOAST" ============ */
@@ -8620,8 +8629,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.5.3";
+    const VERSION_NUMBER = "9.6.0";
     const CHANGELOG = [
+        {
+            version: "9.6.0",
+            major: [],
+            minor: [
+                { fr: "Rééquilibrage du coût des améliorations Puissance/Vitesse : au-delà du niveau 25, le coût grimpe maintenant de façon linéaire au lieu de rester exponentiel. Les joueurs de très haut niveau payaient jusqu'à plusieurs centaines de millions, voire des milliards, par palier", en: "Rebalanced Power/Speed upgrade costs: past level 25, the cost now climbs linearly instead of staying exponential. Very high-level players were paying up to several hundred million, even billions, per level" },
+            ],
+        },
         {
             version: "9.5.3",
             major: [],
