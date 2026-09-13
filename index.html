@@ -1991,6 +1991,7 @@
         giftError: { fr: "Envoi impossible, réessaie plus tard.", en: "Couldn't send, try again later." },
         giftsReceivedTitle: { fr: "🎁 Cadeaux reçus !", en: "🎁 Gifts received!" },
         giftsReceivedTotal: { fr: "Total : +{amount} $", en: "Total: +{amount}$" },
+        giftReceivedToast: { fr: "🎁 {pseudo} vous a envoyé {amount} $", en: "🎁 {pseudo} sent you {amount}$" },
         profileOnline: { fr: "🟢 En ligne", en: "🟢 Online" },
         profileLastSeenMinutes: { fr: "⚪ Vu il y a {n} min", en: "⚪ Last seen {n} min ago" },
         profileLastSeenHours: { fr: "⚪ Vu il y a {n} h", en: "⚪ Last seen {n}h ago" },
@@ -7258,6 +7259,7 @@
 
     let db = null;
     let currentUser = null;
+    let giftsUnsub = null;
 
     function updateOnlineStatus(text) {
         const el = document.getElementById("online-status");
@@ -7273,7 +7275,10 @@
         db = firebase.firestore();
         updateOnlineStatus(tr("onlineConnecting"));
         firebase.auth().onAuthStateChanged((user) => {
-            if (!user) return;
+            if (!user) {
+                if (giftsUnsub) { giftsUnsub(); giftsUnsub = null; }
+                return;
+            }
             currentUser = user;
             updateOnlineStatus(tr("onlineConnected"));
             refreshRecoveryUI();
@@ -7281,8 +7286,12 @@
             // avec le cloud, donc seulement une fois syncCloudSaveOnLogin terminé.
             // Rafraîchit aussi l'écran Profil s'il est ouvert (pseudo, stats...) :
             // utile après une connexion/déconnexion qui change de compte.
+            // startGiftsListener() démarre seulement après que checkIncomingGifts()
+            // a fini de marquer "vus" les cadeaux déjà en attente (batch.commit
+            // résolu) : ainsi son écoute temps réel ne voit plus ces docs et ne
+            // peut pas les créditer une deuxième fois.
             syncCloudSaveOnLogin().then(() => {
-                checkIncomingGifts();
+                checkIncomingGifts().then(() => startGiftsListener());
                 if (screens.profile.classList.contains("active")) renderProfile();
             });
             pingPresence();
@@ -8214,8 +8223,8 @@
     // syncCloudSaveOnLogin (voir initFirebase) pour partir d'un save.money
     // déjà synchronisé avec le cloud.
     function checkIncomingGifts() {
-        if (!db || !currentUser) return;
-        db.collection("gifts").where("to", "==", currentUser.uid).where("seen", "==", false).limit(20).get().then((snap) => {
+        if (!db || !currentUser) return Promise.resolve();
+        return db.collection("gifts").where("to", "==", currentUser.uid).where("seen", "==", false).limit(20).get().then((snap) => {
             if (snap.empty) return;
             let total = 0;
             // Fusionne les cadeaux par expéditeur (uid) : 3 dons de la même
@@ -8244,6 +8253,33 @@
             showProfileDetailModal(tr("giftsReceivedTitle"),
                 rows.join("") + '<p class="gift-received-total">' + tr("giftsReceivedTotal").replace("{amount}", total) + '</p>');
         }).catch((err) => console.error("Lecture des cadeaux impossible :", err));
+    }
+
+    // Écoute temps réel des cadeaux reçus pendant la session active (onglet
+    // ouvert) : contrairement à checkIncomingGifts (appelée une fois au
+    // login pour rattraper les cadeaux reçus hors-ligne), celle-ci reste
+    // active et crédite chaque nouveau cadeau dès son écriture par
+    // l'expéditeur, avec un toast. Démarrée seulement après que
+    // checkIncomingGifts a fini de marquer "vus" les cadeaux en attente
+    // (voir initFirebase) pour ne jamais créditer le même doc deux fois.
+    function startGiftsListener() {
+        if (!db || !currentUser) return;
+        if (giftsUnsub) giftsUnsub();
+        giftsUnsub = db.collection("gifts").where("to", "==", currentUser.uid).where("seen", "==", false)
+            .onSnapshot((snap) => {
+                snap.docChanges().forEach((change) => {
+                    if (change.type !== "added") return;
+                    const doc = change.doc;
+                    const g = doc.data();
+                    const amt = Math.max(0, Math.floor(num(g.amount)));
+                    if (amt <= 0) return;
+                    save.money += amt;
+                    persist();
+                    refreshMenu();
+                    doc.ref.update({ seen: true }).catch((err) => console.error("Marquage du cadeau vu impossible :", err));
+                    showToast(tr("giftReceivedToast").replace("{pseudo}", g.fromPseudo || "Anonyme").replace("{amount}", amt));
+                });
+            }, (err) => console.error("Écoute des cadeaux impossible :", err));
     }
 
     document.getElementById("btn-profile").addEventListener("click", () => showScreen("profile"));
