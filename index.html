@@ -838,7 +838,7 @@
         .tutorial-dot.active { background: var(--accent); }
         /* Petit message temporaire en bas de l'écran (ex: "Pas assez d'argent !") */
         .toast {
-            position: absolute;
+            position: fixed;
             /* Assez haut pour ne jamais passer derrière/sur les icônes flottantes
                (musique/thème/langue/liens), qui montent jusqu'à ~52px du bas. */
             bottom: calc(70px + env(safe-area-inset-bottom));
@@ -1267,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.5.1</div>
+                <div class="version-tag" id="version-tag">v9.5.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2134,7 +2134,7 @@
     // Ça laisse une zone d'échauffement sans surprise.
     const BEACH_EVENT_MIN_DISTANCE = 100;
     // Chaque évènement du monde Plage est tiré au sort à chaque lancer.
-    const BEACH_EVENT_CHANCE = { parasol: 0.5, towel: 0.6, castle: 0.4 };
+    const BEACH_EVENT_CHANCE = { parasol: 0.65, towel: 0.7, castle: 0.55 };
 
     /* ============ 2. DONNÉES STATIQUES ============ */
     // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
@@ -6545,11 +6545,15 @@
     // qui donne l'impression d'une plage différente à chaque lancer.
     function generateBeachDecor() {
         beachProps = [];
-        const count = 10 + Math.floor(Math.random() * 8);
         // Réparti par tranches (jamais deux objets au même endroit), mais avec
         // une position aléatoire DANS sa tranche : la plage change vraiment
         // d'un lancer à l'autre sans jamais s'empiler.
         const slot = 520;
+        // Couvre jusqu'à ~2500m : un lancer très puissant (trousse Fusée...)
+        // dépasse largement les ~750m générés avant, laissant la plage vide
+        // au-delà. Le culling de drawBeachProps limite déjà le coût de rendu
+        // au champ visible, donc étendre ce tableau ne coûte rien à l'affichage.
+        const count = Math.ceil((2500 * SCALE) / slot);
         for (let i = 0; i < count; i++) {
             const roll = Math.random();
             const type = roll < 0.4 ? "parasol" : (roll < 0.75 ? "towel" : "castle");
@@ -8615,8 +8619,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.5.1";
+    const VERSION_NUMBER = "9.5.2";
     const CHANGELOG = [
+        {
+            version: "9.5.2",
+            major: [],
+            minor: [
+                { fr: "Correction de la notification de cadeau invisible sur le menu (elle ne s'affichait qu'en jeu, à cause d'un décalage de hauteur sur mobile)", en: "Fixed the gift notification being invisible on the menu (it only showed up in-game, due to a mobile height offset)" },
+                { fr: "La Plage a maintenant du décor sur une bien plus grande distance : les lancers très puissants (trousse Fusée...) ne traversaient plus qu'une plage vide au-delà d'environ 750m", en: "The Beach now has scenery over a much longer distance: very powerful throws (Rocket pencil case...) used to cross an empty beach beyond about 750m" },
+                { fr: "Légère hausse des chances d'apparition des parasols/serviettes/châteaux sur la Plage", en: "Slightly higher odds of umbrellas/towels/castles appearing on the Beach" },
+            ],
+        },
         {
             version: "9.5.1",
             major: [],
