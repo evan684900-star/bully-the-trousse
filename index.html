@@ -1270,7 +1270,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.6.1</div>
+                <div class="version-tag" id="version-tag">v9.6.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1558,6 +1558,8 @@
 
     <!-- Son du tremblement de terre de la cinématique -->
     <audio id="sfx-quake" src="tremblementdeterre.mp3" preload="auto"></audio>
+    <!-- Son joué à l'envoi d'un cadeau (voir sendGift) -->
+    <audio id="sfx-payment" src="paiment.mp3" preload="auto"></audio>
 
     <div class="toast" id="toast"></div>
 
@@ -2699,6 +2701,11 @@
     function sfxCoinFlip() { beep(900, 0.05, "square", 0.08); beep(1200, 0.05, "square", 0.07); beep(1500, 0.09, "square", 0.06); }
     // Petit jingle plus marqué, joué quand le multiplicateur de la pièce se déclenche
     function sfxCoinBonus() { beep(700, 0.08, "sine", 0.12); beep(1050, 0.08, "sine", 0.12); beep(1400, 0.14, "sine", 0.12); }
+    // Son réel (pas de synthèse) joué à l'envoi d'un cadeau, voir sendGift().
+    const paymentAudio = document.getElementById("sfx-payment");
+    function sfxPayment() {
+        try { paymentAudio.currentTime = 0; paymentAudio.play(); } catch (e) { /* fichier absent : jamais bloquant */ }
+    }
 
     // Musique de fond en boucle, une piste par monde (voir applyWorldMusic,
     // appelée à chaque changement de monde depuis applyWorldTheme). Les
@@ -8243,6 +8250,7 @@
             save.totalMoneyGifted += amount;
             bumpDailyChallenge("gift", amount, "add");
             persist();
+            sfxPayment();
             showToast(tr("giftSent").replace("{amount}", amount));
             inputEl.value = "";
             btnEl.textContent = "✅";
@@ -8651,8 +8659,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.6.1";
+    const VERSION_NUMBER = "9.6.2";
     const CHANGELOG = [
+        {
+            version: "9.6.2",
+            major: [],
+            minor: [
+                { fr: "Un son se déclenche maintenant à l'envoi d'un cadeau d'argent", en: "A sound now plays when sending a money gift" },
+            ],
+        },
         {
             version: "9.6.1",
             major: [],
