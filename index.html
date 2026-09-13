@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.3</div>
+                <div class="version-tag" id="version-tag">v9.7.4</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2260,7 +2260,7 @@
     // Bouton 🦇 : accélère la trousse tant qu'il est maintenu, jusqu'à ce
     // temps cumulé (voir gameLoop, section "flying"), une seule fois par lancer.
     const VAMPIRE_BOOST_MAX_SECONDS = 3;
-    const VAMPIRE_BOOST_GROWTH_PER_SEC = 1.8; // vx multiplié par ce facteur à chaque seconde maintenue (x1.8 s'il est maintenu 1s pile, jusqu'à x5.8 sur les 3s cumulées)
+    const VAMPIRE_BOOST_GROWTH_PER_SEC = 1.5; // vx multiplié par ce facteur à chaque seconde maintenue (x1.5 s'il est maintenu 1s pile, jusqu'à x3,4 sur les 3s cumulées)
 
     // Rééquilibrage : la distance (donc l'argent) augmente déjà avec la
     // Puissance/Vitesse, mais de moins en moins vite à haut niveau (la formule
@@ -9139,8 +9139,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.3";
+    const VERSION_NUMBER = "9.7.4";
     const CHANGELOG = [
+        {
+            version: "9.7.4",
+            major: [],
+            minor: [
+                { fr: "Boost 🦇 de la trousse Vampire rééquilibré à la baisse : x3,4 sur les 3s cumulées au lieu de x5,8, jugé trop abusé", en: "Vampire pencil case's 🦇 boost toned down: x3.4 over the full 3s instead of x5.8, deemed too strong" },
+            ],
+        },
         {
             version: "9.7.3",
             major: [],
