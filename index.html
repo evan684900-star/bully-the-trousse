@@ -1267,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.5.0</div>
+                <div class="version-tag" id="version-tag">v9.5.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -3740,6 +3740,7 @@
         const spaceSpeedMult = getSkin(save.equippedSkin).isRocket ? ROCKET_SPACE_SPEED_MULT : 1;
         vx = SPACE_BOOST_VX * boostFactor * spaceSpeedMult;
         vy = SPACE_BOOST_VY * spaceSpeedMult;
+        if (save.currentWorld === "plage") beachPlaceLandingProp();
         if (hits === currentQteRingCount()) {
             sfxRecord(); // combo parfait
             save.hasPerfectQte = true;
@@ -5272,6 +5273,7 @@
         rocketReturned = true;
         inSpaceMode = false;
         vy = Math.abs(vy) * ROCKET_RETURN_BOUNCE;
+        if (save.currentWorld === "plage") beachPlaceLandingProp();
         sfxSpace();
         showToast(tr("rocketReturnToast"));
         return true;
@@ -6591,8 +6593,9 @@
         else if (beachEvents.castle && !beachUsed.castle) type = "castle";
         if (!type) return;
         const x = predictLandingX();
-        // enlève un accessoire décoratif trop proche, pour ne pas empiler deux objets
-        beachProps = beachProps.filter((p) => !(p.decorative && Math.abs(p.x - x) < 140));
+        // enlève l'ancien accessoire d'évènement (repositionné après un boost/rebond)
+        // et tout accessoire décoratif trop proche, pour ne pas empiler deux objets
+        beachProps = beachProps.filter((p) => !p.event && !(p.decorative && Math.abs(p.x - x) < 140));
         beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1, depth: 0, event: true });
     }
 
@@ -8612,8 +8615,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.5.0";
+    const VERSION_NUMBER = "9.5.1";
     const CHANGELOG = [
+        {
+            version: "9.5.1",
+            major: [],
+            minor: [
+                { fr: "Correction d'un bug de la trousse Fusée sur la Plage : les parasols/serviettes/châteaux ne disparaissaient plus jamais après un boost en apesanteur ou une traversée lunaire, car l'accessoire à atteindre restait posé à l'ancienne position prédite avant le détour spatial", en: "Fixed a Rocket pencil case bug on the Beach: umbrellas/towels/castles could permanently vanish after a zero-g boost or a lunar traversal, because the target prop stayed at the old predicted position from before the space detour" },
+            ],
+        },
         {
             version: "9.5.0",
             major: [],
