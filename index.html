@@ -1344,7 +1344,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.0</div>
+                <div class="version-tag" id="version-tag">v9.7.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -4359,14 +4359,20 @@
     // Trousse Vampire : bouton 🦇 maintenu pendant le vol (voir gameLoop,
     // section "flying"). Une seule utilisation par lancer : relâcher avant le
     // plafond de temps le consomme quand même (voir endVampireBoost).
+    // endVampireBoost() ne fait rien si le boost n'était pas en cours : sans
+    // cette garde, un simple survol de la souris (pointerleave se déclenche
+    // même sans avoir jamais appuyé) consommait l'utilisation du lancer sans
+    // que le joueur ait rien pressé, d'où le bouton qui semblait disparaître
+    // au hasard.
     function endVampireBoost() {
+        if (!vampireBoosting) return;
         vampireBoosting = false;
         vampireBoostUsed = true;
         document.getElementById("btn-vampire-boost").classList.remove("show");
     }
     function startVampireBoost(e) {
         e.preventDefault();
-        if (vampireBoostUsed || state !== "flying") return;
+        if (vampireBoostUsed || state !== "flying" || !getSkin(save.equippedSkin).isVampire) return;
         vampireBoosting = true;
     }
     const vampireBoostBtn = document.getElementById("btn-vampire-boost");
@@ -5520,6 +5526,12 @@
         // Pas de lune à faire "lever" quand on est déjà dessus (easter egg espace)
         screens.game.classList.toggle("in-space", inSpaceMode);
 
+        // Trousse Vampire : recalculé à CHAQUE frame (pas seulement pendant
+        // "flying") pour ne jamais laisser le bouton visible par erreur lors
+        // d'une transition d'état (atterrissage, rebond, séquence spatiale...).
+        document.getElementById("btn-vampire-boost").classList.toggle("show",
+            state === "flying" && getSkin(save.equippedSkin).isVampire && !vampireBoostUsed);
+
         if (state === "flying") {
             // intégration physique simple (méthode d'Euler) :
             // la trousse monte tant que vy > 0, la gravité la ralentit puis la fait redescendre
@@ -5528,11 +5540,8 @@
             vy -= currentG * dt;
             rotation += rotSpeed * dt;
 
-            // Trousse Vampire : le bouton 🦇 n'apparaît que pendant le vol, tant
-            // qu'il n'a pas déjà servi ce lancer-ci. Le maintenir accélère vx
-            // (donc la portée) jusqu'au plafond de temps cumulé.
-            const vampireBtn = document.getElementById("btn-vampire-boost");
-            vampireBtn.classList.toggle("show", getSkin(save.equippedSkin).isVampire && !vampireBoostUsed);
+            // Maintenir le bouton 🦇 accélère vx (donc la portée) jusqu'au
+            // plafond de temps cumulé (voir startVampireBoost/endVampireBoost).
             if (vampireBoosting && vampireBoostSecondsLeft > 0) {
                 const usedDt = Math.min(dt, vampireBoostSecondsLeft);
                 vx *= Math.pow(VAMPIRE_BOOST_GROWTH_PER_SEC, usedDt);
@@ -9109,8 +9118,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.0";
+    const VERSION_NUMBER = "9.7.1";
     const CHANGELOG = [
+        {
+            version: "9.7.1",
+            major: [],
+            minor: [
+                { fr: "Corrige le bouton 🦇 de la trousse Vampire qui disparaissait de façon imprévisible : un simple survol (sans jamais appuyer) le consommait par erreur. Sa visibilité est aussi recalculée à chaque frame (plus seulement pendant le vol) pour ne jamais rester affiché par erreur", en: "Fixed the Vampire pencil case's 🦇 button disappearing unpredictably: a mere hover (without ever pressing) was wrongly consuming it. Its visibility is also recalculated every frame (not just mid-flight) so it can never stay shown by mistake" },
+            ],
+        },
         {
             version: "9.7.0",
             major: [],
