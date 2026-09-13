@@ -1267,7 +1267,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.5.2</div>
+                <div class="version-tag" id="version-tag">v9.5.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -6549,11 +6549,12 @@
         // une position aléatoire DANS sa tranche : la plage change vraiment
         // d'un lancer à l'autre sans jamais s'empiler.
         const slot = 520;
-        // Couvre jusqu'à ~2500m : un lancer très puissant (trousse Fusée...)
-        // dépasse largement les ~750m générés avant, laissant la plage vide
-        // au-delà. Le culling de drawBeachProps limite déjà le coût de rendu
-        // au champ visible, donc étendre ce tableau ne coûte rien à l'affichage.
-        const count = Math.ceil((2500 * SCALE) / slot);
+        // Couvre jusqu'à ~15000m : des joueurs dépassent déjà les 8000m avec
+        // des niveaux Puissance/Vitesse élevés, laissant la plage vide au-delà
+        // de la portée générée. Le culling de drawBeachProps limite déjà le
+        // coût de rendu au champ visible, donc étendre ce tableau ne coûte
+        // rien à l'affichage.
+        const count = Math.ceil((15000 * SCALE) / slot);
         for (let i = 0; i < count; i++) {
             const roll = Math.random();
             const type = roll < 0.4 ? "parasol" : (roll < 0.75 ? "towel" : "castle");
@@ -8619,8 +8620,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.5.2";
+    const VERSION_NUMBER = "9.5.3";
     const CHANGELOG = [
+        {
+            version: "9.5.3",
+            major: [],
+            minor: [
+                { fr: "La portée de décor de la Plage passe de ~2500m à ~15000m : certains joueurs dépassaient déjà largement les 2500m avec des niveaux élevés, retrouvant une plage vide", en: "Beach scenery range goes from ~2500m to ~15000m: some players already went well past 2500m with high levels, ending up on an empty beach" },
+            ],
+        },
         {
             version: "9.5.2",
             major: [],
