@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.4</div>
+                <div class="version-tag" id="version-tag">v9.7.5</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -3974,6 +3974,12 @@
     let vampireBoosting = false;
     let vampireBoostSecondsLeft = VAMPIRE_BOOST_MAX_SECONDS;
     let vampireBoostUsed = false;
+    // Mémorise le dernier état affiché pour ne toucher au DOM que lors d'un
+    // vrai changement (voir gameLoop) : sur certains navigateurs mobiles,
+    // ré-appliquer classList.toggle() à 60-120 IPS même pour une valeur qui
+    // ne change pas peut provoquer un scintillement visuel.
+    let vampireBtnShown = null;
+    let vampireScreenBoosting = null;
 
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
@@ -5547,11 +5553,17 @@
         // Trousse Vampire : recalculé à CHAQUE frame (pas seulement pendant
         // "flying") pour ne jamais laisser le bouton visible par erreur lors
         // d'une transition d'état (atterrissage, rebond, séquence spatiale...).
-        document.getElementById("btn-vampire-boost").classList.toggle("show",
-            state === "flying" && getSkin(save.equippedSkin).isVampire && !vampireBoostUsed);
+        const shouldShowVampireBtn = state === "flying" && getSkin(save.equippedSkin).isVampire && !vampireBoostUsed;
+        if (shouldShowVampireBtn !== vampireBtnShown) {
+            vampireBtnShown = shouldShowVampireBtn;
+            document.getElementById("btn-vampire-boost").classList.toggle("show", shouldShowVampireBtn);
+        }
         // Vignette violette pulsante tant que le boost est activement maintenu
         // (voir #screen-game.vampire-boosting) : retour visuel immédiat.
-        screens.game.classList.toggle("vampire-boosting", vampireBoosting);
+        if (vampireBoosting !== vampireScreenBoosting) {
+            vampireScreenBoosting = vampireBoosting;
+            screens.game.classList.toggle("vampire-boosting", vampireBoosting);
+        }
 
         if (state === "flying") {
             // intégration physique simple (méthode d'Euler) :
@@ -9139,8 +9151,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.4";
+    const VERSION_NUMBER = "9.7.5";
     const CHANGELOG = [
+        {
+            version: "9.7.5",
+            major: [],
+            minor: [
+                { fr: "Le bouton 🦇 de la trousse Vampire ne touche plus le DOM qu'à un vrai changement d'état (au lieu de forcer classList.toggle() à chaque frame, 60 à 120 fois par seconde) : corrige un scintillement rapporté sur certains navigateurs mobiles (Chrome iOS), y compris sur des trousses sans lien avec la Vampire", en: "The Vampire pencil case's 🦇 button now only touches the DOM on an actual state change (instead of forcing classList.toggle() every frame, 60-120 times per second): fixes a flicker reported on some mobile browsers (Chrome iOS), including on pencil cases unrelated to the Vampire" },
+            ],
+        },
         {
             version: "9.7.4",
             major: [],
