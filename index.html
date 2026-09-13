@@ -5563,16 +5563,22 @@
         // Trousse Vampire : recalculé à CHAQUE frame (pas seulement pendant
         // "flying") pour ne jamais laisser le bouton visible par erreur lors
         // d'une transition d'état (atterrissage, rebond, séquence spatiale...).
+        // add()/remove() explicites plutôt que classList.toggle(nom, force) :
+        // le paramètre "force" de toggle() a un historique de support boiteux
+        // sur Safari/WebKit (donc Chrome iOS aussi, qui tourne dessus) — s'il
+        // est ignoré, toggle() bascule l'état au lieu de le FIXER, ce qui
+        // explique un bouton qui reste bloqué visible sur la mauvaise trousse.
         const shouldShowVampireBtn = state === "flying" && getSkin(save.equippedSkin).isVampire && !vampireBoostUsed;
         if (shouldShowVampireBtn !== vampireBtnShown) {
             vampireBtnShown = shouldShowVampireBtn;
-            document.getElementById("btn-vampire-boost").classList.toggle("show", shouldShowVampireBtn);
+            const btn = document.getElementById("btn-vampire-boost");
+            if (shouldShowVampireBtn) btn.classList.add("show"); else btn.classList.remove("show");
         }
         // Vignette violette pulsante tant que le boost est activement maintenu
         // (voir #screen-game.vampire-boosting) : retour visuel immédiat.
         if (vampireBoosting !== vampireScreenBoosting) {
             vampireScreenBoosting = vampireBoosting;
-            screens.game.classList.toggle("vampire-boosting", vampireBoosting);
+            if (vampireBoosting) screens.game.classList.add("vampire-boosting"); else screens.game.classList.remove("vampire-boosting");
         }
 
         if (state === "flying") {
