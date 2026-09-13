@@ -602,18 +602,52 @@
             gap: 10px;
             flex-wrap: wrap;
         }
-        .tabs { display: flex; gap: 8px; padding: 0 16px 10px; }
+        /* Barre d'onglets "liquid glass" : une pastille glisse derrière l'onglet
+           actif (voir moveTabIndicator) au lieu d'un changement de couleur
+           instantané. .tabs devient le "rail" (fond+bordure), chaque .tab-btn
+           reste transparent pour laisser la pastille apparaître au travers. */
+        .tabs {
+            display: flex; gap: 4px;
+            margin: 0 16px 10px; padding: 4px;
+            position: relative; isolation: isolate;
+            background: var(--card-bg); border: 2px solid var(--panel-border); border-radius: 12px;
+        }
+        .tab-indicator {
+            position: absolute; top: 4px; bottom: 4px; left: 4px; width: 0;
+            border-radius: 8px;
+            background: var(--accent);
+            box-shadow: 0 3px 8px rgba(0,0,0,0.25);
+            transition: left 420ms cubic-bezier(0.34, 1.56, 0.64, 1), width 420ms cubic-bezier(0.34, 1.56, 0.64, 1);
+            z-index: 1;
+            pointer-events: none;
+        }
         .tab-btn {
+            position: relative; z-index: 2;
             flex: 1;
             padding: 10px;
-            border-radius: 10px;
-            border: 2px solid var(--panel-border);
-            background: var(--card-bg);
+            border-radius: 8px;
+            border: none;
+            background: transparent;
             color: var(--text-dim);
             font-weight: 700;
             cursor: pointer;
+            overflow: hidden;
+            transition: color 250ms ease;
         }
-        .tab-btn.active { background: var(--accent); color: #1a1a1a; border-color: var(--accent); }
+        .tab-btn.active { color: #1a1a1a; }
+        .tab-ripple {
+            position: absolute; top: 50%; left: 50%;
+            width: 6px; height: 6px; border-radius: 50%;
+            background: rgba(255,255,255,0.5);
+            transform: translate(-50%,-50%) scale(1);
+            pointer-events: none; z-index: 3;
+            animation: tab-ripple-out 500ms ease-out forwards;
+        }
+        @keyframes tab-ripple-out { to { transform: translate(-50%,-50%) scale(14); opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) {
+            .tab-indicator { transition: none; }
+            .tab-ripple { animation: none !important; }
+        }
         /* margin-bottom (pas juste du padding) réduit la boîte elle-même :
            comme pour .menu-wrap, ça garantit que le contenu qui défile
            s'arrête AVANT la zone des icônes flottantes (musique/réglages/
@@ -1270,7 +1304,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.6.2</div>
+                <div class="version-tag" id="version-tag">v9.6.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1383,6 +1417,7 @@
             <div class="money-pill" style="font-size:13px; padding:6px 14px;" id="shop-earn-bonus-pill">📈 <span id="shop-earn-bonus">+0%</span></div>
         </div>
         <div class="tabs">
+            <div class="tab-indicator" id="tab-indicator"></div>
             <button class="tab-btn active" id="tab-upgrades" data-i18n="shopTabUpgrades">⚙️ Améliorations</button>
             <button class="tab-btn" id="tab-skins" data-i18n="shopTabSkins">🎨 Skins</button>
             <button class="tab-btn" id="tab-trails" data-i18n="shopTabTrails">🌈 Traînées</button>
@@ -3081,6 +3116,7 @@
         const bonusPct = Math.round((totalPuissance() + totalVitesse()) * UPGRADE_EARN_BONUS_PER_LEVEL * 100);
         document.getElementById("shop-earn-bonus").textContent = "+" + bonusPct + "%";
         document.getElementById("shop-earn-bonus-pill").title = tr("shopEarnBonusTooltip");
+        moveTabIndicator(true);
         renderShopTab();
     }
 
@@ -3456,11 +3492,42 @@
         Object.entries(shopTabs).forEach(([key, id]) => {
             document.getElementById(id).classList.toggle("active", key === name);
         });
+        moveTabIndicator(false);
         renderShopTab();
     }
-    document.getElementById("tab-upgrades").addEventListener("click", () => switchShopTab("upgrades"));
-    document.getElementById("tab-skins").addEventListener("click", () => switchShopTab("skins"));
-    document.getElementById("tab-trails").addEventListener("click", () => switchShopTab("trails"));
+    // Glisse la pastille "liquid glass" derrière l'onglet actif (voir CSS
+    // .tab-indicator). instant=true coupe la transition pour un repositionnement
+    // immédiat (première ouverture de la boutique, redimensionnement), sans quoi
+    // elle glisserait depuis sa position par défaut (largeur 0, tout à gauche).
+    const tabIndicatorEl = document.getElementById("tab-indicator");
+    function moveTabIndicator(instant) {
+        const activeBtn = document.querySelector(".tabs .tab-btn.active");
+        if (!activeBtn || !tabIndicatorEl) return;
+        if (instant) tabIndicatorEl.style.transition = "none";
+        tabIndicatorEl.style.left = activeBtn.offsetLeft + "px";
+        tabIndicatorEl.style.width = activeBtn.offsetWidth + "px";
+        if (instant) {
+            tabIndicatorEl.offsetHeight; // force le reflow avant de réactiver la transition
+            tabIndicatorEl.style.transition = "";
+        }
+    }
+    function spawnTabRipple(btn, clientX, clientY) {
+        const r = btn.getBoundingClientRect();
+        const span = document.createElement("span");
+        span.className = "tab-ripple";
+        span.style.left = (clientX - r.left) + "px";
+        span.style.top = (clientY - r.top) + "px";
+        btn.appendChild(span);
+        span.addEventListener("animationend", () => span.remove());
+    }
+    document.getElementById("tab-upgrades").addEventListener("click", (e) => { spawnTabRipple(e.currentTarget, e.clientX, e.clientY); switchShopTab("upgrades"); });
+    document.getElementById("tab-skins").addEventListener("click", (e) => { spawnTabRipple(e.currentTarget, e.clientX, e.clientY); switchShopTab("skins"); });
+    document.getElementById("tab-trails").addEventListener("click", (e) => { spawnTabRipple(e.currentTarget, e.clientX, e.clientY); switchShopTab("trails"); });
+    // Repositionne sans animation si la fenêtre change de taille pendant que
+    // la boutique est affichée (voir refreshShop pour le positionnement initial).
+    window.addEventListener("resize", () => {
+        if (screens.shop.classList.contains("active")) moveTabIndicator(true);
+    });
 
     /* ============ 9. ÉCRAN DE JEU : ÉTAT + MÉCANIQUE DE LANCER ============ */
     const canvas = document.getElementById("game-canvas");
@@ -8659,8 +8726,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.6.2";
+    const VERSION_NUMBER = "9.6.3";
     const CHANGELOG = [
+        {
+            version: "9.6.3",
+            major: [],
+            minor: [
+                { fr: "Nouvel effet visuel sur les onglets de la boutique (Améliorations/Skins/Traînées) : une pastille glisse maintenant avec un léger rebond entre les onglets au lieu d'un changement de couleur instantané, avec un petit effet d'onde au clic", en: "New visual effect on the shop tabs (Upgrades/Skins/Trails): a pill now slides with a slight bounce between tabs instead of an instant color change, with a small ripple effect on click" },
+            ],
+        },
         {
             version: "9.6.2",
             major: [],
