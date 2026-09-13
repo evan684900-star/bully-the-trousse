@@ -5556,7 +5556,9 @@
         // Debug temporaire : voir le diagnostic de savoir pourquoi le bouton
         // vampire s'affiche parfois avec une autre trousse équipée.
         document.getElementById("debug-skin-tag").textContent =
-            "skin=" + save.equippedSkin + " isVampire=" + !!getSkin(save.equippedSkin).isVampire + " state=" + state;
+            "skin=" + save.equippedSkin + " isVampire=" + !!getSkin(save.equippedSkin).isVampire + " state=" + state +
+            " memo=" + vampireBtnShown + " domShow=" + document.getElementById("btn-vampire-boost").classList.contains("show") +
+            " used=" + vampireBoostUsed;
 
         // Trousse Vampire : recalculé à CHAQUE frame (pas seulement pendant
         // "flying") pour ne jamais laisser le bouton visible par erreur lors
