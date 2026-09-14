@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.7</div>
+                <div class="version-tag" id="version-tag">v10.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1724,20 +1724,23 @@
             </div>
             <p class="settings-hint" data-i18n="settingsPrivateHint">Les autres joueurs verront une banderole "Ce compte est privé" au lieu de ton profil. Ton score reste visible dans le classement.</p>
 
-            <h3 class="settings-section-title" data-i18n="settingsRecoveryTitle">🔑 Code de récupération</h3>
-            <p class="settings-hint" data-i18n="settingsRecoveryHint">Ta partie est liée à cet appareil : si tu changes de téléphone ou que le navigateur efface ses données, tout est perdu. Note ce code quelque part : il permet de récupérer ta partie n'importe où.</p>
+            <h3 class="settings-section-title" data-i18n="settingsRecoveryTitle">🔑 Mon compte</h3>
+            <!-- Rempli par refreshRecoveryUI() : dit si cet appareil est connecté
+                 au compte (donc synchronisé) ou encore purement local. -->
+            <p class="settings-hint" id="account-status"></p>
+            <p class="settings-hint" data-i18n="settingsRecoveryHint">Ce code EST ton compte : entre-le sur un autre appareil et tu joues sur la même partie, synchronisée dans les deux sens. Note-le quelque part, c'est le seul moyen de retrouver ta partie si ce navigateur efface ses données.</p>
 
-            <button class="btn small" id="btn-recovery-reveal" data-i18n="btnRecoveryReveal">🔑 Afficher mon code</button>
+            <button class="btn small" id="btn-recovery-reveal" data-i18n="btnRecoveryReveal">🔑 Créer / afficher mon code</button>
             <div id="recovery-code-wrap" hidden>
                 <div class="recovery-code" id="recovery-code-value"></div>
                 <button class="btn small secondary" id="btn-recovery-copy" data-i18n="btnRecoveryCopy">📋 Copier</button>
-                <p class="settings-hint" data-i18n="settingsRecoveryWarn">⚠️ Garde-le pour toi : qui a ce code peut récupérer ta partie.</p>
+                <p class="settings-hint" data-i18n="settingsRecoveryWarn">⚠️ Garde-le pour toi : qui a ce code entre dans ton compte.</p>
             </div>
 
             <div class="account-form">
                 <input type="text" id="recovery-input" inputmode="numeric" data-i18n-placeholder="settingsRecoveryPlaceholder" placeholder="J'ai déjà un code (16 chiffres)">
                 <p id="recovery-error" class="account-form-error"></p>
-                <button class="btn small" id="btn-recovery-submit" data-i18n="btnRecoverySubmit">📥 Récupérer ma partie</button>
+                <button class="btn small" id="btn-recovery-submit" data-i18n="btnRecoverySubmit">📥 Connecter cet appareil</button>
             </div>
 
             <button class="btn small secondary" id="btn-logout" data-i18n="btnLogout">🚪 Se déconnecter</button>
@@ -2069,19 +2072,26 @@
         settingsMusicVolcan: { fr: "Monde Volcans", en: "Volcanoes world" },
         btnMusicDownload: { fr: "⬇️ Télécharger", en: "⬇️ Download" },
         btnCancel: { fr: "Annuler", en: "Cancel" },
-        settingsRecoveryTitle: { fr: "🔑 Code de récupération", en: "🔑 Recovery code" },
+        settingsRecoveryTitle: { fr: "🔑 Mon compte", en: "🔑 My account" },
         settingsRecoveryHint: {
-            fr: "Ta partie est liée à cet appareil : si tu changes de téléphone ou que le navigateur efface ses données, tout est perdu. Note ce code quelque part : il permet de récupérer ta partie n'importe où.",
-            en: "Your save is tied to this device: switch phones or let the browser clear its data and it's all gone. Write this code down somewhere: it gets your save back anywhere."
+            fr: "Ce code EST ton compte : entre-le sur un autre appareil et tu joues sur la même partie, synchronisée dans les deux sens. Note-le quelque part, c'est le seul moyen de retrouver ta partie si ce navigateur efface ses données.",
+            en: "This code IS your account: enter it on another device and you play the same save, synced both ways. Write it down — it's the only way to get your save back if this browser clears its data."
         },
-        btnRecoveryReveal: { fr: "🔑 Afficher mon code", en: "🔑 Show my code" },
+        btnRecoveryReveal: { fr: "🔑 Créer / afficher mon code", en: "🔑 Create / show my code" },
         btnRecoveryCopy: { fr: "📋 Copier", en: "📋 Copy" },
         settingsRecoveryWarn: {
-            fr: "⚠️ Garde-le pour toi : qui a ce code peut récupérer ta partie.",
-            en: "⚠️ Keep it to yourself: anyone with this code can take your save."
+            fr: "⚠️ Garde-le pour toi : qui a ce code entre dans ton compte.",
+            en: "⚠️ Keep it to yourself: anyone with this code gets into your account."
         },
         settingsRecoveryPlaceholder: { fr: "J'ai déjà un code (16 chiffres)", en: "I already have a code (16 digits)" },
-        btnRecoverySubmit: { fr: "📥 Récupérer ma partie", en: "📥 Restore my save" },
+        btnRecoverySubmit: { fr: "📥 Connecter cet appareil", en: "📥 Connect this device" },
+        accountStatusLinked: { fr: "✅ Appareil connecté à ton compte — la partie se synchronise automatiquement.", en: "✅ Device connected to your account — the save syncs automatically." },
+        accountStatusLocal: { fr: "📱 Partie locale à cet appareil. Crée ton code ci-dessous pour la retrouver ailleurs.", en: "📱 Save local to this device. Create your code below to access it elsewhere." },
+        accountStatusOffline: { fr: "🔌 Hors ligne : compte indisponible pour le moment.", en: "🔌 Offline: account unavailable right now." },
+        accountLinked: { fr: "✅ Compte créé, cet appareil y est connecté", en: "✅ Account created, this device is connected to it" },
+        accountConnected: { fr: "✅ Appareil connecté à ton compte", en: "✅ Device connected to your account" },
+        cloudSyncPulled: { fr: "🔄 Partie synchronisée depuis un autre appareil", en: "🔄 Save synced from another device" },
+        recoveryErrWrongCode: { fr: "Code incorrect ou compte introuvable.", en: "Wrong code, or account not found." },
         btnLogout: { fr: "🚪 Se déconnecter", en: "🚪 Log out" },
         settingsLogoutHint: {
             fr: "Repart de zéro sur cet appareil avec un compte tout neuf. Assure-toi d'avoir noté ton code de récupération ci-dessus, sinon cette partie est perdue pour de bon.",
@@ -2091,6 +2101,12 @@
         logoutConfirmText: {
             fr: "Tu vas repartir de zéro sur cet appareil, avec un compte tout neuf. Sans ton code de récupération, cette partie sera perdue pour de bon.",
             en: "You're about to start fresh on this device, with a brand new account. Without your recovery code, this save will be lost for good."
+        },
+        // Variante affichée quand le compte est déjà lié à un code : la partie
+        // reste en sécurité dans le cloud, on ne fait que quitter l'appareil.
+        logoutConfirmTextLinked: {
+            fr: "Cet appareil repartira sur un compte tout neuf. Ta partie, elle, reste intacte : ton code te permettra de la retrouver ici ou ailleurs quand tu veux.",
+            en: "This device will start over on a brand new account. Your save stays intact: your code gets you back into it here or anywhere else, whenever you want."
         },
         logoutConfirmYes: { fr: "🚪 Se déconnecter", en: "🚪 Log out" },
         recoveryCopied: { fr: "📋 Code copié !", en: "📋 Code copied!" },
@@ -2948,6 +2964,9 @@
         if (name === "game") resetThrow();
         if (name === "leaderboard") refreshLeaderboardScreen();
         if (name === "profile") renderProfile(null); // null = mon propre profil
+        // Une sauvegarde reçue d'un autre appareil pendant un lancer attend la
+        // fin de la manche pour ne pas l'interrompre (voir startCloudSaveListener).
+        flushPendingRemoteSave();
     }
 
     /* ============ 7. ÉCRAN MENU ============ */
@@ -3983,6 +4002,10 @@
 
     // Remet tout à zéro pour un nouveau lancer et démarre la boucle de rendu
     function resetThrow() {
+        // Applique d'abord une éventuelle sauvegarde reçue d'un autre appareil
+        // pendant le lancer précédent : le monde courant peut changer, et tout
+        // ce qui suit en dépend (décor de la plage, durabilité...).
+        flushPendingRemoteSave();
         state = "idle";
         gamePaused = false; // au cas où on aurait quitté l'écran de jeu en pause
         worldX = 0;
@@ -7851,6 +7874,41 @@
     let db = null;
     let currentUser = null;
     let giftsUnsub = null;
+    let cloudSaveUnsub = null;
+
+    // Identifie CETTE session (cet onglet, cet appareil). Écrit dans la
+    // sauvegarde cloud pour que l'écoute temps réel sache distinguer "c'est
+    // moi qui viens d'écrire" de "un autre appareil a écrit" (voir
+    // startCloudSaveListener).
+    const SESSION_ID = Math.random().toString(36).slice(2) + "-" + Date.now().toString(36);
+
+    // Sauvegarde locale à imposer au compte juste après une connexion (quand le
+    // joueur a choisi de garder la partie de CET appareil plutôt que celle du
+    // compte, voir recoverFromCode et syncCloudSaveOnLogin).
+    let pendingSaveOverride = null;
+    // Sauvegarde reçue d'un autre appareil pendant un lancer : appliquée dès que
+    // la manche est finie (voir flushPendingRemoteSave).
+    let pendingRemoteSave = null;
+
+    /* ---- Compte lié : le code de récupération EST l'identifiant ----
+    // Avant, chaque appareil avait son propre compte anonyme et le code ne
+    // faisait que COPIER la sauvegarde d'un compte à l'autre : deux comptes
+    // distincts, deux entrées de classement, aucune synchronisation.
+    // Maintenant le code sert d'identifiant Firebase Auth (e-mail/mot de passe
+    // dérivés du code) : le premier appareil transforme son compte anonyme en
+    // compte permanent (linkWithCredential, l'uid est CONSERVÉ), et les autres
+    // s'y connectent (signInWithEmailAndPassword). Tous les appareils partagent
+    // donc le même uid : même document de sauvegarde, une seule entrée de
+    // classement, un seul profil. */
+    const ACCOUNT_EMAIL_DOMAIN = "players.bullythetrousse.app";
+    function accountEmailForCode(code) { return "c" + code + "@" + ACCOUNT_EMAIL_DOMAIN; }
+    // Le mot de passe n'ajoute aucun secret (il se déduit du code) : c'est le
+    // code lui-même qui protège le compte, exactement comme avant.
+    function accountPasswordForCode(code) { return "bt-" + code; }
+    function accountCredential(code) {
+        return firebase.auth.EmailAuthProvider.credential(accountEmailForCode(code), accountPasswordForCode(code));
+    }
+    function isLinkedAccount() { return !!(currentUser && !currentUser.isAnonymous); }
 
     function updateOnlineStatus(text) {
         const el = document.getElementById("online-status");
@@ -7867,7 +7925,9 @@
         updateOnlineStatus(tr("onlineConnecting"));
         firebase.auth().onAuthStateChanged((user) => {
             if (!user) {
+                currentUser = null; // plus personne : on n'écrit plus rien côté cloud
                 if (giftsUnsub) { giftsUnsub(); giftsUnsub = null; }
+                if (cloudSaveUnsub) { cloudSaveUnsub(); cloudSaveUnsub = null; }
                 return;
             }
             currentUser = user;
@@ -7882,8 +7942,15 @@
             // résolu) : ainsi son écoute temps réel ne voit plus ces docs et ne
             // peut pas les créditer une deuxième fois.
             syncCloudSaveOnLogin().then(() => {
+                // Un joueur qui avait déjà un code avant la refonte des comptes
+                // est encore anonyme : on transforme son compte en compte
+                // permanent lié à SON code, sans changer d'uid (donc sans rien
+                // perdre : classement, profil, abonnés restent les siens).
+                if (save.recoveryCode && currentUser.isAnonymous) linkAccountToCode(save.recoveryCode);
+                startCloudSaveListener();
                 checkIncomingGifts().then(() => startGiftsListener());
                 if (screens.profile.classList.contains("active")) renderProfile();
+                refreshRecoveryUI();
             });
             pingPresence();
         });
@@ -7899,24 +7966,60 @@
         });
     }
 
+    // Transforme un document Firestore en sauvegarde exploitable : complète les
+    // champs manquants (nouvelles versions du jeu) et retire les champs de
+    // service qui n'appartiennent pas à la sauvegarde elle-même (voir
+    // pushCloudSave), sinon ils finiraient recopiés dans le localStorage.
+    function cloudDataToSave(data) {
+        const merged = migrateLegacyVolcanFields(Object.assign(defaultSave(), data), data);
+        delete merged.sessionId;
+        delete merged.updatedAt;
+        return merged;
+    }
+
+    // Rouvre les mondes déjà débloqués dans la sauvegarde qu'on vient de
+    // charger (cloud, autre appareil, récupération...) : WORLDS est une liste
+    // en mémoire, elle ne se remet pas à jour toute seule.
+    function unlockWorldsFromSave() {
+        if (save.volcanUnlocked) {
+            const volcanWorld = WORLDS.find((w) => w.id === "volcans");
+            if (volcanWorld) volcanWorld.unlocked = true;
+        }
+        if (save.plageUnlocked) {
+            const plageWorld = WORLDS.find((w) => w.id === "plage");
+            if (plageWorld) plageWorld.unlocked = true;
+        }
+    }
+
     // Au premier lien avec le cloud : si une sauvegarde existe déjà pour ce
-    // compte anonyme, elle prend le dessus (utile si l'utilisateur revient sur
-    // le même appareil/navigateur). Sinon, on envoie la sauvegarde locale
-    // actuelle pour créer le document et on génère un pseudo par défaut.
+    // compte, elle prend le dessus (c'est elle qui fait foi entre appareils).
+    // Sinon, on envoie la sauvegarde locale actuelle pour créer le document et
+    // on génère un pseudo par défaut.
     function syncCloudSaveOnLogin() {
         if (!db || !currentUser) return Promise.resolve();
+        // Le joueur vient de connecter cet appareil à son compte et a choisi de
+        // garder LA PARTIE DE CET APPAREIL : elle écrase celle du compte au lieu
+        // d'être écrasée par elle (voir recoverFromCode).
+        if (pendingSaveOverride) {
+            save = pendingSaveOverride;
+            pendingSaveOverride = null;
+            localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+            unlockWorldsFromSave();
+            buildWorldsRow();
+            refreshMenu();
+            persist();
+            pushScoreTo("scores", save.bestDistance);
+            pushScoreTo("scoresPlage", save.plageBestDistance);
+            document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
+            syncAchievementStats();
+            pushPublicProfile();
+            return Promise.resolve();
+        }
         return db.collection("users").doc(currentUser.uid).get().then((doc) => {
             if (doc.exists) {
-                save = migrateLegacyVolcanFields(Object.assign(defaultSave(), doc.data()), doc.data());
+                save = cloudDataToSave(doc.data());
                 localStorage.setItem(SAVE_KEY, JSON.stringify(save));
-                if (save.volcanUnlocked) {
-                    const volcanWorld = WORLDS.find(w => w.id === "volcans");
-                    if (volcanWorld) volcanWorld.unlocked = true;
-                }
-                if (save.plageUnlocked) {
-                    const plageWorld = WORLDS.find(w => w.id === "plage");
-                    if (plageWorld) plageWorld.unlocked = true;
-                }
+                unlockWorldsFromSave();
                 buildWorldsRow();
                 refreshMenu();
             } else {
@@ -7934,11 +8037,97 @@
     // simplement l'erreur, ça ne doit jamais bloquer le jeu.
     function pushCloudSave() {
         if (!db || !currentUser) return;
-        db.collection("users").doc(currentUser.uid).set(save, { merge: true })
+        // sessionId/updatedAt ne font pas partie de la sauvegarde : ils servent
+        // à l'écoute temps réel pour ignorer ses propres écritures et savoir
+        // laquelle est la plus récente (voir startCloudSaveListener).
+        const payload = Object.assign({}, save, {
+            sessionId: SESSION_ID,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+        });
+        db.collection("users").doc(currentUser.uid).set(payload, { merge: true })
             .catch((err) => console.error("Sauvegarde cloud impossible :", err));
         // Garde la copie liée au code de récupération à jour (no-op tant que le
         // joueur n'a pas demandé de code, voir pushRecoverySnapshot).
         pushRecoverySnapshot();
+    }
+
+    /* ---- Synchronisation temps réel entre les appareils du même compte ---- */
+    // Tous les appareils connectés au même code partagent le même uid, donc le
+    // même document "users/{uid}". Cette écoute applique donc en direct ce
+    // qu'un autre appareil vient de sauvegarder. Elle ignore ses propres
+    // écritures (sessionId) et n'écrase jamais une partie en cours : la
+    // sauvegarde reçue attend la fin du lancer (voir flushPendingRemoteSave).
+    function startCloudSaveListener() {
+        if (!db || !currentUser) return;
+        if (cloudSaveUnsub) cloudSaveUnsub();
+        cloudSaveUnsub = db.collection("users").doc(currentUser.uid).onSnapshot((doc) => {
+            if (!doc.exists || doc.metadata.hasPendingWrites) return;
+            const data = doc.data();
+            if (!data || data.sessionId === SESSION_ID) return; // c'est nous
+            if (throwInProgress() || cineActive) { pendingRemoteSave = data; return; }
+            applyRemoteSave(data);
+        }, (err) => console.error("Écoute de la sauvegarde cloud impossible :", err));
+    }
+
+    function applyRemoteSave(data) {
+        save = cloudDataToSave(data);
+        localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+        unlockWorldsFromSave();
+        buildWorldsRow();
+        refreshMenu();
+        if (screens.shop.classList.contains("active")) refreshShop();
+        if (screens.profile.classList.contains("active")) renderProfile();
+        if (document.getElementById("settings-modal").classList.contains("show")) refreshSettingsModal();
+        showToast(tr("cloudSyncPulled"));
+    }
+
+    // Applique la sauvegarde reçue pendant un lancer, une fois la manche finie.
+    function flushPendingRemoteSave() {
+        if (!pendingRemoteSave) return;
+        const data = pendingRemoteSave;
+        pendingRemoteSave = null;
+        applyRemoteSave(data);
+    }
+
+    /* ---- Liaison du compte (le code devient un vrai identifiant) ---- */
+    // Transforme le compte anonyme de cet appareil en compte permanent
+    // identifié par le code. L'uid ne change PAS : la sauvegarde, l'entrée de
+    // classement, le profil, les abonnés et les cadeaux restent exactement les
+    // mêmes. C'est ce qui permet ensuite à un autre appareil de rejoindre CE
+    // compte au lieu d'en créer un deuxième.
+    function linkAccountToCode(code) {
+        if (!FIREBASE_ENABLED || !currentUser || !code) return Promise.resolve(false);
+        if (!currentUser.isAnonymous) return Promise.resolve(true); // déjà lié
+        return currentUser.linkWithCredential(accountCredential(code)).then(() => {
+            currentUser = firebase.auth().currentUser;
+            refreshRecoveryUI();
+            return true;
+        }).catch((err) => {
+            // "email-already-in-use" = ce code appartient déjà à un compte (par
+            // ex. un autre appareil l'a réclamé en premier). On ne casse rien :
+            // le joueur peut saisir le code pour rejoindre ce compte-là.
+            console.error("Liaison du compte impossible :", err);
+            return false;
+        });
+    }
+
+    // Efface les traces publiques du compte anonyme qu'on s'apprête à
+    // abandonner en rejoignant un vrai compte : sans ça son entrée resterait
+    // dans le classement et son profil continuerait d'exister — c'est
+    // exactement le "doublon" que l'ancien système laissait derrière lui.
+    // À appeler TANT QU'ON EST ENCORE connecté à ce compte (les règles
+    // Firestore n'autorisent chacun qu'à supprimer ses propres documents).
+    function cleanupAbandonedAnonymousAccount() {
+        if (!db || !currentUser || !currentUser.isAnonymous) return Promise.resolve();
+        const uid = currentUser.uid;
+        const user = currentUser;
+        const wipes = ["scores", "scoresPlage", "profiles", "users", "activePlayers"].map((col) =>
+            db.collection(col).doc(uid).delete().catch(() => { /* best-effort */ })
+        );
+        return Promise.all(wipes)
+            // Supprime aussi le compte anonyme lui-même, pour ne pas laisser un
+            // compte fantôme dans Firebase Auth.
+            .then(() => user.delete().catch(() => { /* best-effort */ }));
     }
 
     /* ---- Code de récupération (partie transférable, sans email) ---- */
@@ -8012,6 +8201,14 @@
         } else {
             pushRecoverySnapshot(); // s'assure que la copie est à jour
         }
+        // Un code ne sert à rien s'il n'ouvre pas un vrai compte : on transforme
+        // le compte anonyme de cet appareil en compte permanent identifié par ce
+        // code (l'uid est conservé, voir linkAccountToCode).
+        const wasAnonymous = !!(currentUser && currentUser.isAnonymous);
+        linkAccountToCode(save.recoveryCode).then((linked) => {
+            if (linked && wasAnonymous) showToast(tr("accountLinked"));
+            refreshRecoveryUI();
+        });
         refreshRecoveryUI();
     }
 
@@ -8024,6 +8221,12 @@
         revealBtn.hidden = hasCode;
         if (hasCode) {
             document.getElementById("recovery-code-value").textContent = formatRecoveryCode(save.recoveryCode);
+        }
+        const status = document.getElementById("account-status");
+        if (status) {
+            status.textContent = (!FIREBASE_ENABLED || !currentUser) ? tr("accountStatusOffline")
+                : isLinkedAccount() ? tr("accountStatusLinked")
+                : tr("accountStatusLocal");
         }
     }
 
@@ -8043,7 +8246,98 @@
         ));
     }
 
-    // Récupère la partie associée à un code saisi par le joueur.
+    // Deuxième instance Firebase, isolée de la session en cours : elle sert à
+    // VÉRIFIER un code et à lire la partie du compte visé sans toucher à la
+    // connexion actuelle. Si le code est faux ou que le joueur annule, rien
+    // n'a bougé — c'est ce qui rend l'opération sans risque.
+    function getVerifyApp() {
+        const existing = firebase.apps.filter((a) => a.name === "verify")[0];
+        return existing || firebase.initializeApp(firebaseConfig, "verify");
+    }
+    function closeVerifyApp() {
+        const app = firebase.apps.filter((a) => a.name === "verify")[0];
+        if (!app) return Promise.resolve();
+        return app.auth().signOut().catch(() => {}).then(() => app.delete().catch(() => {}));
+    }
+
+    // Regarde ce que désigne un code :
+    //   { kind: "account", uid, save } -> un vrai compte (système actuel)
+    //   { kind: "legacy", data }       -> un ancien code (simple copie de partie)
+    //   null                           -> code inconnu
+    function lookupAccountByCode(code) {
+        const app = getVerifyApp();
+        return app.auth().signInWithEmailAndPassword(accountEmailForCode(code), accountPasswordForCode(code))
+            .then((cred) => app.firestore().collection("users").doc(cred.user.uid).get().then((doc) => ({
+                kind: "account",
+                uid: cred.user.uid,
+                save: doc.exists ? cloudDataToSave(doc.data()) : defaultSave(),
+            })))
+            .catch((err) => {
+                // Pas de compte pour ce code : soit il est faux, soit il date
+                // d'avant la refonte (copie dans "recoveryCodes"), soit
+                // l'authentification e-mail/mot de passe n'est pas activée dans
+                // la console Firebase. Dans les trois cas on retombe sur
+                // l'ancien mécanisme plutôt que d'échouer. La protection
+                // anti-énumération de Firebase masque "user-not-found" derrière
+                // "invalid-credential", d'où les deux codes traités pareil.
+                const noAccount = err && (err.code === "auth/user-not-found"
+                    || err.code === "auth/invalid-credential"
+                    || err.code === "auth/invalid-login-credentials"
+                    || err.code === "auth/wrong-password"
+                    || err.code === "auth/operation-not-allowed");
+                if (!noAccount) throw err;
+                return db.collection("recoveryCodes").doc(code).get().then((doc) => {
+                    if (!doc.exists || !doc.data().save) return null;
+                    return { kind: "legacy", data: doc.data() };
+                });
+            });
+    }
+
+    // Connecte CET appareil au compte désigné par le code : on quitte le compte
+    // courant (nettoyé s'il n'était qu'anonyme, pour ne pas laisser de doublon
+    // au classement) et on se connecte au vrai compte. Le chargement de la
+    // partie, l'écoute temps réel et les cadeaux repartent tout seuls depuis
+    // onAuthStateChanged.
+    function joinAccount(code, choice, localSave) {
+        // "current" = le joueur garde la partie de cet appareil : elle écrasera
+        // celle du compte juste après la connexion (voir syncCloudSaveOnLogin).
+        if (choice === "current") {
+            localSave.recoveryCode = code;
+            pendingSaveOverride = localSave;
+        }
+        if (cloudSaveUnsub) { cloudSaveUnsub(); cloudSaveUnsub = null; }
+        if (giftsUnsub) { giftsUnsub(); giftsUnsub = null; }
+        return cleanupAbandonedAnonymousAccount()
+            .then(() => firebase.auth().signInWithEmailAndPassword(accountEmailForCode(code), accountPasswordForCode(code)))
+            .then(() => { showToast(tr("accountConnected")); });
+    }
+
+    // Ancien code (créé avant la refonte) : il ne pointe pas vers un compte
+    // mais vers une COPIE de la partie. On la restaure comme avant, puis on lie
+    // le compte courant à ce code pour que les prochains appareils s'y
+    // connectent vraiment au lieu d'en créer un deuxième.
+    function restoreLegacyCode(code, data, otherSave, localSave, choice) {
+        return retireOldLeaderboardEntry(data.uid, data.retireToken, otherSave.pseudo).then(() => {
+            save = choice === "other" ? otherSave : localSave;
+            save.recoveryCode = code; // le code suit le joueur d'un appareil à l'autre
+            if (!save.recoveryRetireToken) save.recoveryRetireToken = generateRecoveryCode();
+            localStorage.setItem(SAVE_KEY, JSON.stringify(save));
+            unlockWorldsFromSave();
+            persist(); // envoie la partie choisie (+ la copie de récupération)
+            // Republie les deux classements tout de suite au lieu d'attendre le
+            // prochain record (voir pushScoreIfRecord).
+            pushScoreTo("scores", save.bestDistance);
+            pushScoreTo("scoresPlage", save.plageBestDistance);
+            buildWorldsRow();
+            refreshMenu();
+            refreshSettingsModal();
+            if (screens.profile.classList.contains("active")) renderProfile();
+            showToast(tr("recoveryDone"));
+            return linkAccountToCode(code);
+        });
+    }
+
+    // Connecte cet appareil au compte correspondant au code saisi par le joueur.
     function recoverFromCode(rawInput) {
         clearAccountFormError("recovery-error");
         const code = normalizeRecoveryCode(rawInput);
@@ -8055,53 +8349,39 @@
             showAccountFormError("recovery-error", tr("recoveryErrOffline"));
             return;
         }
-        if (code === save.recoveryCode) {
+        // Déjà connecté à ce compte-là : rien à faire. (Si le code est dans la
+        // sauvegarde mais que le compte n'est pas encore lié, on laisse passer :
+        // la connexion est justement ce qu'il manque.)
+        if (code === save.recoveryCode && isLinkedAccount()) {
             showAccountFormError("recovery-error", tr("recoveryErrSameAccount"));
             return;
         }
         const btn = document.getElementById("btn-recovery-submit");
         btn.disabled = true;
-        db.collection("recoveryCodes").doc(code).get().then((doc) => {
-            if (!doc.exists || !doc.data().save) {
+        const localSave = JSON.parse(JSON.stringify(save));
+        lookupAccountByCode(code).then((found) => {
+            if (!found) {
                 showAccountFormError("recovery-error", tr("recoveryErrUnknown"));
                 return;
             }
-            const data = doc.data();
-            const otherSave = migrateLegacyVolcanFields(Object.assign(defaultSave(), data.save), data.save);
-            const currentSave = JSON.parse(JSON.stringify(save));
+            const otherSave = found.kind === "account"
+                ? found.save
+                : migrateLegacyVolcanFields(Object.assign(defaultSave(), found.data.save), found.data.save);
             // Le choix laisse la partie actuelle intacte si on annule, et ne
             // fusionne jamais champ par champ : c'est l'une OU l'autre, en entier.
-            return showMergeChoice(summarizeSaveStats(currentSave), summarizeSaveStats(otherSave), true).then((choice) => {
+            return showMergeChoice(summarizeSaveStats(localSave), summarizeSaveStats(otherSave), true).then((choice) => {
                 if (!choice) return; // annulé, rien ne change
-                return retireOldLeaderboardEntry(data.uid, data.retireToken, otherSave.pseudo).then(() => {
-                    save = choice === "other" ? otherSave : currentSave;
-                    save.recoveryCode = code; // le code suit le joueur d'un appareil à l'autre
-                    if (!save.recoveryRetireToken) save.recoveryRetireToken = generateRecoveryCode();
-                    localStorage.setItem(SAVE_KEY, JSON.stringify(save));
-                    if (save.volcanUnlocked) {
-                        const volcanWorld = WORLDS.find((w) => w.id === "volcans");
-                        if (volcanWorld) volcanWorld.unlocked = true;
-                    }
-                    if (save.plageUnlocked) {
-                        const plageWorld = WORLDS.find((w) => w.id === "plage");
-                        if (plageWorld) plageWorld.unlocked = true;
-                    }
-                    persist(); // envoie la partie choisie (+ la copie de récupération)
-                    // Republie les deux classements tout de suite au lieu
-                    // d'attendre le prochain record (voir pushScoreIfRecord).
-                    pushScoreTo("scores", save.bestDistance);
-                    pushScoreTo("scoresPlage", save.plageBestDistance);
-                    buildWorldsRow();
-                    refreshMenu();
-                    refreshSettingsModal();
-                    if (screens.profile.classList.contains("active")) renderProfile();
-                    showToast(tr("recoveryDone"));
-                });
+                return found.kind === "account"
+                    ? joinAccount(code, choice, localSave)
+                    : restoreLegacyCode(code, found.data, otherSave, localSave, choice);
             });
         }).catch((err) => {
-            console.error("Récupération impossible :", err);
-            showAccountFormError("recovery-error", tr("recoveryErrUnknown"));
-        }).then(() => { btn.disabled = false; });
+            console.error("Connexion au compte impossible :", err);
+            showAccountFormError("recovery-error", tr("recoveryErrWrongCode"));
+        }).then(() => {
+            closeVerifyApp();
+            btn.disabled = false;
+        });
     }
 
     function showAccountFormError(id, message) {
@@ -8365,8 +8645,13 @@
             body.innerHTML = "";
             let rank = 0;
             snapshot.forEach((doc) => {
-                rank++;
                 const data = doc.data();
+                // Entrées "retirées" d'anciens comptes récupérés : leur distance
+                // a été remise à 0 au lieu d'être supprimée (les règles ne
+                // permettent pas de prouver qu'on a le droit de supprimer sans
+                // payload). Les masquer évite le pseudo en double tout en bas.
+                if (!(num(data.bestDistance) > 0)) return;
+                rank++;
                 const isMe = !!(currentUser && doc.id === currentUser.uid);
                 const row = document.createElement("div");
                 row.className = "leaderboard-row clickable" + (isMe ? " you" : "");
@@ -9131,6 +9416,10 @@
     // session Firebase actuelle, pour qu'au rechargement onAuthStateChanged
     // en crée une toute neuve (voir initFirebase).
     document.getElementById("btn-logout").addEventListener("click", () => {
+        // Compte lié = la partie reste en sécurité dans le cloud et le code
+        // permet d'y revenir ; sans code, se déconnecter la perd vraiment.
+        document.querySelector('#logout-confirm-modal [data-i18n="logoutConfirmText"]').textContent =
+            isLinkedAccount() ? tr("logoutConfirmTextLinked") : tr("logoutConfirmText");
         document.getElementById("logout-confirm-modal").classList.add("show");
     });
     document.getElementById("btn-logout-confirm-no").addEventListener("click", () => {
@@ -9224,8 +9513,20 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.7";
+    const VERSION_NUMBER = "10.0.0";
     const CHANGELOG = [
+        {
+            version: "10.0.0",
+            major: [
+                { fr: "Refonte complète du système de comptes : ton code de récupération n'est plus une simple copie de sauvegarde, c'est devenu ton véritable identifiant de connexion. Entrer ton code sur un autre appareil le connecte au MÊME compte — la partie se synchronise automatiquement dans les deux sens, et tu n'as plus qu'une seule entrée au classement au lieu de deux comptes en double qui ne communiquaient pas", en: "Complete account system overhaul: your recovery code is no longer just a save copy, it has become your actual login credential. Entering your code on another device connects it to the SAME account — the save syncs automatically both ways, and you now have a single leaderboard entry instead of two duplicate accounts that never talked to each other" },
+            ],
+            minor: [
+                { fr: "La partie se synchronise en direct entre tous tes appareils connectés : ce que tu gagnes sur l'un apparaît sur l'autre, sans rien faire (jamais au milieu d'un lancer, la manche en cours n'est pas interrompue)", en: "Your save syncs live across all your connected devices: what you earn on one shows up on the other, automatically (never mid-throw — the current run is not interrupted)" },
+                { fr: "Connecter un appareil ne laisse plus de compte fantôme derrière lui : l'ancien compte temporaire et son entrée de classement sont supprimés proprement", en: "Connecting a device no longer leaves a ghost account behind: the old temporary account and its leaderboard entry are properly deleted" },
+                { fr: "Les entrées fantômes déjà présentes dans le classement (anciennes récupérations) sont désormais masquées", en: "Ghost entries already sitting in the leaderboard (from past restores) are now hidden" },
+                { fr: "Les anciens codes continuent de fonctionner : ils restaurent la partie comme avant, puis deviennent automatiquement de vrais identifiants de connexion", en: "Old codes still work: they restore the save as before, then automatically become real login credentials" },
+            ],
+        },
         {
             version: "9.7.7",
             major: [],

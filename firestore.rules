@@ -27,6 +27,13 @@ service cloud.firestore {
                    && request.resource.data.bestDistance is number
                    && request.resource.data.bestDistance >= 0
                    && request.resource.data.bestDistance <= 100000;
+      // Chacun peut supprimer SA propre entrée. Utilisé quand un appareil
+      // abandonne son compte anonyme pour rejoindre un vrai compte (voir
+      // cleanupAbandonedAnonymousAccount) : sans ça, l'entrée orpheline
+      // resterait affichée en double dans le classement.
+      // (Règle séparée : sur une suppression, "request.resource" est nul, donc
+      // les conditions de "write" ci-dessus échoueraient toutes.)
+      allow delete: if request.auth != null && request.auth.uid == uid;
       // Retrait après récupération de partie (voir retireOldLeaderboardEntry) :
       // quand un joueur récupère sa partie sur un nouvel appareil, son ancien
       // compte garderait sinon son entrée ici, en double avec la nouvelle.
@@ -55,6 +62,8 @@ service cloud.firestore {
                    && request.resource.data.bestDistance is number
                    && request.resource.data.bestDistance >= 0
                    && request.resource.data.bestDistance <= 100000;
+      // Même suppression de sa propre entrée que pour "scores" ci-dessus.
+      allow delete: if request.auth != null && request.auth.uid == uid;
       allow update: if request.auth != null
                     && request.resource.data.bestDistance == 0
                     && request.resource.data.retireToken is string
@@ -63,11 +72,15 @@ service cloud.firestore {
                        == request.resource.data.retireToken;
     }
 
-    // Code de récupération : permet de retrouver sa partie (monde normal ET
-    // plage, c'est le même document "users/{uid}" complet) sur un autre
-    // appareil sans email ni mot de passe (voir revealRecoveryCode). L'id du
-    // document EST le code secret de 16 chiffres, et le document contient une
-    // copie de la sauvegarde.
+    // Code de récupération. Depuis la refonte des comptes, le code de 16
+    // chiffres sert surtout d'IDENTIFIANT Firebase Auth (e-mail/mot de passe
+    // dérivés du code, voir linkAccountToCode) : tous les appareils d'un même
+    // joueur partagent alors le même uid, donc la même sauvegarde et une seule
+    // entrée de classement.
+    // Cette collection reste écrite comme filet de sécurité : elle contient une
+    // copie de la sauvegarde, utilisée pour les codes créés AVANT la refonte,
+    // et si l'authentification e-mail/mot de passe n'est pas activée dans la
+    // console Firebase (le jeu retombe alors sur l'ancien comportement).
     // "get" est public mais "list" est refusé : sans connaître le code exact,
     // impossible de lire quoi que ce soit (et 10^16 combinaisons rendent la
     // recherche au hasard sans espoir). Seul le propriétaire du compte pointé
