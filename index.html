@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.0.0</div>
+                <div class="version-tag" id="version-tag">v10.0.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1571,7 +1571,9 @@
     <div class="modal-overlay" id="logout-confirm-modal">
         <div class="info-box">
             <h2 data-i18n="logoutConfirmTitle">🚪 Se déconnecter ?</h2>
-            <p data-i18n="logoutConfirmText">Tu vas repartir de zéro sur cet appareil, avec un compte tout neuf. Sans ton code de récupération, cette partie sera perdue pour de bon.</p>
+            <!-- La clé de traduction est remplacée à l'ouverture selon que le
+                 compte est lié ou non (voir le clic sur #btn-logout) -->
+            <p id="logout-confirm-text" data-i18n="logoutConfirmText">Tu vas repartir de zéro sur cet appareil, avec un compte tout neuf. Sans ton code de récupération, cette partie sera perdue pour de bon.</p>
             <div class="replay-buttons">
                 <button class="btn" id="btn-logout-confirm-yes" data-i18n="logoutConfirmYes">🚪 Se déconnecter</button>
                 <button class="btn secondary" id="btn-logout-confirm-no" data-i18n="btnCancel">Annuler</button>
@@ -2684,7 +2686,14 @@
         }
     }
 
+    // Date de la dernière sauvegarde locale, comparée à celle d'une sauvegarde
+    // reçue d'un autre appareil pour savoir laquelle est la plus récente
+    // (voir flushPendingRemoteSave). Les deux valeurs viennent de la même
+    // horloge, celle de cet appareil : la comparaison est donc fiable.
+    let lastPersistAt = 0;
+
     function persist() {
+        lastPersistAt = Date.now();
         localStorage.setItem(SAVE_KEY, JSON.stringify(save));
         pushCloudSave(); // best-effort, ne fait rien si Firebase n'est pas connecté
         checkAchievements();
@@ -7875,6 +7884,10 @@
     let currentUser = null;
     let giftsUnsub = null;
     let cloudSaveUnsub = null;
+    // Passe à true dès que Firebase a rendu son premier verdict sur la session
+    // gardée en local (voir initFirebase) : c'est ce qui évite de recréer un
+    // compte anonyme par-dessus un compte déjà connecté.
+    let authStateResolved = false;
 
     // Identifie CETTE session (cet onglet, cet appareil). Écrit dans la
     // sauvegarde cloud pour que l'écoute temps réel sache distinguer "c'est
@@ -7887,8 +7900,10 @@
     // compte, voir recoverFromCode et syncCloudSaveOnLogin).
     let pendingSaveOverride = null;
     // Sauvegarde reçue d'un autre appareil pendant un lancer : appliquée dès que
-    // la manche est finie (voir flushPendingRemoteSave).
+    // la manche est finie (voir flushPendingRemoteSave), sauf si le lancer a
+    // sauvegardé entre-temps — auquel cas elle est périmée.
     let pendingRemoteSave = null;
+    let pendingRemoteSaveAt = 0;
 
     /* ---- Compte lié : le code de récupération EST l'identifiant ----
     // Avant, chaque appareil avait son propre compte anonyme et le code ne
@@ -7928,8 +7943,23 @@
                 currentUser = null; // plus personne : on n'écrit plus rien côté cloud
                 if (giftsUnsub) { giftsUnsub(); giftsUnsub = null; }
                 if (cloudSaveUnsub) { cloudSaveUnsub(); cloudSaveUnsub = null; }
+                // Premier verdict de Firebase et personne n'est connecté : aucune
+                // session n'était gardée sur cet appareil, on crée donc le compte
+                // anonyme de départ. C'est le SEUL moment où on le fait :
+                // signInAnonymously() ne réutilise QUE les comptes anonymes, donc
+                // l'appeler à chaque chargement remplacerait la session d'un
+                // compte lié par un nouveau compte anonyme (nouvel uid, nouvelle
+                // entrée de classement) — exactement ce que la refonte évite.
+                if (!authStateResolved) {
+                    authStateResolved = true;
+                    firebase.auth().signInAnonymously().catch((err) => {
+                        console.error("Connexion Firebase échouée :", err);
+                        updateOnlineStatus(tr("onlineOfflineFailed"));
+                    });
+                }
                 return;
             }
+            authStateResolved = true;
             currentUser = user;
             updateOnlineStatus(tr("onlineConnected"));
             refreshRecoveryUI();
@@ -7946,7 +7976,7 @@
                 // est encore anonyme : on transforme son compte en compte
                 // permanent lié à SON code, sans changer d'uid (donc sans rien
                 // perdre : classement, profil, abonnés restent les siens).
-                if (save.recoveryCode && currentUser.isAnonymous) linkAccountToCode(save.recoveryCode);
+                if (save.recoveryCode && currentUser && currentUser.isAnonymous) linkAccountToCode(save.recoveryCode);
                 startCloudSaveListener();
                 checkIncomingGifts().then(() => startGiftsListener());
                 if (screens.profile.classList.contains("active")) renderProfile();
@@ -7960,10 +7990,9 @@
         // changement d'appareil ou un nettoyage des données du site — c'est le
         // rôle du code de récupération (voir revealRecoveryCode plus bas).
         firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(() => {});
-        firebase.auth().signInAnonymously().catch((err) => {
-            console.error("Connexion Firebase échouée :", err);
-            updateOnlineStatus(tr("onlineOfflineFailed"));
-        });
+        // Pas de signInAnonymously() ici : c'est onAuthStateChanged ci-dessus qui
+        // s'en charge, et seulement s'il n'y avait vraiment aucune session
+        // gardée sur cet appareil (voir authStateResolved).
     }
 
     // Transforme un document Firestore en sauvegarde exploitable : complète les
@@ -8057,22 +8086,54 @@
     // qu'un autre appareil vient de sauvegarder. Elle ignore ses propres
     // écritures (sessionId) et n'écrase jamais une partie en cours : la
     // sauvegarde reçue attend la fin du lancer (voir flushPendingRemoteSave).
+    // Empreinte de ce qui compte vraiment dans une sauvegarde : tout SAUF les
+    // compteurs qui avancent tout seuls de leur côté sur chaque appareil
+    // (temps de jeu, écoute de la musique). Sans ça, deux appareils allumés
+    // côte à côte se renverraient leur sauvegarde toutes les 30 secondes (voir
+    // l'autosave de playTime) et s'afficheraient un toast en boucle.
+    function meaningfulSaveFingerprint(s) {
+        const copy = Object.assign({}, s);
+        delete copy.playTime;
+        delete copy.musicListenSeconds;
+        delete copy.sessionId;
+        delete copy.updatedAt;
+        return JSON.stringify(copy);
+    }
+
     function startCloudSaveListener() {
         if (!db || !currentUser) return;
         if (cloudSaveUnsub) cloudSaveUnsub();
+        // Le tout premier instantané renvoie le document tel qu'il est DÉJÀ,
+        // c'est-à-dire ce que syncCloudSaveOnLogin vient de charger : l'appliquer
+        // (et afficher "synchronisé") à chaque lancement n'aurait aucun sens.
+        let firstSnapshot = true;
         cloudSaveUnsub = db.collection("users").doc(currentUser.uid).onSnapshot((doc) => {
+            if (firstSnapshot) { firstSnapshot = false; return; }
             if (!doc.exists || doc.metadata.hasPendingWrites) return;
             const data = doc.data();
             if (!data || data.sessionId === SESSION_ID) return; // c'est nous
-            if (throwInProgress() || cineActive) { pendingRemoteSave = data; return; }
+            // Rien de neuf pour le joueur (juste le temps de jeu de l'autre
+            // appareil qui a avancé) : on ne touche à rien.
+            if (meaningfulSaveFingerprint(cloudDataToSave(data)) === meaningfulSaveFingerprint(save)) return;
+            if (throwInProgress() || cineActive) {
+                pendingRemoteSave = data;
+                pendingRemoteSaveAt = Date.now();
+                return;
+            }
             applyRemoteSave(data);
         }, (err) => console.error("Écoute de la sauvegarde cloud impossible :", err));
     }
 
     function applyRemoteSave(data) {
+        const localPlayTime = save.playTime || 0;
         save = cloudDataToSave(data);
+        // Le temps de jeu ne doit jamais reculer : chaque appareil compte le
+        // sien, on garde donc le plus avancé des deux.
+        save.playTime = Math.max(save.playTime || 0, localPlayTime);
         localStorage.setItem(SAVE_KEY, JSON.stringify(save));
         unlockWorldsFromSave();
+        applyTheme();     // le thème fait partie de la sauvegarde synchronisée
+        applyLanguage();  // la langue aussi
         buildWorldsRow();
         refreshMenu();
         if (screens.shop.classList.contains("active")) refreshShop();
@@ -8085,7 +8146,13 @@
     function flushPendingRemoteSave() {
         if (!pendingRemoteSave) return;
         const data = pendingRemoteSave;
+        const receivedAt = pendingRemoteSaveAt;
         pendingRemoteSave = null;
+        // Le lancer qui vient de se terminer a sauvegardé APRÈS l'arrivée de
+        // cette copie : elle est donc périmée (elle ne contient ni les gains ni
+        // le record de la manche). L'appliquer annulerait le lancer — et la
+        // sauvegarde suivante renverrait cette régression dans le cloud.
+        if (lastPersistAt > receivedAt) return;
         applyRemoteSave(data);
     }
 
@@ -8120,14 +8187,27 @@
     function cleanupAbandonedAnonymousAccount() {
         if (!db || !currentUser || !currentUser.isAnonymous) return Promise.resolve();
         const uid = currentUser.uid;
-        const user = currentUser;
-        const wipes = ["scores", "scoresPlage", "profiles", "users", "activePlayers"].map((col) =>
+        const wipes = ["scores", "scoresPlage", "profiles", "users", "activePlayers", "recoveryTokens"].map((col) =>
             db.collection(col).doc(uid).delete().catch(() => { /* best-effort */ })
         );
-        return Promise.all(wipes)
-            // Supprime aussi le compte anonyme lui-même, pour ne pas laisser un
-            // compte fantôme dans Firebase Auth.
-            .then(() => user.delete().catch(() => { /* best-effort */ }));
+        // Les succès déjà marqués doivent partir avec le reste : "activePlayers"
+        // est le dénominateur du pourcentage de joueurs par succès et
+        // "achvUnlocks" le numérateur. N'effacer que le premier ferait grimper
+        // les pourcentages au-dessus de 100%.
+        (save.unlockedAchievements || []).forEach((id) => {
+            wipes.push(db.collection("achvUnlocks").doc(id).collection("players").doc(uid)
+                .delete().catch(() => { /* best-effort */ }));
+        });
+        // Les abonnements de ce compte jetable, sinon ils gonflent le nombre
+        // d'abonnés des joueurs suivis avec un compte qui n'existe plus.
+        wipes.push(db.collection("follows").where("follower", "==", uid).get()
+            .then((snap) => Promise.all(snap.docs.map((d) => d.ref.delete().catch(() => {}))))
+            .catch(() => { /* best-effort */ }));
+        // Le compte Firebase Auth anonyme lui-même n'est PAS supprimé ici : si
+        // la connexion au vrai compte échouait juste après, l'appareil se
+        // retrouverait sans aucune session utilisable. Un compte anonyme
+        // orphelin ne coûte rien et ne porte plus aucune donnée.
+        return Promise.all(wipes);
     }
 
     /* ---- Code de récupération (partie transférable, sans email) ---- */
@@ -8301,15 +8381,35 @@
     function joinAccount(code, choice, localSave) {
         // "current" = le joueur garde la partie de cet appareil : elle écrasera
         // celle du compte juste après la connexion (voir syncCloudSaveOnLogin).
+        // Remis explicitement à null sinon : une tentative précédente qui aurait
+        // échoué laisserait sa sauvegarde en attente et écraserait le compte
+        // qu'on rejoint maintenant.
         if (choice === "current") {
             localSave.recoveryCode = code;
             pendingSaveOverride = localSave;
+        } else {
+            pendingSaveOverride = null;
         }
         if (cloudSaveUnsub) { cloudSaveUnsub(); cloudSaveUnsub = null; }
         if (giftsUnsub) { giftsUnsub(); giftsUnsub = null; }
+        // Une sauvegarde reçue de l'ANCIEN compte n'a plus rien à faire ici :
+        // appliquée après la bascule, elle serait recopiée dans le nouveau.
+        pendingRemoteSave = null;
         return cleanupAbandonedAnonymousAccount()
             .then(() => firebase.auth().signInWithEmailAndPassword(accountEmailForCode(code), accountPasswordForCode(code)))
-            .then(() => { showToast(tr("accountConnected")); });
+            .then(() => { showToast(tr("accountConnected")); })
+            .catch((err) => {
+                // La connexion a échoué après coup (réseau...) : on reste sur le
+                // compte courant. Sans ça, la sauvegarde locale mise de côté
+                // s'appliquerait au prochain compte rejoint, et les écoutes
+                // resteraient coupées jusqu'au rechargement.
+                pendingSaveOverride = null;
+                if (currentUser) {
+                    startCloudSaveListener();
+                    startGiftsListener();
+                }
+                throw err;
+            });
     }
 
     // Ancien code (créé avant la refonte) : il ne pointe pas vers un compte
@@ -9418,8 +9518,13 @@
     document.getElementById("btn-logout").addEventListener("click", () => {
         // Compte lié = la partie reste en sécurité dans le cloud et le code
         // permet d'y revenir ; sans code, se déconnecter la perd vraiment.
-        document.querySelector('#logout-confirm-modal [data-i18n="logoutConfirmText"]').textContent =
-            isLinkedAccount() ? tr("logoutConfirmTextLinked") : tr("logoutConfirmText");
+        // On change la CLÉ de traduction (pas seulement le texte) : sinon un
+        // changement de langue pendant que la modale est ouverte rétablirait
+        // la version "partie perdue" (voir applyLanguage).
+        const key = isLinkedAccount() ? "logoutConfirmTextLinked" : "logoutConfirmText";
+        const textEl = document.getElementById("logout-confirm-text");
+        textEl.setAttribute("data-i18n", key);
+        textEl.textContent = tr(key);
         document.getElementById("logout-confirm-modal").classList.add("show");
     });
     document.getElementById("btn-logout-confirm-no").addEventListener("click", () => {
@@ -9513,8 +9618,20 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.0.0";
+    const VERSION_NUMBER = "10.0.1";
     const CHANGELOG = [
+        {
+            version: "10.0.1",
+            major: [],
+            minor: [
+                { fr: "Correctif majeur de la refonte des comptes : à chaque chargement, le jeu recréait un compte anonyme par-dessus le compte connecté, ce qui annulait purement et simplement la synchronisation entre appareils", en: "Major fix to the account overhaul: on every load the game created a fresh anonymous account on top of the connected one, which plainly cancelled out cross-device syncing" },
+                { fr: "La synchronisation ne peut plus annuler un lancer : une sauvegarde reçue d'un autre appareil pendant une manche est ignorée si elle est plus ancienne que la manche qui vient de se terminer", en: "Syncing can no longer undo a throw: a save received from another device mid-run is discarded if it predates the run that just ended" },
+                { fr: "Plus de message \"partie synchronisée\" toutes les 30 secondes ni au lancement : seules les vraies différences sont signalées (le temps de jeu de chaque appareil ne compte plus comme un changement)", en: "No more \"save synced\" message every 30 seconds or on launch: only real differences are reported (each device's play time no longer counts as a change)" },
+                { fr: "Le thème et la langue suivent maintenant la synchronisation, et le temps de jeu ne peut plus reculer", en: "Theme and language now follow the sync, and play time can no longer go backwards" },
+                { fr: "Connexion à un compte plus sûre : si elle échoue, l'appareil reste utilisable sur son compte actuel au lieu de se retrouver déconnecté", en: "Safer account connection: if it fails, the device stays usable on its current account instead of ending up signed out" },
+                { fr: "Le nettoyage d'un compte temporaire efface aussi ses succès et ses abonnements : les pourcentages de succès ne peuvent plus dépasser 100%", en: "Cleaning up a temporary account now also clears its achievements and follows: achievement percentages can no longer exceed 100%" },
+            ],
+        },
         {
             version: "10.0.0",
             major: [
