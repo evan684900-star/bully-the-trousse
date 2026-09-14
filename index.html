@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v9.7.6</div>
+                <div class="version-tag" id="version-tag">v9.7.7</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -5469,6 +5469,75 @@
         targetCtx.restore();
     }
 
+    // Applique une chaîne de filtres CSS (grayscale/sepia/saturate/hue-rotate/
+    // brightness/contrast/opacity) pixel par pixel, et garde le résultat en
+    // cache par trousse dessinée dans un <canvas> hors écran. Remplace
+    // CanvasRenderingContext2D.filter (voir drawTrousse) : Safari/WebKit n'a
+    // supporté cette API qu'à partir de la version 15.4 (2022) — avant ça, le
+    // filtre est silencieusement ignoré et la trousse s'affiche toujours avec
+    // son apparence de base, quel que soit le skin équipé. Cette approche par
+    // pixels fonctionne sur tous les navigateurs, y compris les plus anciens.
+    const skinFilterCache = {};
+    function parseCssFilterChain(str) {
+        if (!str || str === "none") return [];
+        const re = /([\w-]+)\(([^)]*)\)/g;
+        const out = [];
+        let m;
+        while ((m = re.exec(str))) out.push({ name: m[1], value: parseFloat(m[2]) });
+        return out;
+    }
+    function applyCssFilterToImageData(imgData, filters) {
+        const d = imgData.data;
+        for (let i = 0; i < d.length; i += 4) {
+            let r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+            for (const f of filters) {
+                const v = f.value;
+                if (f.name === "grayscale" || f.name === "saturate") {
+                    const l = 0.213 * r + 0.715 * g + 0.072 * b;
+                    const s = f.name === "grayscale" ? (1 - v) : v;
+                    r = l + (r - l) * s; g = l + (g - l) * s; b = l + (b - l) * s;
+                } else if (f.name === "sepia") {
+                    const sr = 0.393 * r + 0.769 * g + 0.189 * b;
+                    const sg = 0.349 * r + 0.686 * g + 0.168 * b;
+                    const sb = 0.272 * r + 0.534 * g + 0.131 * b;
+                    r = r + (sr - r) * v; g = g + (sg - g) * v; b = b + (sb - b) * v;
+                } else if (f.name === "hue-rotate") {
+                    const rad = v * Math.PI / 180, cos = Math.cos(rad), sin = Math.sin(rad);
+                    const nr = (0.213 + cos * 0.787 - sin * 0.213) * r + (0.715 - cos * 0.715 - sin * 0.715) * g + (0.072 - cos * 0.072 + sin * 0.928) * b;
+                    const ng = (0.213 - cos * 0.213 + sin * 0.143) * r + (0.715 + cos * 0.285 + sin * 0.140) * g + (0.072 - cos * 0.072 - sin * 0.283) * b;
+                    const nb = (0.213 - cos * 0.213 - sin * 0.787) * r + (0.715 - cos * 0.715 + sin * 0.715) * g + (0.072 + cos * 0.928 + sin * 0.072) * b;
+                    r = nr; g = ng; b = nb;
+                } else if (f.name === "brightness") {
+                    r *= v; g *= v; b *= v;
+                } else if (f.name === "contrast") {
+                    r = (r - 128) * v + 128; g = (g - 128) * v + 128; b = (b - 128) * v + 128;
+                } else if (f.name === "opacity") {
+                    a *= v;
+                }
+            }
+            d[i] = Math.max(0, Math.min(255, r));
+            d[i + 1] = Math.max(0, Math.min(255, g));
+            d[i + 2] = Math.max(0, Math.min(255, b));
+            d[i + 3] = Math.max(0, Math.min(255, a));
+        }
+        return imgData;
+    }
+    function getFilteredSkinCanvas(baseImg, filterStr) {
+        if (!filterStr || filterStr === "none") return baseImg;
+        const cached = skinFilterCache[filterStr];
+        if (cached) return cached;
+        const off = document.createElement("canvas");
+        off.width = baseImg.naturalWidth || baseImg.width;
+        off.height = baseImg.naturalHeight || baseImg.height;
+        const octx = off.getContext("2d");
+        octx.drawImage(baseImg, 0, 0);
+        const imgData = octx.getImageData(0, 0, off.width, off.height);
+        applyCssFilterToImageData(imgData, parseCssFilterChain(filterStr));
+        octx.putImageData(imgData, 0, 0);
+        skinFilterCache[filterStr] = off;
+        return off;
+    }
+
     function drawTrousse() {
         // petit flottement vertical purement visuel pendant la séquence spatiale
         let floatBob = 0;
@@ -5488,15 +5557,14 @@
             ctx.translate(-size / 2, -size / 2); // drawIronIngot dessine depuis (0,0)
             drawIronIngot(ctx, size);
         } else {
-            ctx.filter = rainbowOrFilter(skin.filter, performance.now());
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
-                ctx.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+                const filterStr = rainbowOrFilter(skin.filter, performance.now());
+                ctx.drawImage(getFilteredSkinCanvas(trousseImg, filterStr), -size / 2, -size / 2, size, size);
             } else {
                 // filet de sécurité si l'image n'a pas fini de charger
                 ctx.fillStyle = "#e67e22";
                 ctx.fillRect(-size / 2, -size / 2, size, size);
             }
-            ctx.filter = "none";
             if (skin.isBasket) drawSneakers(ctx, size);
             if (skin.isLunar) drawCraters(ctx, size);
             if (skin.isRocket) drawRocketFlame(ctx, size);
@@ -6580,14 +6648,13 @@
             c.translate(-size / 2, -size / 2);
             drawIronIngot(c, size);
         } else {
-            c.filter = rainbowOrFilter(skin.filter, performance.now());
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
-                c.drawImage(trousseImg, -size / 2, -size / 2, size, size);
+                const filterStr = rainbowOrFilter(skin.filter, performance.now());
+                c.drawImage(getFilteredSkinCanvas(trousseImg, filterStr), -size / 2, -size / 2, size, size);
             } else {
                 c.fillStyle = "#e67e22";
                 c.fillRect(-size / 2, -size / 2, size, size);
             }
-            c.filter = "none";
             if (skin.isBasket) drawSneakers(c, size);
             if (skin.isLunar) drawCraters(c, size);
             if (skin.isRocket) drawRocketFlame(c, size);
@@ -9157,8 +9224,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "9.7.6";
+    const VERSION_NUMBER = "9.7.7";
     const CHANGELOG = [
+        {
+            version: "9.7.7",
+            major: [],
+            minor: [
+                { fr: "Corrige les skins qui s'affichaient toujours comme la Trousse Classique pendant le vol (et dans la cinématique du Volcan) sur certains navigateurs mobiles : le rendu utilisait CanvasRenderingContext2D.filter, non supporté par Safari/WebKit avant sa version 15.4. Remplacé par un filtrage pixel par pixel, compatible partout", en: "Fixed pencil case skins always rendering as the Classic one mid-flight (and in the Volcano cutscene) on some mobile browsers: rendering used CanvasRenderingContext2D.filter, unsupported by Safari/WebKit before version 15.4. Replaced with pixel-by-pixel filtering, compatible everywhere" },
+            ],
+        },
         {
             version: "9.7.6",
             major: [],
