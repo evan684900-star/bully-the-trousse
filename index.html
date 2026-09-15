@@ -1361,7 +1361,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.0.1</div>
+                <div class="version-tag" id="version-tag">v10.0.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -8058,6 +8058,12 @@
             document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
             syncAchievementStats(); // rattrape les succès déjà débloqués avant l'ajout de ce système
             pushPublicProfile();
+            // Republie l'entrée de classement à chaque connexion (no-op tant que
+            // le record est à 0). Ça répare tout seul un classement incohérent :
+            // il suffit de supprimer une entrée fantôme côté Firestore, la bonne
+            // revient au prochain lancement du jeu — sans attendre un record.
+            pushScoreTo("scores", save.bestDistance);
+            pushScoreTo("scoresPlage", save.plageBestDistance);
         }).catch((err) => console.error("Lecture de la sauvegarde cloud impossible :", err));
     }
 
@@ -9531,11 +9537,24 @@
         document.getElementById("logout-confirm-modal").classList.remove("show");
     });
     document.getElementById("btn-logout-confirm-yes").addEventListener("click", () => {
-        localStorage.removeItem(SAVE_KEY);
-        if (FIREBASE_ENABLED && firebase.auth().currentUser) {
-            firebase.auth().signOut().catch(() => {}).then(() => location.reload());
+        // Compte anonyme : personne ne pourra jamais y revenir (pas de code),
+        // donc son entrée de classement et son profil doivent partir avec lui.
+        // Sans ça, se déconnecter laissait un pseudo fantôme dans le classement,
+        // avec le score figé de l'appareil déconnecté.
+        // Compte lié : on ne touche à rien, le joueur peut y revenir avec son code
+        // (cleanupAbandonedAnonymousAccount ne fait rien dans ce cas).
+        const done = () => {
+            localStorage.removeItem(SAVE_KEY);
+            if (FIREBASE_ENABLED && firebase.auth().currentUser) {
+                firebase.auth().signOut().catch(() => {}).then(() => location.reload());
+            } else {
+                location.reload();
+            }
+        };
+        if (FIREBASE_ENABLED && currentUser && currentUser.isAnonymous) {
+            cleanupAbandonedAnonymousAccount().catch(() => {}).then(done);
         } else {
-            location.reload();
+            done();
         }
     });
 
@@ -9618,8 +9637,16 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.0.1";
+    const VERSION_NUMBER = "10.0.2";
     const CHANGELOG = [
+        {
+            version: "10.0.2",
+            major: [],
+            minor: [
+                { fr: "Se déconnecter d'un compte temporaire (sans code) efface maintenant son entrée de classement et son profil : sans ça, un pseudo fantôme restait affiché avec le score figé de l'appareil déconnecté. Un compte lié à un code, lui, n'est jamais effacé — on peut y revenir quand on veut", en: "Logging out of a temporary account (no code) now clears its leaderboard entry and profile: without this, a ghost nickname stayed on the board with the disconnected device's frozen score. An account tied to a code is never cleared — you can come back to it whenever you want" },
+                { fr: "L'entrée de classement est republiée à chaque connexion : un classement incohérent se répare désormais tout seul, sans attendre un nouveau record", en: "The leaderboard entry is republished on every login: an inconsistent leaderboard now repairs itself, without waiting for a new record" },
+            ],
+        },
         {
             version: "10.0.1",
             major: [],
