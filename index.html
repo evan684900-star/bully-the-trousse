@@ -1367,7 +1367,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.1</div>
+                <div class="version-tag" id="version-tag">v10.1.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1822,7 +1822,7 @@
         btnThrowAgain: { fr: "🔁 Relancer", en: "🔁 Throw again" },
         notEnoughMoney: { fr: "Pas assez d'argent !", en: "Not enough money!" },
         konamiLockedHint: { fr: "🔒 Ne s'achète pas... un vieux code à taper te dirait quelque chose ?", en: "🔒 Not for sale... does an old code to type in ring a bell?" },
-        konamiUnlocked: { fr: "🎮 Code Konami reconnu ! Trousse Konami débloquée !", en: "🎮 Konami Code recognized! Konami Pencil Case unlocked!" },
+        konamiUnlocked: { fr: "🎮 Code Konami reconnu ! Trousse ?????? débloquée !", en: "🎮 Konami Code recognized! Trousse ?????? unlocked!" },
         shopTabUpgrades: { fr: "⚙️ Améliorations", en: "⚙️ Upgrades" },
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
@@ -2545,7 +2545,7 @@
             // l'achat (voir listenForKonamiCode). Dessinée à part comme un
             // pavé rouge "??????" (voir drawKonamiCard), clin d'œil au logo
             // Konami dont on a caché le nom derrière des points d'interrogation.
-            id: "konami", name: "Trousse Konami", cost: null,
+            id: "konami", name: "Trousse ??????", cost: null,
             desc: "+15 Puissance, +15 Vitesse. Ne s'achète pas : un vieux code à taper sur ton clavier te dirait peut-être quelque chose...",
             bonusPuissance: 15, bonusVitesse: 15, filter: "none", isKonami: true, secretUnlock: true
         },
@@ -9749,8 +9749,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.1";
+    const VERSION_NUMBER = "10.1.2";
     const CHANGELOG = [
+        {
+            version: "10.1.2",
+            major: [],
+            minor: [
+                { fr: "La Trousse Konami garde son nom mystère (\"Trousse ??????\") même une fois débloquée, plutôt que de révéler \"Konami\"", en: "The Konami Pencil Case keeps its mystery name (\"Trousse ??????\") even once unlocked, instead of revealing \"Konami\"" },
+            ],
+        },
         {
             version: "10.1.1",
             major: [],
