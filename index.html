@@ -4238,6 +4238,7 @@
         // veut pas voler des flèches/lettres tapées dans un champ de texte.
         const tag = document.activeElement && document.activeElement.tagName;
         if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (e.repeat) return; // une touche tenue enfoncée répète "keydown" en rafale : ça compterait comme plusieurs pas identiques et casserait la séquence (ex: "Haut" tenu 0,3s de trop redevient "Haut" au pas 3, qui attend "Bas")
         const token = KONAMI_KEY_MAP[e.code];
         if (token) konamiStep(token); // touches non mappées (Espace...) ignorées, ne cassent pas une séquence en cours
     });
