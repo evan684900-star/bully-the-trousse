@@ -1382,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.13</div>
+                <div class="version-tag" id="version-tag">v10.1.14</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2577,7 +2577,7 @@
             // trousse, jamais à l'achat (voir listenForSecretCode). Dessinée à
             // part comme un pavé "??????" (voir drawSecretCard).
             id: "secret", name: "Trousse ??????", cost: null,
-            desc: "+15 Puissance, +15 Vitesse. Ne s'achète pas : il existe un autre moyen de la débloquer...",
+            desc: "+15 Puissance, +15 Vitesse. Ne s'achète pas : il existe un autre moyen de la débloquer... Fun fact : 1 5 1 5 était mon premier code !!",
             bonusPuissance: 15, bonusVitesse: 15, filter: "none", isSecretSkin: true, secretUnlock: true
         },
     ];
@@ -9909,8 +9909,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.13";
+    const VERSION_NUMBER = "10.1.14";
     const CHANGELOG = [
+        {
+            version: "10.1.14",
+            major: [],
+            minor: [
+                { fr: "Petite retouche de texte", en: "Small text tweak" },
+            ],
+        },
         {
             version: "10.1.13",
             major: [],
