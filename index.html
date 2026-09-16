@@ -190,10 +190,10 @@
            (même spécificité, la cascade tranche à l'ordre). */
         @media (max-width: 480px) {
             .sky-anim .celestial {
-                left: 90%;
-                width: 30px;
-                height: 30px;
-                margin-left: -15px;
+                left: 94%;
+                width: 24px;
+                height: 24px;
+                margin-left: -12px;
             }
             .sky-anim .sun { box-shadow: 0 0 18px 6px rgba(255,190,60,0.45); }
             .sky-anim .moon {
@@ -202,8 +202,14 @@
                     inset -6px -4px 0 -1px rgba(160,168,190,0.55),
                     inset 6px 7px 0 -5px rgba(160,168,190,0.45);
             }
-            [data-theme="light"] .sky-anim .sun { top: 3%; }
-            [data-theme="dark"] .sky-anim .moon { top: 3%; }
+            /* Décalage fixe (pas en %) : sur l'écran menu, le titre peut être
+               assez large (ex: "Bully the Trousse" + emoji) pour approcher le
+               coin haut-droit même sur mobile — un "top" en % de la hauteur du
+               conteneur ne garantit pas de rester au-dessus du texte sur les
+               petits écrans. 6px colle l'astre tout en haut, sous la garde du
+               titre qui commence après le tag de version. */
+            [data-theme="light"] .sky-anim .sun { top: 6px; }
+            [data-theme="dark"] .sky-anim .moon { top: 6px; }
             html[data-world="volcans"] .sky-anim .moon { box-shadow: 0 0 14px 4px rgba(200,50,30,0.45); }
             html[data-world="volcans"][data-theme="light"] .sky-anim .sun { box-shadow: 0 0 16px 5px rgba(200,60,20,0.3); }
             /* Sur l'écran de jeu, le coin est pris par les pastilles $ / distance
@@ -1361,7 +1367,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.0.2</div>
+                <div class="version-tag" id="version-tag">v10.0.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -9637,8 +9643,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.0.2";
+    const VERSION_NUMBER = "10.0.3";
     const CHANGELOG = [
+        {
+            version: "10.0.3",
+            major: [],
+            minor: [
+                { fr: "Sur mobile en thème sombre, la lune du menu chevauchait le titre \"Bully the Trousse\" — repositionnée dans son coin, bien dégagée du texte", en: "On mobile in dark theme, the menu's moon overlapped the \"Bully the Trousse\" title — repositioned into its own corner, clear of the text" },
+            ],
+        },
         {
             version: "10.0.2",
             major: [],
