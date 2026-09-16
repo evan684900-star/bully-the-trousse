@@ -1370,7 +1370,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.6</div>
+                <div class="version-tag" id="version-tag">v10.1.7</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -9804,8 +9804,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.6";
+    const VERSION_NUMBER = "10.1.7";
     const CHANGELOG = [
+        {
+            version: "10.1.7",
+            major: [],
+            minor: [
+                { fr: "Corrige un cas où un easter egg caché récemment ajouté pouvait échouer à se déclencher si une touche restait appuyée un peu trop longtemps", en: "Fixed a case where a recently added hidden easter egg could fail to trigger if a key was held down slightly too long" },
+            ],
+        },
         {
             version: "10.1.1 - 10.1.6",
             major: [],
