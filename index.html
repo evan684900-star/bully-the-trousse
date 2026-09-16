@@ -1367,7 +1367,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.0.5</div>
+                <div class="version-tag" id="version-tag">v10.1.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1821,6 +1821,8 @@
         resultPerfect: { fr: "✨ LANCER PARFAIT !", en: "✨ PERFECT THROW!" },
         btnThrowAgain: { fr: "🔁 Relancer", en: "🔁 Throw again" },
         notEnoughMoney: { fr: "Pas assez d'argent !", en: "Not enough money!" },
+        konamiLockedHint: { fr: "🔒 Ne s'achète pas... un vieux code à taper te dirait quelque chose ?", en: "🔒 Not for sale... does an old code to type in ring a bell?" },
+        konamiUnlocked: { fr: "🎮 Code Konami reconnu ! Trousse Konami débloquée !", en: "🎮 Konami Code recognized! Konami Pencil Case unlocked!" },
         shopTabUpgrades: { fr: "⚙️ Améliorations", en: "⚙️ Upgrades" },
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
@@ -2534,6 +2536,15 @@
             id: "vampire", name: "Trousse Vampire", cost: 60000,
             desc: "+5 Puissance, +6 Vitesse. Un pacte se paie : elle vole un % de l'argent gagné à ce lancer (jusqu'à 40%, plus la distance est grande). En échange, maintiens 🦇 pendant le vol pour accélérer (3s cumulées max, une seule fois par lancer).",
             bonusPuissance: 5, bonusVitesse: 6, filter: "grayscale(0.4) saturate(2.5) hue-rotate(260deg) brightness(0.8)", isVampire: true
+        },
+        {
+            // Easter egg clavier : ↑↑↓↓←→←→BA débloque cette trousse, jamais à
+            // l'achat (voir listenForKonamiCode). Dessinée à part comme un
+            // pavé rouge "??????" (voir drawKonamiCard), clin d'œil au logo
+            // Konami dont on a caché le nom derrière des points d'interrogation.
+            id: "konami", name: "Trousse Konami", cost: null,
+            desc: "+15 Puissance, +15 Vitesse. Ne s'achète pas : un vieux code à taper sur ton clavier te dirait peut-être quelque chose...",
+            bonusPuissance: 15, bonusVitesse: 15, filter: "none", isKonami: true, secretUnlock: true
         },
     ];
 
@@ -3503,6 +3514,13 @@
             iconCanvas.height = 46;
             drawIronIngot(iconCanvas.getContext("2d"), 46);
             card.appendChild(iconCanvas);
+        } else if (skin.isKonami) {
+            // Trousse Konami : sprite dédié (pavé rouge "??????"), comme la Trousse Pièce.
+            const iconCanvas = document.createElement("canvas");
+            iconCanvas.width = 46;
+            iconCanvas.height = 46;
+            drawKonamiCard(iconCanvas.getContext("2d"), 46);
+            card.appendChild(iconCanvas);
         } else if (skin.isBasket || skin.isLunar || skin.isRocket || skin.isPlane) {
             // Baskets/cratères/flamme/ailes : superposées sur l'image de base via
             // un canvas transparent par-dessus (voir drawTrousse, même logique en jeu).
@@ -3552,6 +3570,15 @@
                 showToast("✅ " + skin.name + " équipée !");
                 refreshShop();
                 playPurchasePop();
+            });
+        } else if (skin.secretUnlock) {
+            // Ne s'achète jamais avec de l'argent : le prix affiché reste "???"
+            // et le clic ne fait qu'indiquer qu'il faut chercher ailleurs (voir
+            // listenForKonamiCode plus bas).
+            btn.textContent = "???";
+            btn.addEventListener("click", () => {
+                sfxError();
+                showToast(tr("konamiLockedHint"));
             });
         } else {
             btn.textContent = skin.cost + " $";
@@ -4165,6 +4192,34 @@
         if (e.code === "Space" && screens.game.classList.contains("active")) {
             e.preventDefault();
             handleTap();
+        }
+    });
+
+    // Easter egg clavier : ↑↑↓↓←→←→BA débloque la Trousse Konami (voir SKINS),
+    // jamais à l'achat. "e.code" (position physique de la touche) plutôt que
+    // "e.key" pour rester fidèle au code d'origine quel que soit le clavier.
+    const KONAMI_SEQUENCE = ["ArrowUp", "ArrowUp", "ArrowDown", "ArrowDown", "ArrowLeft", "ArrowRight", "ArrowLeft", "ArrowRight", "KeyB", "KeyA"];
+    let konamiProgress = 0;
+    function unlockKonamiSkin() {
+        sfxBuy();
+        playPurchasePop();
+        showToast(tr("konamiUnlocked"));
+        if (!save.ownedSkins.includes("konami")) {
+            save.ownedSkins.push("konami");
+            persist();
+        }
+        if (screens.shop.classList.contains("active")) refreshShop();
+    }
+    window.addEventListener("keydown", (e) => {
+        // Jamais pendant une saisie (pseudo, code de récupération...) : on ne
+        // veut pas voler des flèches/lettres tapées dans un champ de texte.
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        konamiProgress = (e.code === KONAMI_SEQUENCE[konamiProgress]) ? konamiProgress + 1
+            : (e.code === KONAMI_SEQUENCE[0] ? 1 : 0);
+        if (konamiProgress === KONAMI_SEQUENCE.length) {
+            konamiProgress = 0;
+            unlockKonamiSkin();
         }
     });
 
@@ -5338,6 +5393,47 @@
         targetCtx.restore();
     }
 
+    // Trousse Konami : dessinée à part comme un pavé rouge "??????" (clin
+    // d'œil au logo de l'éditeur, dont le nom reste caché), même esprit que
+    // drawPixelCoin/drawIronIngot plutôt qu'un filtre sur l'image de base.
+    function drawKonamiCard(targetCtx, size) {
+        const w = size, h = size * 0.68;
+        const top = (size - h) / 2;
+        const r = size * 0.1;
+        targetCtx.save();
+        targetCtx.translate(0, top);
+        targetCtx.beginPath();
+        targetCtx.moveTo(r, 0);
+        targetCtx.arcTo(w, 0, w, h, r);
+        targetCtx.arcTo(w, h, 0, h, r);
+        targetCtx.arcTo(0, h, 0, 0, r);
+        targetCtx.arcTo(0, 0, w, 0, r);
+        targetCtx.closePath();
+        const grad = targetCtx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, "#c81d25");
+        grad.addColorStop(1, "#8f0e14");
+        targetCtx.fillStyle = grad;
+        targetCtx.fill();
+        // fines diagonales plus claires, pour le grain du logo de référence
+        targetCtx.save();
+        targetCtx.clip();
+        targetCtx.strokeStyle = "rgba(255,255,255,0.06)";
+        targetCtx.lineWidth = size * 0.04;
+        for (let x = -h; x < w + h; x += size * 0.16) {
+            targetCtx.beginPath();
+            targetCtx.moveTo(x, h);
+            targetCtx.lineTo(x + h, 0);
+            targetCtx.stroke();
+        }
+        targetCtx.restore();
+        targetCtx.fillStyle = "#fff";
+        targetCtx.font = "900 " + Math.round(size * 0.16) + "px 'Segoe UI', Arial, sans-serif";
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText("??????", w / 2, h / 2 + h * 0.03);
+        targetCtx.restore();
+    }
+
     // Trousse Lunaire : petits cratères peints sur la trousse (blanchie via le
     // filtre grayscale/brightness du skin) pour évoquer la surface de la Lune.
     function drawCraters(targetCtx, size) {
@@ -5594,6 +5690,9 @@
         } else if (skin.isIron) {
             ctx.translate(-size / 2, -size / 2); // drawIronIngot dessine depuis (0,0)
             drawIronIngot(ctx, size);
+        } else if (skin.isKonami) {
+            ctx.translate(-size / 2, -size / 2); // drawKonamiCard dessine depuis (0,0)
+            drawKonamiCard(ctx, size);
         } else {
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
                 const filterStr = rainbowOrFilter(skin.filter, performance.now());
@@ -6685,6 +6784,9 @@
         } else if (skin.isIron) {
             c.translate(-size / 2, -size / 2);
             drawIronIngot(c, size);
+        } else if (skin.isKonami) {
+            c.translate(-size / 2, -size / 2);
+            drawKonamiCard(c, size);
         } else {
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
                 const filterStr = rainbowOrFilter(skin.filter, performance.now());
@@ -9644,8 +9746,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.0.5";
+    const VERSION_NUMBER = "10.1.0";
     const CHANGELOG = [
+        {
+            version: "10.1.0",
+            major: [
+                { fr: "Nouvel easter egg clavier : ↑↑↓↓←→←→BA débloque la Trousse Konami (+15 Puissance, +15 Vitesse), introuvable en boutique — la carte y reste affichée avec un prix \"???\" tant que le code n'a pas été tapé", en: "New keyboard easter egg: ↑↑↓↓←→←→BA unlocks the Konami Pencil Case (+15 Power, +15 Speed), never for sale — its shop card stays shown with a \"???\" price until the code is entered" },
+            ],
+            minor: [],
+        },
         {
             version: "10.0.5",
             major: [],
