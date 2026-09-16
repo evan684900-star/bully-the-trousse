@@ -387,11 +387,8 @@
         .achievement-row.locked { opacity: 0.5; }
         .achievement-row .icon { font-size: 26px; width: 34px; text-align: center; }
         .achievement-row .info { flex: 1; }
-        /* "overflow-wrap: anywhere" : certains noms/descriptions (voir l'easter
-           egg caché du Code Konami, un long texte encodé sans espaces) n'ont
-           aucun point de coupure naturel et débordaient sinon de la carte. */
-        .achievement-row .info h3 { margin: 0 0 3px; font-size: 14px; overflow-wrap: anywhere; }
-        .achievement-row .info p { margin: 0; font-size: 11.5px; color: var(--text-dim); overflow-wrap: anywhere; }
+        .achievement-row .info h3 { margin: 0 0 3px; font-size: 14px; }
+        .achievement-row .info p { margin: 0; font-size: 11.5px; color: var(--text-dim); }
         .achievement-row .pct {
             font-size: 11px; font-weight: 800; color: var(--accent);
             white-space: nowrap; text-align: right; min-width: 42px;
@@ -1370,7 +1367,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.6</div>
+                <div class="version-tag" id="version-tag">v10.1.7</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1824,8 +1821,6 @@
         resultPerfect: { fr: "✨ LANCER PARFAIT !", en: "✨ PERFECT THROW!" },
         btnThrowAgain: { fr: "🔁 Relancer", en: "🔁 Throw again" },
         notEnoughMoney: { fr: "Pas assez d'argent !", en: "Not enough money!" },
-        konamiLockedHint: { fr: "🔒 Ne s'achète pas... un vieux code à taper te dirait quelque chose ?", en: "🔒 Not for sale... does an old code to type in ring a bell?" },
-        konamiUnlocked: { fr: "🎮 Code Konami reconnu ! Trousse ?????? débloquée !", en: "🎮 Konami Code recognized! Trousse ?????? unlocked!" },
         shopTabUpgrades: { fr: "⚙️ Améliorations", en: "⚙️ Upgrades" },
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
@@ -2044,8 +2039,6 @@
         achvGifterDesc: { fr: "Envoie 1 000 000 $ en cadeaux depuis le début.", en: "Send a cumulative $1,000,000 in gifts." },
         achvMusicName: { fr: "Adorateur de la musique", en: "Music worshipper" },
         achvMusicDesc: { fr: "Écoute la musique de fond pendant 3h consécutives.", en: "Listen to the background music for 3 consecutive hours." },
-        achvKonamiName: { fr: "%E2%86%91%E2%86%91%E2%86%93%E2%86%93%E2%86%90%E2%86%92%E2%86%90%E2%86%92BA", en: "%E2%86%91%E2%86%91%E2%86%93%E2%86%93%E2%86%90%E2%86%92%E2%86%90%E2%86%92BA" },
-        achvKonamiDesc: { fr: "Ce succès va rester inconnu pendant looooooooongtemps.", en: "This achievement will stay unknown for a looooooong time." },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
             en: "Not enough active players yet for reliable stats ("
@@ -2377,7 +2370,6 @@
         { id: "defisAccomplis", emoji: "📅", nameKey: "achvDailyChallengesName", descKey: "achvDailyChallengesDesc", check: (s) => s.dailyChallenges.length >= 3 && s.dailyChallenges.every((c) => c.claimed) },
         { id: "grandDonateur", emoji: "🎁", nameKey: "achvGifterName", descKey: "achvGifterDesc", check: (s) => s.totalMoneyGifted >= 1000000 },
         { id: "adorateurMusique", emoji: "🎧", nameKey: "achvMusicName", descKey: "achvMusicDesc", check: (s) => (s.musicListenSeconds || 0) >= 10800 },
-        { id: "konamiCode", emoji: "🎮", nameKey: "achvKonamiName", descKey: "achvKonamiDesc", check: (s) => s.ownedSkins.includes("konami") },
     ];
 
     // Défis quotidiens (voir ensureDailyChallenges/bumpDailyChallenge) : 3 tirés
@@ -2542,15 +2534,6 @@
             id: "vampire", name: "Trousse Vampire", cost: 60000,
             desc: "+5 Puissance, +6 Vitesse. Un pacte se paie : elle vole un % de l'argent gagné à ce lancer (jusqu'à 40%, plus la distance est grande). En échange, maintiens 🦇 pendant le vol pour accélérer (3s cumulées max, une seule fois par lancer).",
             bonusPuissance: 5, bonusVitesse: 6, filter: "grayscale(0.4) saturate(2.5) hue-rotate(260deg) brightness(0.8)", isVampire: true
-        },
-        {
-            // Easter egg clavier : ↑↑↓↓←→←→BA débloque cette trousse, jamais à
-            // l'achat (voir listenForKonamiCode). Dessinée à part comme un
-            // pavé rouge "??????" (voir drawKonamiCard), clin d'œil au logo
-            // Konami dont on a caché le nom derrière des points d'interrogation.
-            id: "konami", name: "Trousse ??????", cost: null,
-            desc: "+15 Puissance, +15 Vitesse. Ne s'achète pas : un vieux code à taper sur ton clavier te dirait peut-être quelque chose...",
-            bonusPuissance: 15, bonusVitesse: 15, filter: "none", isKonami: true, secretUnlock: true
         },
     ];
 
@@ -3520,13 +3503,6 @@
             iconCanvas.height = 46;
             drawIronIngot(iconCanvas.getContext("2d"), 46);
             card.appendChild(iconCanvas);
-        } else if (skin.isKonami) {
-            // Trousse Konami : sprite dédié (pavé rouge "??????"), comme la Trousse Pièce.
-            const iconCanvas = document.createElement("canvas");
-            iconCanvas.width = 46;
-            iconCanvas.height = 46;
-            drawKonamiCard(iconCanvas.getContext("2d"), 46);
-            card.appendChild(iconCanvas);
         } else if (skin.isBasket || skin.isLunar || skin.isRocket || skin.isPlane) {
             // Baskets/cratères/flamme/ailes : superposées sur l'image de base via
             // un canvas transparent par-dessus (voir drawTrousse, même logique en jeu).
@@ -3576,15 +3552,6 @@
                 showToast("✅ " + skin.name + " équipée !");
                 refreshShop();
                 playPurchasePop();
-            });
-        } else if (skin.secretUnlock) {
-            // Ne s'achète jamais avec de l'argent : le prix affiché reste "???"
-            // et le clic ne fait qu'indiquer qu'il faut chercher ailleurs (voir
-            // listenForKonamiCode plus bas).
-            btn.textContent = "???";
-            btn.addEventListener("click", () => {
-                sfxError();
-                showToast(tr("konamiLockedHint"));
             });
         } else {
             btn.textContent = skin.cost + " $";
@@ -4200,85 +4167,6 @@
             handleTap();
         }
     });
-
-    // Easter egg : ↑↑↓↓←→←→BA débloque la Trousse Konami (voir SKINS), jamais
-    // à l'achat. Deux façons d'entrer la même séquence, qui alimentent le même
-    // compteur (konamiProgress) : au clavier (flèches + B/A, voir plus bas), ou
-    // au doigt sur mobile (glissés dans les 4 directions + 2 tapotis rapides
-    // pour B/A, voir konamiTouch* plus loin) — le jeu se joue au tactile, donc
-    // un easter egg clavier-only serait invisible pour la plupart des joueurs.
-    const KONAMI_SEQUENCE = ["up", "up", "down", "down", "left", "right", "left", "right", "b", "a"];
-    let konamiProgress = 0;
-    function unlockKonamiSkin() {
-        sfxBuy();
-        playPurchasePop();
-        showToast(tr("konamiUnlocked"));
-        if (!save.ownedSkins.includes("konami")) {
-            save.ownedSkins.push("konami");
-            persist();
-        }
-        if (screens.shop.classList.contains("active")) refreshShop();
-    }
-    // Fait avancer la séquence d'un cran si "token" est bien l'étape attendue,
-    // recommence à 1 s'il correspond quand même au tout premier pas ("up"),
-    // sinon repart de zéro. Commun aux deux entrées (clavier et tactile).
-    function konamiStep(token) {
-        konamiProgress = (token === KONAMI_SEQUENCE[konamiProgress]) ? konamiProgress + 1
-            : (token === KONAMI_SEQUENCE[0] ? 1 : 0);
-        if (konamiProgress === KONAMI_SEQUENCE.length) {
-            konamiProgress = 0;
-            unlockKonamiSkin();
-        }
-    }
-    // "e.code" (position physique de la touche) plutôt que "e.key" pour rester
-    // fidèle au code d'origine quel que soit le clavier.
-    const KONAMI_KEY_MAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyB: "b", KeyA: "a" };
-    window.addEventListener("keydown", (e) => {
-        // Jamais pendant une saisie (pseudo, code de récupération...) : on ne
-        // veut pas voler des flèches/lettres tapées dans un champ de texte.
-        const tag = document.activeElement && document.activeElement.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA") return;
-        const token = KONAMI_KEY_MAP[e.code];
-        if (token) konamiStep(token); // touches non mappées (Espace...) ignorées, ne cassent pas une séquence en cours
-    });
-
-    // Équivalent tactile : les 4 glissés remplacent les flèches, et un tapoti
-    // (peu de mouvement, rapide) remplace indifféremment B ou A — un doigt ne
-    // distingue pas deux boutons, donc les deux derniers pas acceptent
-    // n'importe quel tapoti tant qu'il tombe au bon moment de la séquence.
-    // Écoute globale et passive : ne gêne jamais le glissé du jeu lui-même
-    // (charge de la puissance/précision), qui reste géré par ses propres
-    // écouteurs sur le canvas.
-    const KONAMI_TAP_MAX_DIST = 12;   // px : au-delà, ce n'est plus un tapoti
-    const KONAMI_TAP_MAX_MS = 300;    // ms : au-delà, ce n'est plus un tapoti
-    const KONAMI_SWIPE_MIN_DIST = 40; // px : en-deçà, glissé trop court pour compter
-    let konamiTouchStart = null;
-    window.addEventListener("touchstart", (e) => {
-        if (e.touches.length !== 1) { konamiTouchStart = null; return; } // ignore le multi-doigt
-        const t = e.touches[0];
-        konamiTouchStart = { x: t.clientX, y: t.clientY, at: performance.now() };
-    }, { passive: true });
-    window.addEventListener("touchend", (e) => {
-        const start = konamiTouchStart;
-        konamiTouchStart = null;
-        if (!start || e.changedTouches.length !== 1) return;
-        const t = e.changedTouches[0];
-        const dx = t.clientX - start.x, dy = t.clientY - start.y;
-        const dist = Math.hypot(dx, dy);
-        const elapsed = performance.now() - start.at;
-        if (dist <= KONAMI_TAP_MAX_DIST && elapsed <= KONAMI_TAP_MAX_MS) {
-            // Un tapoti ne complète la séquence que si B ou A est bien attendu
-            // à cette étape précise ; sinon on la fait échouer proprement
-            // plutôt que de la faire progresser sur une étape directionnelle.
-            const expected = KONAMI_SEQUENCE[konamiProgress];
-            konamiStep((expected === "b" || expected === "a") ? expected : "");
-        } else if (dist >= KONAMI_SWIPE_MIN_DIST) {
-            const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
-            konamiStep(dir);
-        }
-        // Ni tapoti ni glissé franc (trop lent, trop court...) : ignoré, la
-        // séquence en cours n'est pas cassée pour un geste ambigu.
-    }, { passive: true });
 
     function handleTap() {
         if (gamePaused) return; // partie figée : ni tap, ni touche Espace
@@ -5450,47 +5338,6 @@
         targetCtx.restore();
     }
 
-    // Trousse Konami : dessinée à part comme un pavé rouge "??????" (clin
-    // d'œil au logo de l'éditeur, dont le nom reste caché), même esprit que
-    // drawPixelCoin/drawIronIngot plutôt qu'un filtre sur l'image de base.
-    function drawKonamiCard(targetCtx, size) {
-        const w = size, h = size * 0.68;
-        const top = (size - h) / 2;
-        const r = size * 0.1;
-        targetCtx.save();
-        targetCtx.translate(0, top);
-        targetCtx.beginPath();
-        targetCtx.moveTo(r, 0);
-        targetCtx.arcTo(w, 0, w, h, r);
-        targetCtx.arcTo(w, h, 0, h, r);
-        targetCtx.arcTo(0, h, 0, 0, r);
-        targetCtx.arcTo(0, 0, w, 0, r);
-        targetCtx.closePath();
-        const grad = targetCtx.createLinearGradient(0, 0, w, h);
-        grad.addColorStop(0, "#c81d25");
-        grad.addColorStop(1, "#8f0e14");
-        targetCtx.fillStyle = grad;
-        targetCtx.fill();
-        // fines diagonales plus claires, pour le grain du logo de référence
-        targetCtx.save();
-        targetCtx.clip();
-        targetCtx.strokeStyle = "rgba(255,255,255,0.06)";
-        targetCtx.lineWidth = size * 0.04;
-        for (let x = -h; x < w + h; x += size * 0.16) {
-            targetCtx.beginPath();
-            targetCtx.moveTo(x, h);
-            targetCtx.lineTo(x + h, 0);
-            targetCtx.stroke();
-        }
-        targetCtx.restore();
-        targetCtx.fillStyle = "#fff";
-        targetCtx.font = "900 " + Math.round(size * 0.16) + "px 'Segoe UI', Arial, sans-serif";
-        targetCtx.textAlign = "center";
-        targetCtx.textBaseline = "middle";
-        targetCtx.fillText("??????", w / 2, h / 2 + h * 0.03);
-        targetCtx.restore();
-    }
-
     // Trousse Lunaire : petits cratères peints sur la trousse (blanchie via le
     // filtre grayscale/brightness du skin) pour évoquer la surface de la Lune.
     function drawCraters(targetCtx, size) {
@@ -5747,9 +5594,6 @@
         } else if (skin.isIron) {
             ctx.translate(-size / 2, -size / 2); // drawIronIngot dessine depuis (0,0)
             drawIronIngot(ctx, size);
-        } else if (skin.isKonami) {
-            ctx.translate(-size / 2, -size / 2); // drawKonamiCard dessine depuis (0,0)
-            drawKonamiCard(ctx, size);
         } else {
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
                 const filterStr = rainbowOrFilter(skin.filter, performance.now());
@@ -6841,9 +6685,6 @@
         } else if (skin.isIron) {
             c.translate(-size / 2, -size / 2);
             drawIronIngot(c, size);
-        } else if (skin.isKonami) {
-            c.translate(-size / 2, -size / 2);
-            drawKonamiCard(c, size);
         } else {
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
                 const filterStr = rainbowOrFilter(skin.filter, performance.now());
@@ -9803,56 +9644,14 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.6";
+    const VERSION_NUMBER = "10.1.7";
     const CHANGELOG = [
         {
-            version: "10.1.6",
+            version: "10.1.7",
             major: [],
             minor: [
-                { fr: "Retire du journal des changements la séquence exacte de l'easter egg caché, qui y était étourdiment révélée en toutes lettres", en: "Removed the hidden easter egg's exact sequence from the changelog, which had carelessly spelled it out" },
+                { fr: "Retire l'easter egg expérimental ajouté dans les versions précédentes", en: "Removed the experimental easter egg added in previous versions" },
             ],
-        },
-        {
-            version: "10.1.5",
-            major: [
-                { fr: "L'easter egg du Code Konami se joue maintenant aussi au tactile, avec un équivalent en glissés/tapotis pour ceux qui n'ont pas de clavier", en: "The Konami Code easter egg is now also playable on touch, with a swipe/tap equivalent for those without a keyboard" },
-            ],
-            minor: [],
-        },
-        {
-            version: "10.1.4",
-            major: [],
-            minor: [
-                { fr: "Corrige le nom du succès caché de l'easter egg Konami (texte encodé sans espaces) qui débordait de sa carte dans la liste des succès", en: "Fixed the Konami easter egg's hidden achievement name (encoded text with no spaces) overflowing its card in the achievements list" },
-            ],
-        },
-        {
-            version: "10.1.3",
-            major: [],
-            minor: [
-                { fr: "Le nom du succès caché de l'easter egg Konami est maintenant son texte encodé tel quel, plutôt que les flèches décodées", en: "The Konami easter egg's hidden achievement name is now its raw encoded text, rather than the decoded arrows" },
-            ],
-        },
-        {
-            version: "10.1.2",
-            major: [],
-            minor: [
-                { fr: "La Trousse Konami garde son nom mystère (\"Trousse ??????\") même une fois débloquée, plutôt que de révéler \"Konami\"", en: "The Konami Pencil Case keeps its mystery name (\"Trousse ??????\") even once unlocked, instead of revealing \"Konami\"" },
-            ],
-        },
-        {
-            version: "10.1.1",
-            major: [],
-            minor: [
-                { fr: "Un succès caché accompagne désormais l'easter egg du Code Konami", en: "A hidden achievement now comes with the Konami Code easter egg" },
-            ],
-        },
-        {
-            version: "10.1.0",
-            major: [
-                { fr: "Nouvel easter egg caché : un vieux code bien connu débloque une trousse mystère (+15 Puissance, +15 Vitesse), introuvable en boutique — sa carte y reste affichée avec un prix \"???\"", en: "New hidden easter egg: a well-known old code unlocks a mystery pencil case (+15 Power, +15 Speed), never for sale — its shop card stays shown with a \"???\" price" },
-            ],
-            minor: [],
         },
         {
             version: "10.0.5",
