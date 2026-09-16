@@ -915,6 +915,7 @@
         /* S'affiche PAR-DESSUS la modale Réglages (même z-index de base, donc
            l'ordre du DOM déciderait sinon lequel des deux gagne) */
         #logout-confirm-modal { z-index: 55; }
+        #secret-math-modal { z-index: 55; }
 
         /* ---------- TUTORIEL (affiché une seule fois pour les nouveaux joueurs) ---------- */
         .tutorial-box {
@@ -1073,6 +1074,17 @@
             font-size: 14px; font-weight: 700;
         }
         .settings-hint { margin: 6px 0 0; font-size: 12px; color: var(--text-dim); line-height: 1.4; }
+        /* Zone cliquable minuscule tout en bas des réglages, quasi invisible
+           (voir #settings-secret-trigger) : une grande zone tactile malgré le
+           rendu discret, pour rester repérable au doigt sans se voir à l'œil. */
+        .settings-secret-trigger {
+            text-align: center;
+            font-size: 11px;
+            opacity: 0.15;
+            padding: 14px 0 2px;
+            cursor: default;
+            user-select: none;
+        }
         /* Plus spécifique que ".info-box .btn" (qui met tous les boutons en
            pleine largeur) : ici on veut un petit bouton aligné à droite de la
            ligne, pas un pavé qui prend toute la largeur de la modale. */
@@ -1370,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.10</div>
+                <div class="version-tag" id="version-tag">v10.1.11</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1779,7 +1791,23 @@
                 <a class="btn small secondary" href="musique-volcan.mp3" download="musique-volcan.mp3" data-i18n="btnMusicDownload">⬇️ Télécharger</a>
             </div>
 
+            <div class="settings-secret-trigger" id="settings-secret-trigger">·</div>
             <button class="btn" id="btn-settings-close" data-i18n="btnOk">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Défi caché atteint via #settings-secret-trigger : 4 calculs mentaux à
+     enchaîner sous 5s chacun (voir openSecretMathChallenge). Ne débloque la
+     Trousse Secrète (voir SKINS) que si les 4 réponses sont justes ET dans
+     les temps ; sinon se referme sans rien dire, comme si de rien n'était. -->
+<div class="modal-overlay" id="secret-math-modal">
+    <div class="info-box">
+        <h2 id="secret-math-title">?</h2>
+        <p class="settings-hint" id="secret-math-timer"></p>
+        <div class="account-form">
+            <input type="number" id="secret-math-input" inputmode="numeric">
+            <button class="btn small" id="secret-math-submit" data-i18n="secretMathSubmit">Valider</button>
         </div>
     </div>
 </div>
@@ -1826,6 +1854,7 @@
         notEnoughMoney: { fr: "Pas assez d'argent !", en: "Not enough money!" },
         secretLockedHint: { fr: "🔒 Ne s'achète pas... il existe peut-être un autre moyen ?", en: "🔒 Not for sale... maybe there's another way?" },
         secretUnlocked: { fr: "🔓 Secret découvert ! Trousse ?????? débloquée !", en: "🔓 Secret discovered! Trousse ?????? unlocked!" },
+        secretMathSubmit: { fr: "Valider", en: "Submit" },
         shopTabUpgrades: { fr: "⚙️ Améliorations", en: "⚙️ Upgrades" },
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
@@ -2044,7 +2073,7 @@
         achvGifterDesc: { fr: "Envoie 1 000 000 $ en cadeaux depuis le début.", en: "Send a cumulative $1,000,000 in gifts." },
         achvMusicName: { fr: "Adorateur de la musique", en: "Music worshipper" },
         achvMusicDesc: { fr: "Écoute la musique de fond pendant 3h consécutives.", en: "Listen to the background music for 3 consecutive hours." },
-        achvSecretName: { fr: "▲▲▼▼◀▶◀▶●●", en: "▲▲▼▼◀▶◀▶●●" },
+        achvSecretName: { fr: "...", en: "..." },
         achvSecretDesc: { fr: "Il n'y a rien à voir ici.", en: "There's nothing to see here." },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
@@ -4280,6 +4309,73 @@
         // Ni tapoti ni glissé franc (trop lent, trop court...) : ignoré, la
         // séquence en cours n'est pas cassée pour un geste ambigu.
     }, { passive: true });
+
+    // Deuxième chemin vers le même secret (voir #settings-secret-trigger,
+    // tout en bas des réglages) : 4 calculs mentaux enchaînés, 5 secondes
+    // chacun. L'astuce n'est pas la difficulté (volontairement simple) mais
+    // l'ordre des réponses correctes : 1, 5, 1, 5 — un clin d'œil au +15 de
+    // la trousse qu'ils débloquent.
+    const SECRET_MATH_QUESTIONS = [
+        { text: "12 − 11 = ?", answer: 1 },
+        { text: "2 × 3 − 1 = ?", answer: 5 },
+        { text: "100 ÷ 100 = ?", answer: 1 },
+        { text: "9 − 4 = ?", answer: 5 },
+    ];
+    let secretMathIndex = 0;
+    let secretMathTimerId = null;
+    let secretMathDeadline = 0;
+
+    function closeSecretMathModal() {
+        clearInterval(secretMathTimerId);
+        secretMathTimerId = null;
+        document.getElementById("secret-math-modal").classList.remove("show");
+    }
+
+    function tickSecretMathTimer() {
+        const remaining = secretMathDeadline - performance.now();
+        if (remaining <= 0) { closeSecretMathModal(); return; } // temps écoulé : échec silencieux, comme une mauvaise réponse
+        document.getElementById("secret-math-timer").textContent = Math.ceil(remaining / 1000) + "s";
+    }
+
+    function showSecretMathQuestion() {
+        const q = SECRET_MATH_QUESTIONS[secretMathIndex];
+        document.getElementById("secret-math-title").textContent = q.text;
+        const input = document.getElementById("secret-math-input");
+        input.value = "";
+        input.focus();
+        secretMathDeadline = performance.now() + 5000;
+        tickSecretMathTimer();
+        clearInterval(secretMathTimerId);
+        secretMathTimerId = setInterval(tickSecretMathTimer, 100);
+    }
+
+    function openSecretMathChallenge() {
+        secretMathIndex = 0;
+        document.getElementById("secret-math-modal").classList.add("show");
+        showSecretMathQuestion();
+    }
+
+    function submitSecretMathAnswer() {
+        const q = SECRET_MATH_QUESTIONS[secretMathIndex];
+        const val = parseInt(document.getElementById("secret-math-input").value, 10);
+        if (val !== q.answer) { closeSecretMathModal(); return; } // mauvaise réponse : échec silencieux, pas d'indice donné
+        secretMathIndex++;
+        if (secretMathIndex >= SECRET_MATH_QUESTIONS.length) {
+            closeSecretMathModal();
+            unlockSecretSkin();
+        } else {
+            showSecretMathQuestion();
+        }
+    }
+
+    document.getElementById("settings-secret-trigger").addEventListener("click", openSecretMathChallenge);
+    document.getElementById("secret-math-submit").addEventListener("click", submitSecretMathAnswer);
+    document.getElementById("secret-math-input").addEventListener("keydown", (e) => {
+        if (e.code === "Enter") submitSecretMathAnswer();
+    });
+    document.getElementById("secret-math-modal").addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) closeSecretMathModal();
+    });
 
     function handleTap() {
         if (gamePaused) return; // partie figée : ni tap, ni touche Espace
@@ -9645,6 +9741,7 @@
     // emprunté (bouton OK ou clic en dehors de la boîte).
     function closeSettingsModal() {
         document.getElementById("settings-modal").classList.remove("show");
+        closeSecretMathModal(); // évite un minuteur orphelin si les réglages se ferment pendant un calcul en cours
         resumeGame();
     }
 
@@ -9803,8 +9900,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.10";
+    const VERSION_NUMBER = "10.1.11";
     const CHANGELOG = [
+        {
+            version: "10.1.11",
+            major: [],
+            minor: [
+                { fr: "Petite retouche de texte", en: "Small text tweak" },
+            ],
+        },
         {
             version: "10.1.10",
             major: [],
