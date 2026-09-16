@@ -1370,7 +1370,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.8</div>
+                <div class="version-tag" id="version-tag">v10.1.9</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1824,6 +1824,8 @@
         resultPerfect: { fr: "✨ LANCER PARFAIT !", en: "✨ PERFECT THROW!" },
         btnThrowAgain: { fr: "🔁 Relancer", en: "🔁 Throw again" },
         notEnoughMoney: { fr: "Pas assez d'argent !", en: "Not enough money!" },
+        secretLockedHint: { fr: "🔒 Ne s'achète pas... il existe peut-être un autre moyen ?", en: "🔒 Not for sale... maybe there's another way?" },
+        secretUnlocked: { fr: "🔓 Secret découvert ! Trousse ?????? débloquée !", en: "🔓 Secret discovered! Trousse ?????? unlocked!" },
         shopTabUpgrades: { fr: "⚙️ Améliorations", en: "⚙️ Upgrades" },
         shopTabSkins: { fr: "🎨 Skins", en: "🎨 Skins" },
         shopTabTrails: { fr: "🌈 Traînées", en: "🌈 Trails" },
@@ -2042,6 +2044,8 @@
         achvGifterDesc: { fr: "Envoie 1 000 000 $ en cadeaux depuis le début.", en: "Send a cumulative $1,000,000 in gifts." },
         achvMusicName: { fr: "Adorateur de la musique", en: "Music worshipper" },
         achvMusicDesc: { fr: "Écoute la musique de fond pendant 3h consécutives.", en: "Listen to the background music for 3 consecutive hours." },
+        achvSecretName: { fr: "▲▲▼▼◀▶◀▶●●", en: "▲▲▼▼◀▶◀▶●●" },
+        achvSecretDesc: { fr: "Il n'y a rien à décoder ici. Continue de chercher.", en: "There's nothing to decode here. Keep looking." },
         achvPctNotEnough: {
             fr: "Pas assez de joueurs actifs pour afficher des statistiques fiables (",
             en: "Not enough active players yet for reliable stats ("
@@ -2373,6 +2377,7 @@
         { id: "defisAccomplis", emoji: "📅", nameKey: "achvDailyChallengesName", descKey: "achvDailyChallengesDesc", check: (s) => s.dailyChallenges.length >= 3 && s.dailyChallenges.every((c) => c.claimed) },
         { id: "grandDonateur", emoji: "🎁", nameKey: "achvGifterName", descKey: "achvGifterDesc", check: (s) => s.totalMoneyGifted >= 1000000 },
         { id: "adorateurMusique", emoji: "🎧", nameKey: "achvMusicName", descKey: "achvMusicDesc", check: (s) => (s.musicListenSeconds || 0) >= 10800 },
+        { id: "secretTrouve", emoji: "🔓", nameKey: "achvSecretName", descKey: "achvSecretDesc", check: (s) => s.ownedSkins.includes("secret") },
     ];
 
     // Défis quotidiens (voir ensureDailyChallenges/bumpDailyChallenge) : 3 tirés
@@ -2537,6 +2542,14 @@
             id: "vampire", name: "Trousse Vampire", cost: 60000,
             desc: "+5 Puissance, +6 Vitesse. Un pacte se paie : elle vole un % de l'argent gagné à ce lancer (jusqu'à 40%, plus la distance est grande). En échange, maintiens 🦇 pendant le vol pour accélérer (3s cumulées max, une seule fois par lancer).",
             bonusPuissance: 5, bonusVitesse: 6, filter: "grayscale(0.4) saturate(2.5) hue-rotate(260deg) brightness(0.8)", isVampire: true
+        },
+        {
+            // Easter egg clavier/tactile : une séquence secrète débloque cette
+            // trousse, jamais à l'achat (voir listenForSecretCode). Dessinée à
+            // part comme un pavé "??????" (voir drawSecretCard).
+            id: "secret", name: "Trousse ??????", cost: null,
+            desc: "+15 Puissance, +15 Vitesse. Ne s'achète pas : il existe un autre moyen de la débloquer...",
+            bonusPuissance: 15, bonusVitesse: 15, filter: "none", isSecretSkin: true, secretUnlock: true
         },
     ];
 
@@ -3506,6 +3519,13 @@
             iconCanvas.height = 46;
             drawIronIngot(iconCanvas.getContext("2d"), 46);
             card.appendChild(iconCanvas);
+        } else if (skin.isSecretSkin) {
+            // Trousse secrète : sprite dédié (pavé "??????"), comme la Trousse Pièce.
+            const iconCanvas = document.createElement("canvas");
+            iconCanvas.width = 46;
+            iconCanvas.height = 46;
+            drawSecretCard(iconCanvas.getContext("2d"), 46);
+            card.appendChild(iconCanvas);
         } else if (skin.isBasket || skin.isLunar || skin.isRocket || skin.isPlane) {
             // Baskets/cratères/flamme/ailes : superposées sur l'image de base via
             // un canvas transparent par-dessus (voir drawTrousse, même logique en jeu).
@@ -3555,6 +3575,15 @@
                 showToast("✅ " + skin.name + " équipée !");
                 refreshShop();
                 playPurchasePop();
+            });
+        } else if (skin.secretUnlock) {
+            // Ne s'achète jamais avec de l'argent : le prix affiché reste "???"
+            // et le clic ne fait qu'indiquer qu'il faut chercher ailleurs (voir
+            // listenForSecretCode plus bas).
+            btn.textContent = "???";
+            btn.addEventListener("click", () => {
+                sfxError();
+                showToast(tr("secretLockedHint"));
             });
         } else {
             btn.textContent = skin.cost + " $";
@@ -4170,6 +4199,87 @@
             handleTap();
         }
     });
+
+    // Easter egg : une séquence secrète débloque la Trousse Secrète (voir
+    // SKINS), jamais à l'achat. Deux façons d'entrer la même séquence, qui
+    // alimentent le même compteur (secretProgress) : au clavier (flèches +
+    // B/A, voir plus bas), ou au doigt sur mobile (glissés dans les 4
+    // directions + 2 tapotis rapides, voir secretTouch* plus loin) — le jeu
+    // se joue au tactile, donc un easter egg clavier-only serait invisible
+    // pour la plupart des joueurs.
+    const SECRET_SEQUENCE = ["down", "down", "up", "up", "right", "left", "right", "left", "a", "b"];
+    let secretProgress = 0;
+    function unlockSecretSkin() {
+        sfxBuy();
+        playPurchasePop();
+        showToast(tr("secretUnlocked"));
+        if (!save.ownedSkins.includes("secret")) {
+            save.ownedSkins.push("secret");
+            persist();
+        }
+        if (screens.shop.classList.contains("active")) refreshShop();
+    }
+    // Fait avancer la séquence d'un cran si "token" est bien l'étape attendue,
+    // recommence à 1 s'il correspond quand même au tout premier pas ("down"),
+    // sinon repart de zéro. Commun aux deux entrées (clavier et tactile).
+    function secretStep(token) {
+        secretProgress = (token === SECRET_SEQUENCE[secretProgress]) ? secretProgress + 1
+            : (token === SECRET_SEQUENCE[0] ? 1 : 0);
+        if (secretProgress === SECRET_SEQUENCE.length) {
+            secretProgress = 0;
+            unlockSecretSkin();
+        }
+    }
+    // "e.code" (position physique de la touche) plutôt que "e.key" pour rester
+    // cohérent quel que soit le clavier.
+    const SECRET_KEY_MAP = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", KeyA: "a", KeyB: "b" };
+    window.addEventListener("keydown", (e) => {
+        // Jamais pendant une saisie (pseudo, code de récupération...) : on ne
+        // veut pas voler des flèches/lettres tapées dans un champ de texte.
+        const tag = document.activeElement && document.activeElement.tagName;
+        if (tag === "INPUT" || tag === "TEXTAREA") return;
+        if (e.repeat) return; // une touche tenue enfoncée répète "keydown" en rafale : ça compterait comme plusieurs pas identiques et casserait la séquence
+        const token = SECRET_KEY_MAP[e.code];
+        if (token) secretStep(token); // touches non mappées (Espace...) ignorées, ne cassent pas une séquence en cours
+    });
+
+    // Équivalent tactile : les 4 glissés remplacent les flèches, et un tapoti
+    // (peu de mouvement, rapide) remplace indifféremment A ou B — un doigt ne
+    // distingue pas deux boutons, donc les deux derniers pas acceptent
+    // n'importe quel tapoti tant qu'il tombe au bon moment de la séquence.
+    // Écoute globale et passive : ne gêne jamais le glissé du jeu lui-même
+    // (charge de la puissance/précision), qui reste géré par ses propres
+    // écouteurs sur le canvas.
+    const SECRET_TAP_MAX_DIST = 12;   // px : au-delà, ce n'est plus un tapoti
+    const SECRET_TAP_MAX_MS = 300;    // ms : au-delà, ce n'est plus un tapoti
+    const SECRET_SWIPE_MIN_DIST = 40; // px : en-deçà, glissé trop court pour compter
+    let secretTouchStart = null;
+    window.addEventListener("touchstart", (e) => {
+        if (e.touches.length !== 1) { secretTouchStart = null; return; } // ignore le multi-doigt
+        const t = e.touches[0];
+        secretTouchStart = { x: t.clientX, y: t.clientY, at: performance.now() };
+    }, { passive: true });
+    window.addEventListener("touchend", (e) => {
+        const start = secretTouchStart;
+        secretTouchStart = null;
+        if (!start || e.changedTouches.length !== 1) return;
+        const t = e.changedTouches[0];
+        const dx = t.clientX - start.x, dy = t.clientY - start.y;
+        const dist = Math.hypot(dx, dy);
+        const elapsed = performance.now() - start.at;
+        if (dist <= SECRET_TAP_MAX_DIST && elapsed <= SECRET_TAP_MAX_MS) {
+            // Un tapoti ne complète la séquence que si A ou B est bien attendu
+            // à cette étape précise ; sinon on la fait échouer proprement
+            // plutôt que de la faire progresser sur une étape directionnelle.
+            const expected = SECRET_SEQUENCE[secretProgress];
+            secretStep((expected === "a" || expected === "b") ? expected : "");
+        } else if (dist >= SECRET_SWIPE_MIN_DIST) {
+            const dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? "right" : "left") : (dy > 0 ? "down" : "up");
+            secretStep(dir);
+        }
+        // Ni tapoti ni glissé franc (trop lent, trop court...) : ignoré, la
+        // séquence en cours n'est pas cassée pour un geste ambigu.
+    }, { passive: true });
 
     function handleTap() {
         if (gamePaused) return; // partie figée : ni tap, ni touche Espace
@@ -5341,6 +5451,46 @@
         targetCtx.restore();
     }
 
+    // Trousse secrète : dessinée à part comme un pavé sombre "??????", même
+    // esprit que drawPixelCoin/drawIronIngot plutôt qu'un filtre sur l'image
+    // de base.
+    function drawSecretCard(targetCtx, size) {
+        const w = size, h = size * 0.68;
+        const top = (size - h) / 2;
+        const r = size * 0.1;
+        targetCtx.save();
+        targetCtx.translate(0, top);
+        targetCtx.beginPath();
+        targetCtx.moveTo(r, 0);
+        targetCtx.arcTo(w, 0, w, h, r);
+        targetCtx.arcTo(w, h, 0, h, r);
+        targetCtx.arcTo(0, h, 0, 0, r);
+        targetCtx.arcTo(0, 0, w, 0, r);
+        targetCtx.closePath();
+        const grad = targetCtx.createLinearGradient(0, 0, w, h);
+        grad.addColorStop(0, "#3a2d6b");
+        grad.addColorStop(1, "#1c1440");
+        targetCtx.fillStyle = grad;
+        targetCtx.fill();
+        targetCtx.save();
+        targetCtx.clip();
+        targetCtx.strokeStyle = "rgba(255,255,255,0.06)";
+        targetCtx.lineWidth = size * 0.04;
+        for (let x = -h; x < w + h; x += size * 0.16) {
+            targetCtx.beginPath();
+            targetCtx.moveTo(x, h);
+            targetCtx.lineTo(x + h, 0);
+            targetCtx.stroke();
+        }
+        targetCtx.restore();
+        targetCtx.fillStyle = "#fff";
+        targetCtx.font = "900 " + Math.round(size * 0.16) + "px 'Segoe UI', Arial, sans-serif";
+        targetCtx.textAlign = "center";
+        targetCtx.textBaseline = "middle";
+        targetCtx.fillText("??????", w / 2, h / 2 + h * 0.03);
+        targetCtx.restore();
+    }
+
     // Trousse Lunaire : petits cratères peints sur la trousse (blanchie via le
     // filtre grayscale/brightness du skin) pour évoquer la surface de la Lune.
     function drawCraters(targetCtx, size) {
@@ -5597,6 +5747,9 @@
         } else if (skin.isIron) {
             ctx.translate(-size / 2, -size / 2); // drawIronIngot dessine depuis (0,0)
             drawIronIngot(ctx, size);
+        } else if (skin.isSecretSkin) {
+            ctx.translate(-size / 2, -size / 2); // drawSecretCard dessine depuis (0,0)
+            drawSecretCard(ctx, size);
         } else {
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
                 const filterStr = rainbowOrFilter(skin.filter, performance.now());
@@ -6688,6 +6841,9 @@
         } else if (skin.isIron) {
             c.translate(-size / 2, -size / 2);
             drawIronIngot(c, size);
+        } else if (skin.isSecretSkin) {
+            c.translate(-size / 2, -size / 2);
+            drawSecretCard(c, size);
         } else {
             if (trousseImg.complete && trousseImg.naturalWidth > 0) {
                 const filterStr = rainbowOrFilter(skin.filter, performance.now());
@@ -9647,8 +9803,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.8";
+    const VERSION_NUMBER = "10.1.9";
     const CHANGELOG = [
+        {
+            version: "10.1.9",
+            major: [
+                { fr: "Nouvel easter egg caché à découvrir...", en: "New hidden easter egg to discover..." },
+            ],
+            minor: [],
+        },
         {
             version: "10.1.8",
             major: [],
