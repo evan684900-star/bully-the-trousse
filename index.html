@@ -1367,7 +1367,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.0.3</div>
+                <div class="version-tag" id="version-tag">v10.0.4</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -7170,12 +7170,13 @@
         // une position aléatoire DANS sa tranche : la plage change vraiment
         // d'un lancer à l'autre sans jamais s'empiler.
         const slot = 520;
-        // Couvre jusqu'à ~15000m : des joueurs dépassent déjà les 8000m avec
+        // Couvre jusqu'à 100 000m : des joueurs dépassent déjà les 50 000m avec
         // des niveaux Puissance/Vitesse élevés, laissant la plage vide au-delà
         // de la portée générée. Le culling de drawBeachProps limite déjà le
         // coût de rendu au champ visible, donc étendre ce tableau ne coûte
-        // rien à l'affichage.
-        const count = Math.ceil((15000 * SCALE) / slot);
+        // rien à l'affichage (juste plus d'entrées dans un tableau généré une
+        // seule fois par lancer, jamais par frame).
+        const count = Math.ceil((100000 * SCALE) / slot);
         for (let i = 0; i < count; i++) {
             const roll = Math.random();
             const type = roll < 0.4 ? "parasol" : (roll < 0.75 ? "towel" : "castle");
@@ -9643,8 +9644,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.0.3";
+    const VERSION_NUMBER = "10.0.4";
     const CHANGELOG = [
+        {
+            version: "10.0.4",
+            major: [],
+            minor: [
+                { fr: "La portée de décor de la Plage passe de ~15000m à 100000m : des joueurs dépassaient déjà les 50000m, retrouvant une plage vide au-delà", en: "Beach scenery range goes from ~15000m to 100000m: some players already went past 50000m, ending up on an empty beach beyond that" },
+            ],
+        },
         {
             version: "10.0.3",
             major: [],
