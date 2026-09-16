@@ -1382,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.11</div>
+                <div class="version-tag" id="version-tag">v10.1.12</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -4312,14 +4312,14 @@
 
     // Deuxième chemin vers le même secret (voir #settings-secret-trigger,
     // tout en bas des réglages) : 4 calculs mentaux enchaînés, 5 secondes
-    // chacun. L'astuce n'est pas la difficulté (volontairement simple) mais
-    // l'ordre des réponses correctes : 1, 5, 1, 5 — un clin d'œil au +15 de
-    // la trousse qu'ils débloquent.
+    // chacun, volontairement corsés (multiplications à deux chiffres). Leur
+    // seul point commun : les réponses suivent l'ordre 1, 5, 1, 5 — un clin
+    // d'œil au +15 de la trousse qu'ils débloquent.
     const SECRET_MATH_QUESTIONS = [
-        { text: "12 − 11 = ?", answer: 1 },
-        { text: "2 × 3 − 1 = ?", answer: 5 },
-        { text: "100 ÷ 100 = ?", answer: 1 },
-        { text: "9 − 4 = ?", answer: 5 },
+        { text: "38 × 17 − 645 = ?", answer: 1 },
+        { text: "47 × 23 − 1076 = ?", answer: 5 },
+        { text: "63 × 29 − 1826 = ?", answer: 1 },
+        { text: "84 × 19 − 1591 = ?", answer: 5 },
     ];
     let secretMathIndex = 0;
     let secretMathTimerId = null;
@@ -9900,8 +9900,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.11";
+    const VERSION_NUMBER = "10.1.12";
     const CHANGELOG = [
+        {
+            version: "10.1.12",
+            major: [],
+            minor: [
+                { fr: "Petite retouche de texte", en: "Small text tweak" },
+            ],
+        },
         {
             version: "10.1.11",
             major: [],
