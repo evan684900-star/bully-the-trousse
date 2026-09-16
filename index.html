@@ -1382,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.12</div>
+                <div class="version-tag" id="version-tag">v10.1.13</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -4063,9 +4063,11 @@
 
     // Trousse Vampire : bouton 🦇 maintenu pendant le vol (voir gameLoop et
     // wireVampireBoostButton). vampireBoosting = maintenu là tout de suite ;
-    // vampireBoostSecondsLeft = combien de temps il reste avant le plafond ;
-    // vampireBoostUsed = déjà utilisé une fois ce lancer (relâché ou plafond
-    // atteint), le bouton disparaît alors jusqu'au prochain lancer.
+    // vampireBoostSecondsLeft = combien de temps il reste avant le plafond,
+    // partagé entre plusieurs appuis/relâchements (relâcher avant le plafond
+    // met juste en pause, ça ne consomme pas le reste) ; vampireBoostUsed =
+    // budget de 3s entièrement épuisé, le bouton disparaît alors jusqu'au
+    // prochain lancer.
     let vampireBoosting = false;
     let vampireBoostSecondsLeft = VAMPIRE_BOOST_MAX_SECONDS;
     let vampireBoostUsed = false;
@@ -4628,8 +4630,13 @@
     }
 
     // Trousse Vampire : bouton 🦇 maintenu pendant le vol (voir gameLoop,
-    // section "flying"). Une seule utilisation par lancer : relâcher avant le
-    // plafond de temps le consomme quand même (voir endVampireBoost).
+    // section "flying"). Les 3s de budget sont cumulées sur plusieurs
+    // appuis/relâchements : relâcher avant le plafond met juste le boost en
+    // pause, il redevient disponible au prochain appui (voir
+    // vampireBoostSecondsLeft, décrémenté uniquement pendant "vampireBoosting").
+    // Le bouton n'est définitivement "utilisé" (et caché) qu'une fois ce
+    // budget épuisé (voir gameLoop, section "flying", qui rappelle cette
+    // fonction quand vampireBoostSecondsLeft atteint 0).
     // endVampireBoost() ne fait rien si le boost n'était pas en cours : sans
     // cette garde, un simple survol de la souris (pointerleave se déclenche
     // même sans avoir jamais appuyé) consommait l'utilisation du lancer sans
@@ -4638,8 +4645,10 @@
     function endVampireBoost() {
         if (!vampireBoosting) return;
         vampireBoosting = false;
-        vampireBoostUsed = true;
-        document.getElementById("btn-vampire-boost").classList.remove("show");
+        if (vampireBoostSecondsLeft <= 0) {
+            vampireBoostUsed = true;
+            document.getElementById("btn-vampire-boost").classList.remove("show");
+        }
     }
     function startVampireBoost(e) {
         e.preventDefault();
@@ -9900,13 +9909,13 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.12";
+    const VERSION_NUMBER = "10.1.13";
     const CHANGELOG = [
         {
-            version: "10.1.12",
+            version: "10.1.13",
             major: [],
             minor: [
-                { fr: "Petite retouche de texte", en: "Small text tweak" },
+                { fr: "Corrige le bouton 🦇 de la Trousse Vampire qui disparaissait pour le reste du lancer dès qu'on le relâchait avant les 3s, même s'il restait du temps de boost", en: "Fixed the Vampire Pencil Case's 🦇 button vanishing for the rest of the throw as soon as it was released before the 3s cap, even with boost time still remaining" },
             ],
         },
         {
