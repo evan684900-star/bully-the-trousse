@@ -1370,7 +1370,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.5</div>
+                <div class="version-tag" id="version-tag">v10.1.6</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -9803,12 +9803,19 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.5";
+    const VERSION_NUMBER = "10.1.6";
     const CHANGELOG = [
+        {
+            version: "10.1.6",
+            major: [],
+            minor: [
+                { fr: "Retire du journal des changements la séquence exacte de l'easter egg caché, qui y était étourdiment révélée en toutes lettres", en: "Removed the hidden easter egg's exact sequence from the changelog, which had carelessly spelled it out" },
+            ],
+        },
         {
             version: "10.1.5",
             major: [
-                { fr: "L'easter egg du Code Konami se joue maintenant aussi au tactile : 4 glissés (haut/haut/bas/bas/gauche/droite/gauche/droite) suivis de 2 tapotis rapides remplacent les flèches et B/A du clavier", en: "The Konami Code easter egg is now also playable on touch: 4 swipes (up/up/down/down/left/right/left/right) followed by 2 quick taps replace the keyboard's arrows and B/A" },
+                { fr: "L'easter egg du Code Konami se joue maintenant aussi au tactile, avec un équivalent en glissés/tapotis pour ceux qui n'ont pas de clavier", en: "The Konami Code easter egg is now also playable on touch, with a swipe/tap equivalent for those without a keyboard" },
             ],
             minor: [],
         },
@@ -9843,7 +9850,7 @@
         {
             version: "10.1.0",
             major: [
-                { fr: "Nouvel easter egg clavier : ↑↑↓↓←→←→BA débloque la Trousse Konami (+15 Puissance, +15 Vitesse), introuvable en boutique — la carte y reste affichée avec un prix \"???\" tant que le code n'a pas été tapé", en: "New keyboard easter egg: ↑↑↓↓←→←→BA unlocks the Konami Pencil Case (+15 Power, +15 Speed), never for sale — its shop card stays shown with a \"???\" price until the code is entered" },
+                { fr: "Nouvel easter egg caché : un vieux code bien connu débloque une trousse mystère (+15 Puissance, +15 Vitesse), introuvable en boutique — sa carte y reste affichée avec un prix \"???\"", en: "New hidden easter egg: a well-known old code unlocks a mystery pencil case (+15 Power, +15 Speed), never for sale — its shop card stays shown with a \"???\" price" },
             ],
             minor: [],
         },
