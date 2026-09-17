@@ -1382,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.2.0</div>
+                <div class="version-tag" id="version-tag">v10.2.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2348,7 +2348,7 @@
     // Skin "Trousse Pièce" : à chaque lancer, COIN_BONUS_CHANCE de déclencher
     // un bonus, puis le multiplicateur exact est tiré parmi COIN_MULTIPLIERS
     // (sous-probabilités qui s'appliquent SI le bonus s'est déclenché).
-    const COIN_BONUS_CHANCE = 0.40;
+    const COIN_BONUS_CHANCE = 0.50;
     const COIN_MULTIPLIERS = [
         { value: 1.6, chance: 0.60 },
         { value: 2, chance: 0.29 },
@@ -2513,13 +2513,13 @@
             bonusPuissance: 5, bonusVitesse: 5, filter: "rainbow" // cas spécial : géré par rainbowOrFilter()
         },
         {
-            // Clin d'œil "pile ou face" : pas de bonus de stats, mais 40% de
+            // Clin d'œil "pile ou face" : pas de bonus de stats, mais 50% de
             // chance à chaque lancer de multiplier le score du coup (voir
             // COIN_BONUS_CHANCE et onLanded()). Dessinée comme une pièce
             // pixelisée à part (voir drawPixelCoin) plutôt que réutiliser
             // l'image de la trousse.
             id: "piece", name: "Trousse Pièce", cost: 2500,
-            desc: "Aucun bonus de stats, mais 40% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3, x5... voire x10) !",
+            desc: "Aucun bonus de stats, mais 50% de chance à chaque lancer de multiplier ton score (x1.6, x2, x3, x5... voire x10) !",
             bonusPuissance: 0, bonusVitesse: 0, filter: "none", isCoin: true
         },
         {
@@ -9868,8 +9868,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.2.0";
+    const VERSION_NUMBER = "10.2.1";
     const CHANGELOG = [
+        {
+            version: "10.2.1",
+            major: [],
+            minor: [
+                { fr: "Chance de bonus de la Trousse Pièce augmentée (40% → 50%)", en: "Coin Pencil Case bonus chance increased (40% → 50%)" },
+            ],
+        },
         {
             version: "10.2.0",
             major: [
