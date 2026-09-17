@@ -1382,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.1.15</div>
+                <div class="version-tag" id="version-tag">v10.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2072,6 +2072,22 @@
         achvGifterDesc: { fr: "Envoie 1 000 000 $ en cadeaux depuis le début.", en: "Send a cumulative $1,000,000 in gifts." },
         achvMusicName: { fr: "Adorateur de la musique", en: "Music worshipper" },
         achvMusicDesc: { fr: "Écoute la musique de fond pendant 3h consécutives.", en: "Listen to the background music for 3 consecutive hours." },
+        achvForgetfulName: { fr: "Étourdi", en: "Forgetful" },
+        achvForgetfulDesc: { fr: "Oublie ton argent en arrivant à la plage.", en: "Forget your money when arriving at the beach." },
+        achv20000mName: { fr: "20 000 m", en: "20,000 m" },
+        achv20000mDesc: { fr: "Atteins un record de 20 000 m.", en: "Reach a record of 20,000 m." },
+        achv50000mName: { fr: "50 000 m", en: "50,000 m" },
+        achv50000mDesc: { fr: "Atteins un record de 50 000 m.", en: "Reach a record of 50,000 m." },
+        achvMultiMillionaireName: { fr: "Multimillionnaire", en: "Multimillionaire" },
+        achvMultiMillionaireDesc: { fr: "Gagne 10 000 000 $ depuis le début.", en: "Earn a cumulative $10,000,000." },
+        achvAvatarName: { fr: "Change de tête", en: "New look" },
+        achvAvatarDesc: { fr: "Choisis une photo de profil.", en: "Pick a profile picture." },
+        achvPlage5000Name: { fr: "5000 m à la plage", en: "5000 m at the beach" },
+        achvPlage5000Desc: { fr: "Atteins un record de 5000 m sur la plage.", en: "Reach a record of 5000 m at the beach." },
+        achv1000ThrowsName: { fr: "1000 lancers", en: "1000 throws" },
+        achv1000ThrowsDesc: { fr: "Effectue 1000 lancers au total.", en: "Make 1000 throws in total." },
+        achvLevel100Name: { fr: "Niveau 100", en: "Level 100" },
+        achvLevel100Desc: { fr: "Atteins un total de 100 niveaux (Puissance + Vitesse).", en: "Reach a combined total of 100 levels (Power + Speed)." },
         achvSecretName: { fr: "...", en: "..." },
         achvSecretDesc: { fr: "Il n'y a rien à voir ici.", en: "There's nothing to see here." },
         achvPctNotEnough: {
@@ -2409,6 +2425,14 @@
         { id: "defisAccomplis", emoji: "📅", nameKey: "achvDailyChallengesName", descKey: "achvDailyChallengesDesc", check: (s) => s.dailyChallenges.length >= 3 && s.dailyChallenges.every((c) => c.claimed) },
         { id: "grandDonateur", emoji: "🎁", nameKey: "achvGifterName", descKey: "achvGifterDesc", check: (s) => s.totalMoneyGifted >= 1000000 },
         { id: "adorateurMusique", emoji: "🎧", nameKey: "achvMusicName", descKey: "achvMusicDesc", check: (s) => (s.musicListenSeconds || 0) >= 10800 },
+        { id: "etourdi", emoji: "🤦", nameKey: "achvForgetfulName", descKey: "achvForgetfulDesc", check: (s) => s.hasForgottenMoney },
+        { id: "vingtMille20000m", emoji: "🌍", nameKey: "achv20000mName", descKey: "achv20000mDesc", check: (s) => s.bestDistance >= 20000 },
+        { id: "cinquanteMille50000m", emoji: "🛰️", nameKey: "achv50000mName", descKey: "achv50000mDesc", check: (s) => s.bestDistance >= 50000 },
+        { id: "multiMillionnaire", emoji: "💎", nameKey: "achvMultiMillionaireName", descKey: "achvMultiMillionaireDesc", check: (s) => s.totalMoneyEarned >= 10000000 },
+        { id: "changeDeTete", emoji: "🖼️", nameKey: "achvAvatarName", descKey: "achvAvatarDesc", check: (s) => !!s.avatarEmoji },
+        { id: "plage5000", emoji: "🐚", nameKey: "achvPlage5000Name", descKey: "achvPlage5000Desc", check: (s) => s.plageBestDistance >= 5000 },
+        { id: "milleLancers", emoji: "🔥", nameKey: "achv1000ThrowsName", descKey: "achv1000ThrowsDesc", check: (s) => s.totalThrows >= 1000 },
+        { id: "niveau100", emoji: "👑", nameKey: "achvLevel100Name", descKey: "achvLevel100Desc", check: (s) => s.puissanceLevel + s.vitesseLevel >= 100 },
         { id: "secretTrouve", emoji: "🔓", nameKey: "achvSecretName", descKey: "achvSecretDesc", check: (s) => s.ownedSkins.includes("secret") },
     ];
 
@@ -9844,8 +9868,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.1.15";
+    const VERSION_NUMBER = "10.2.0";
     const CHANGELOG = [
+        {
+            version: "10.2.0",
+            major: [
+                { fr: "8 nouveaux succès : Étourdi (oublier son argent à la plage), 20 000m et 50 000m, Multimillionnaire (10M$), Change de tête (choisir un avatar), 5000m à la plage, 1000 lancers, et Niveau 100", en: "8 new achievements: Forgetful (forget your money at the beach), 20,000m and 50,000m, Multimillionaire ($10M), New look (pick an avatar), 5000m at the beach, 1000 throws, and Level 100" },
+            ],
+            minor: [],
+        },
         {
             version: "10.1.15",
             major: [],
