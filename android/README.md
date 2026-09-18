@@ -204,20 +204,56 @@ Android) avant d'être branché à l'affichage dans `:app`.
   Menu en pleine charge (avant le 3e tap) abandonne ce lancer plutôt que de
   le mettre en pause — un nouvel écran Jeu repart toujours de `Idle`.
 
-## Ce qu'il reste à faire (dans un ordre logique)
+- **Firebase (scaffolding, pas branché)** : `CloudSaveSync` dans `:core`
+  (la seule vraie *logique* de la synchronisation cloud — résolution de
+  conflit entre sauvegarde locale et copie distante reçue, portage exact de
+  `flushPendingRemoteSave()` : une copie reçue avant le dernier `persist()`
+  local est ignorée pour ne pas régresser un lancer qui vient de se
+  terminer), testé (133 tests au total). `FirebaseSaveRepository` dans
+  `:app` (connexion anonyme, pousser/lire la sauvegarde et le classement,
+  portage best-effort de `pushCloudSave()`/`syncCloudSaveOnLogin()`/
+  `pushScoreTo()`) et les dépendances Firebase (BoM, Auth, Firestore) dans
+  `app/build.gradle.kts`.
 
-1. **Vrai sprite pour la trousse** — remplacer sa forme vectorielle par un
+  **`GameRoot` n'appelle rien de tout ça** : c'est écrit et prêt, mais pas
+  relié, pour trois raisons qui se recoupent :
+  1. Il faut un vrai projet Firebase (console Firebase → ajouter une app
+     Android → télécharger `google-services.json` dans `app/`) — rien de
+     générique à committer ici, ce sont de vrais identifiants propres à ce
+     projet.
+  2. Le plugin `com.google.gms.google-services` (nécessaire pour lire ce
+     fichier) reste en commentaire dans `app/build.gradle.kts` : l'appliquer
+     sans le fichier ferait échouer TOUT le build, y compris pour quelqu'un
+     qui n'a pas encore configuré Firebase.
+  3. **Ce module n'a pas pu être compilé ni testé dans ce bac à sable**
+     (même blocage que l'Android Gradle Plugin : le SDK Firebase se
+     résout via `google()`, injoignable ici) — écrit avec le même soin que
+     le reste, mais à valider dans Android Studio une fois les deux points
+     précédents réglés.
+
+  Divergence assumée par rapport au web : la sauvegarde cloud est stockée
+  comme une seule chaîne JSON (`SaveCodec`, déjà porté) plutôt qu'un champ
+  Firestore par propriété — plus simple et fidèle à écrire/relire, au prix
+  de ne pas pouvoir interroger un champ précis côté serveur (le classement,
+  lui, garde un champ dédié puisque c'est justement ce qu'on veut trier).
+
+  Hors scope de ce scaffolding (à faire plus tard si besoin) : la liaison
+  de compte par code de récupération, les cadeaux, les abonnés, le profil
+  public — tout ce qui dépend de la structure de compte multi-appareils
+  construite côté web cette session.
+
+## Ce qu'il reste à faire
+
+1. **Créer le projet Firebase et brancher `FirebaseSaveRepository`** —
+   suivre les 3 points ci-dessus, puis appeler `ensureSignedIn()`/
+   `fetchCloudSave()`/`pushCloudSave()` depuis `GameRoot` (au lancement et
+   après chaque `onSaveChange`), avec `CloudSaveSync.shouldApplyRemoteSave()`
+   pour arbitrer. Tout le reste du jeu (physique, mondes, skins, succès,
+   défis) est fonctionnellement complet côté `:core`/`:app`.
+2. **Vrai sprite pour la trousse** — remplacer sa forme vectorielle par un
    vrai sprite (+ ses variantes de skins, maintenant que la liste des skins
-   existe), si des assets sont fournis.
-2. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
-   les comptes, le classement, les cadeaux — la synchronisation cloud des
-   succès/défis déjà portés localement inclue. Probablement la partie la
-   plus longue, vu tout ce qui a été construit et corrigé côté web cette
-   session (comptes multi-appareils, cadeaux, etc.) — **et pas vérifiable
-   dans ce bac à sable** : le SDK Firebase Android a le même problème que
-   l'Android Gradle Plugin (dépôt Google Maven injoignable ici), et il
-   faudrait de vrais identifiants de projet Firebase. À faire dans Android
-   Studio directement.
+   existe) ; bloqué faute d'assets graphiques fournis, rien à faire côté
+   code tant qu'aucune image n'est disponible.
 
 Chaque étape devrait suivre le même principe que celle-ci : porter la
 logique dans `:core` avec des tests dont les valeurs de référence viennent
