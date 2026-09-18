@@ -22,6 +22,7 @@ import com.bullythetrousse.core.Camera
 import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.FlightSimulator
 import com.bullythetrousse.core.FlightState
+import com.bullythetrousse.core.Skid
 import com.bullythetrousse.core.ThrowResult
 import com.bullythetrousse.core.rotationSpeed
 import com.bullythetrousse.core.toInitialFlightState
@@ -217,6 +218,35 @@ fun animateFlight(result: ThrowResult, onLanded: () -> Unit): FlightState {
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
         }
         onLanded()
+    }
+
+    return state
+}
+
+/**
+ * Anime le dérapage du monde Volcan (voir [Skid], `:core`) : la trousse
+ * continue de glisser au sol depuis [landingWorldX] jusqu'à la cible tirée
+ * au hasard, pas à pas. `onFinished` est appelé une seule fois, avec la
+ * position finale, quand la glissade s'arrête.
+ */
+@Composable
+fun animateSkid(landingWorldX: Double, onFinished: (finalWorldX: Double) -> Unit): FlightState {
+    val target = remember(landingWorldX) { Skid.targetWorldX(landingWorldX) }
+    var state by remember(landingWorldX) { mutableStateOf(FlightState(worldX = landingWorldX, worldY = 0.0, vx = 0.0, vy = 0.0)) }
+
+    LaunchedEffect(landingWorldX) {
+        var lastFrameMillis = System.currentTimeMillis()
+        var finished = false
+        while (!finished) {
+            withFrameNanos { }
+            val now = System.currentTimeMillis()
+            val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
+            lastFrameMillis = now
+            val step = Skid.step(worldX = state.worldX, targetWorldX = target, rotation = state.rotation, dt = dt)
+            state = state.copy(worldX = step.worldX, rotation = step.rotation)
+            finished = step.finished
+        }
+        onFinished(state.worldX)
     }
 
     return state

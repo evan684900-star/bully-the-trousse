@@ -34,15 +34,19 @@ import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.Shop
+import com.bullythetrousse.core.Skid
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
+import com.bullythetrousse.core.VolcanoCinematic
 
 /**
- * Sixième tranche du portage natif : boutique Puissance/Vitesse (Shop, voir
- * :core), qui débite save.money et pilote réellement la physique du lancer
- * suivant. La sauvegarde locale (GameSave) est chargée au lancement et
- * mise à jour/persistée (argent gagné, meilleure distance, nombre de
- * lancers, niveaux achetés) à chaque évènement, comme persist() côté web.
+ * Septième tranche du portage natif : mécaniques du monde Volcan — dérapage
+ * à l'atterrissage (Skid, voir :core) quand save.currentWorld == "volcans",
+ * et la cinématique de déblocage du volcan (VolcanoCinematic, mini-jeu
+ * d'esquive des roches + QTE de descente), accessible tant que le monde
+ * n'est pas débloqué. Toujours pas d'écran de sélection de monde à part
+ * entière (voir android/README.md) : basculer vers "volcans" se fait
+ * uniquement en réussissant la cinématique, comme côté web.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -50,7 +54,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ThrowScreen()
+                    GameRoot()
                 }
             }
         }
@@ -58,11 +62,33 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ThrowScreen() {
+fun GameRoot() {
     val context = LocalContext.current
     val repository = remember { SaveRepository(context) }
     var save by remember { mutableStateOf(repository.load()) }
+    var showingVolcanoCinematic by remember { mutableStateOf(false) }
 
+    fun updateSave(updated: GameSave) {
+        save = updated
+        repository.save(updated)
+    }
+
+    if (showingVolcanoCinematic) {
+        VolcanoCinematicScreen(onFinished = { outcome ->
+            updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
+            showingVolcanoCinematic = false
+        })
+    } else {
+        ThrowScreen(
+            save = save,
+            onSaveChange = ::updateSave,
+            onStartVolcanoCinematic = { showingVolcanoCinematic = true },
+        )
+    }
+}
+
+@Composable
+fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcanoCinematic: () -> Unit) {
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
 
@@ -115,30 +141,57 @@ fun ThrowScreen() {
                 val result = current.result
                 var flightFinished by remember(result) { mutableStateOf(false) }
                 val flightState: FlightState = animateFlight(result) { flightFinished = true }
-                ThrowCanvas(flightState = flightState)
 
-                // Porté de onLanded()/persist() côté web : argent gagné, record et
-                // nombre de lancers mis à jour puis sauvegardés dès l'atterrissage,
-                // une seule fois par lancer (clé = ce `result` précis, voir remember).
-                LaunchedEffect(flightFinished, result) {
-                    if (!flightFinished) return@LaunchedEffect
+                // Monde Volcan : la poussière rouge rend le sol glissant (25% de
+                // chance), voir Skid dans :core (portage de SKID_CHANCE et du
+                // bloc "skidding" de gameLoop()). Décidé une seule fois par
+                // lancer, dès que le vol se termine.
+                var isSkidding by remember(result) { mutableStateOf(false) }
+                var skidDecided by remember(result) { mutableStateOf(false) }
+                var skidFinished by remember(result) { mutableStateOf(false) }
+                LaunchedEffect(flightFinished) {
+                    if (flightFinished && !skidDecided) {
+                        skidDecided = true
+                        isSkidding = save.currentWorld == "volcans" && Skid.shouldSkid()
+                    }
+                }
+
+                val displayedFlightState = if (isSkidding && !skidFinished) {
+                    animateSkid(landingWorldX = flightState.worldX) { skidFinished = true }
+                } else {
+                    flightState
+                }
+                ThrowCanvas(flightState = displayedFlightState)
+
+                val throwResolved = flightFinished && skidDecided && (!isSkidding || skidFinished)
+
+                // Porté de onLanded()/persist() côté web : argent gagné, record,
+                // nombre de lancers et coût en durabilité d'un dérapage éventuel,
+                // mis à jour puis sauvegardés une seule fois par lancer, une fois
+                // le vol ET un éventuel dérapage entièrement résolus.
+                LaunchedEffect(throwResolved, result) {
+                    if (!throwResolved) return@LaunchedEffect
                     val totalLevels = save.puissanceLevel + save.vitesseLevel
                     val earned = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels)
-                    save = save.copy(
+                    var updated = save.copy(
                         money = save.money + earned,
                         totalMoneyEarned = save.totalMoneyEarned + earned,
                         bestDistance = maxOf(save.bestDistance, result.distanceMeters),
                         totalThrows = save.totalThrows + 1,
                     )
-                    repository.save(save)
+                    if (isSkidding) updated = Skid.applyDurabilityCost(updated)
+                    onSaveChange(updated)
                 }
 
-                if (flightFinished) {
-                    Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
-                    if (result.isPerfect) Text("✨ Lancer parfait !")
-                    Text("Tape pour relancer.")
-                } else {
-                    Text("En vol...")
+                when {
+                    !flightFinished -> Text("En vol...")
+                    isSkidding && !skidFinished -> Text("Dérapage dans la poussière rouge...")
+                    else -> {
+                        Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
+                        if (result.isPerfect) Text("✨ Lancer parfait !")
+                        if (isSkidding) Text("💥 Dérapage : -${Skid.DURABILITY_COST} durabilité")
+                        Text("Tape pour relancer.")
+                    }
                 }
             }
         }
@@ -147,10 +200,28 @@ fun ThrowScreen() {
             Text("Tap")
         }
 
-        ShopRow(save = save, onPurchase = { updated ->
-            save = updated
-            repository.save(updated)
-        })
+        ShopRow(save = save, onPurchase = onSaveChange)
+        VolcanoRow(save = save, onStartVolcanoCinematic = onStartVolcanoCinematic)
+    }
+}
+
+/**
+ * Bouton pour lancer la cinématique de déblocage du volcan, portage de
+ * tryStartVolcanoCinematic() côté web : verrouillé tant que le monde est
+ * débloqué, ou pendant les 10 minutes de cooldown après un échec.
+ */
+@Composable
+private fun VolcanoRow(save: GameSave, onStartVolcanoCinematic: () -> Unit) {
+    if (save.volcanUnlocked) return
+    val cooldownRemainingMs = save.volcanFailedUntil - System.currentTimeMillis()
+    if (cooldownRemainingMs > 0) {
+        val minutes = cooldownRemainingMs / 60_000
+        val seconds = (cooldownRemainingMs % 60_000) / 1000
+        Text("🌋 Le volcan gronde encore... réessaie dans ${minutes} min ${seconds} s")
+    } else {
+        Button(onClick = onStartVolcanoCinematic, modifier = Modifier.fillMaxWidth()) {
+            Text("🌋 Découvrir le volcan")
+        }
     }
 }
 

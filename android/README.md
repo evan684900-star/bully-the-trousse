@@ -83,18 +83,37 @@ Android) avant d'être branché à l'affichage dans `:app`.
   n'est pas encore accessible depuis un écran de boutique dédié — juste des
   boutons directement sur l'écran de jeu pour l'instant).
 
+- **Monde Volcan (partiel)** : `Skid` dans `:core` (dérapage à l'atterrissage
+  — 25% de chance, portage de `SKID_CHANCE`/le bloc "skidding" de
+  `gameLoop()`, coût en durabilité) et `VolcanoCinematic` (moteur pur de la
+  cinématique de déblocage — séquence de phases chronométrées, mini-jeu
+  d'esquive de 5 roches avec 2 vies et esquive automatique "de justesse",
+  QTE de 10 clics pendant la descente — portage de `cineUpdate()`/
+  `CINE_TIMES`/`cineStartRock()`/`cineResolveRock()`), testés (55 tests au
+  total). Branchés dans `:app` : un dérapage se déclenche vraiment après un
+  atterrissage dans le monde Volcan (`animateSkid` dans `ThrowCanvas.kt`,
+  coûte de la durabilité) ; `VolcanoCinematicScreen.kt` rejoue la
+  cinématique avec un habillage visuel simplifié (fond de couleur par
+  phase, indicateur de canal, compteur de clics) — pas encore le décor 3D
+  animé (secousse d'écran, éclair, particules) du web, juste le
+  déroulement/l'issue, qui eux sont fidèles.
+
 ## Ce qu'il reste à faire (dans un ordre logique)
 
 1. **Vrai sprite pour la trousse + décor des autres mondes** — remplacer la
    forme vectorielle de `ThrowCanvas` par un vrai sprite (+ ses variantes de
-   skins) si des assets sont fournis, et porter le décor des mondes Volcan
-   et Plage (parasols/serviettes/châteaux, dérapage) sur le même principe
-   que `CourDecor` (placement testé dans `:core`, dessin dans `:app`).
+   skins) si des assets sont fournis, et porter le décor du monde Volcan
+   (le mini-jeu et le dérapage sont déjà là, juste pas leur habillage
+   visuel riche) et de la Plage, sur le même principe que `CourDecor`
+   (placement testé dans `:core`, dessin dans `:app`).
 2. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
    seul écran ; découper en vraies destinations (navigation Compose) une
    fois qu'il y a plus d'un écran à afficher.
-3. **Les 3 mondes** (Cour, Volcans, Plage) et leurs mécaniques propres
-   (dérapage, parasols/serviettes/châteaux, cinématiques de déblocage).
+3. **Sélecteur de monde + monde Plage** — pour l'instant, `currentWorld`
+   ne bascule sur "volcans" qu'en réussissant sa cinématique (comme côté
+   web), sans écran pour choisir/revenir sur "cour" ; le monde Plage
+   (parasols/serviettes/châteaux, bus, cinématique dédiée) n'est pas
+   commencé.
 4. **Les skins et traînées** — un module `:core` supplémentaire pour la
    liste des skins et leurs bonus/mécaniques spéciales, séparé du rendu.
 5. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
