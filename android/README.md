@@ -34,20 +34,24 @@ Android) avant d'être branché à l'affichage dans `:app`.
 ## Ce qui est fait
 
 - Squelette Gradle multi-module (`:core` + `:app`).
-- `:core` : physique du lancer (`ThrowPhysics`) et économie
-  (`Economy.moneyEarned` / `Economy.upgradeCost`), portées formule par
-  formule depuis `index.html` (voir les commentaires de chaque fichier
-  pour la correspondance exacte avec le code web), avec des tests unitaires
-  dont les valeurs attendues ont été calculées directement depuis les
-  formules JS pour garantir un comportement identique aux deux endroits.
-- `:app` : un seul écran Compose minimal qui prouve que l'UI parle bien à
-  `:core` (bouton "Lancer" → distance + argent gagné affichés). Pas encore
-  le vrai gameplay (charge de puissance, visée, rendu de la trousse).
+- `:core` : physique du lancer (`ThrowPhysics`), les barres de
+  puissance/précision (`PowerAndAccuracy`), la machine à états du lancer en
+  3 taps (`ThrowSequence`, horloge injectable pour des tests déterministes)
+  et l'économie (`Economy.moneyEarned` / `Economy.upgradeCost`) — tout porté
+  formule par formule depuis `index.html` (voir les commentaires de chaque
+  fichier pour la correspondance exacte avec le code web), avec 15 tests
+  unitaires dont les valeurs attendues ont été calculées directement depuis
+  les formules JS.
+- `:app` : un écran Compose qui utilise la vraie interaction en 3 taps
+  (idle → charge de puissance → charge de précision → lancé) via
+  `ThrowSequence`. Pas encore d'animation de barre en temps réel (le texte
+  affiche juste l'état courant) ni de rendu de la trousse.
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
-1. **Vraie interaction de lancer** — charge de puissance (appui maintenu),
-   visée (barre animée), au lieu du lancer "au hasard" actuel.
+1. **Animation des barres en temps réel** — afficher l'oscillation
+   puissance/précision pendant la charge (actuellement seule la valeur
+   figée au moment du tap est visible), via `LaunchedEffect` + un timer.
 2. **Rendu de la trousse et du décor** — `Canvas` Compose, en portant
    `drawTrousse()`/les fonctions `drawXxx()` de skins depuis le JS.
 3. **Sauvegarde locale** — équivalent de `defaultSave()`/`loadSave()`

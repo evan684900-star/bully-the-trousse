@@ -3,11 +3,15 @@ package com.bullythetrousse.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -19,15 +23,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.bullythetrousse.core.Economy
-import com.bullythetrousse.core.ThrowInput
-import com.bullythetrousse.core.ThrowPhysics
+import com.bullythetrousse.core.ThrowSequence
+import com.bullythetrousse.core.ThrowState
 
 /**
- * Première tranche verticale du portage natif : un seul écran qui prouve
- * que ":app" (Compose) parle bien à ":core" (physique/économie), avant de
- * construire le vrai gameplay (charge de puissance, visée, rendu de la
- * trousse...). Volontairement minimal.
+ * Deuxième tranche du portage natif : la vraie interaction en 3 taps
+ * (idle → charge de puissance → charge de précision → lancé), portée
+ * depuis handleTap()/lockPower()/lockAccuracyAndLaunch() côté web. Pas
+ * encore d'animation de barre en temps réel ni de rendu de la trousse —
+ * juste le texte d'état, pour valider la mécanique avant de l'habiller.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,7 +39,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    ThrowPreviewScreen()
+                    ThrowScreen()
                 }
             }
         }
@@ -43,35 +47,49 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun ThrowPreviewScreen() {
-    var lastDistance by remember { mutableStateOf<Double?>(null) }
-    var lastEarn by remember { mutableStateOf<Int?>(null) }
+fun ThrowScreen() {
+    // Niveaux fixes pour l'instant (pas encore de sauvegarde/boutique
+    // portés) : voir android/README.md pour la suite prévue.
+    val puissanceLevel = 0
+    val vitesseLevel = 0
+
+    val sequence = remember { ThrowSequence() }
+    var state by remember { mutableStateOf<ThrowState>(sequence.state) }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+            .clickable { state = sequence.tap(puissanceLevel, vitesseLevel) },
+        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
         Text("🎒 Bully the Trousse", style = MaterialTheme.typography.headlineMedium)
-        Text("Portage natif — première tranche : physique + économie de :core")
 
-        Button(onClick = {
-            // Lancer "au hasard" juste pour prouver le câblage bout en bout ;
-            // la vraie interaction (charge de puissance, visée) viendra dans
-            // une prochaine tranche.
-            val result = ThrowPhysics.simulateThrow(
-                ThrowInput(puissanceLevel = 0, vitesseLevel = 0, lockedPower = 1.0, accuracyValue = 0.0)
-            )
-            lastDistance = result.distanceMeters
-            lastEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels = 0)
-        }) {
-            Text("🚀 Lancer (test)")
+        when (val current = state) {
+            is ThrowState.Idle ->
+                Text("Tape l'écran pour commencer à charger la puissance.")
+
+            is ThrowState.ChargingPower -> {
+                Text("Puissance en charge... tape pour la figer.")
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(8.dp))
+            }
+
+            is ThrowState.ChargingAccuracy -> {
+                Text("Puissance figée à ${(current.lockedPower * 100).toInt()}%.")
+                Text("Précision en charge... tape pour lancer.")
+                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(8.dp))
+            }
+
+            is ThrowState.Landed -> {
+                val result = current.result
+                Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
+                if (result.isPerfect) Text("✨ Lancer parfait !")
+                Text("Tape pour relancer.")
+            }
         }
 
-        lastDistance?.let { distance ->
-            Text("Distance : ${"%.1f".format(distance)} m")
-        }
-        lastEarn?.let { earn ->
-            Text("Gagné : $earn \$")
+        Button(onClick = { state = sequence.tap(puissanceLevel, vitesseLevel) }) {
+            Text("Tap")
         }
     }
 }
