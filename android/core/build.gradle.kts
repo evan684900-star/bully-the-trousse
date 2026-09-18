@@ -17,12 +17,13 @@ dependencies {
     testImplementation(kotlin("test"))
 }
 
-kotlin {
-    // 21 pour coller au JDK réellement disponible ici ; l'app Android
-    // (module ":app") ciblera son propre niveau via l'Android Gradle Plugin,
-    // indépendamment de ce module.
-    jvmToolchain(21)
-}
+// Pas de jvmToolchain() explicite : ce module n'a besoin d'aucune version
+// précise, donc on laisse Gradle utiliser tel quel le JDK qui lance le
+// build (celui d'Android Studio, ou celui du système). Fixer une version
+// exacte forcerait Gradle à la retélécharger si elle diffère de celle
+// disponible localement — inutile ici, et source d'erreurs "Toolchain
+// download repositories have not been configured" si le réseau ou les
+// dépôts de toolchain ne sont pas accessibles.
 
 tasks.test {
     useJUnitPlatform()
