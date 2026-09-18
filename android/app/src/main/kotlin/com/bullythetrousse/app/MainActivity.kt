@@ -26,17 +26,16 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 
 /**
- * Troisième tranche du portage natif : les barres de puissance/précision
- * s'animent maintenant en temps réel pendant la charge (avant, seul le
- * texte d'état s'affichait), en suivant les mêmes oscillations que
- * PowerAndAccuracy — donc la valeur affichée à l'écran au moment du tap
- * est bien celle qui sera verrouillée. Toujours pas de rendu de la
- * trousse (voir android/README.md).
+ * Quatrième tranche du portage natif : la trousse et le sol se dessinent
+ * maintenant sur un Canvas (ThrowCanvas.kt) et la trousse vole réellement
+ * (animée image par image via FlightSimulator) entre le 3e tap et
+ * l'atterrissage, plutôt que de sauter directement au résultat final.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,10 +70,13 @@ fun ThrowScreen() {
         Text("🎒 Bully the Trousse", style = MaterialTheme.typography.headlineMedium)
 
         when (val current = state) {
-            is ThrowState.Idle ->
+            is ThrowState.Idle -> {
+                ThrowCanvas(flightState = null)
                 Text("Tape l'écran pour commencer à charger la puissance.")
+            }
 
             is ThrowState.ChargingPower -> {
+                ThrowCanvas(flightState = null)
                 Text("Puissance en charge... tape pour la figer.")
                 LiveOscillatingBar(
                     startedAtMillis = current.startedAtMillis,
@@ -86,6 +88,7 @@ fun ThrowScreen() {
             }
 
             is ThrowState.ChargingAccuracy -> {
+                ThrowCanvas(flightState = null)
                 Text("Puissance figée à ${(current.lockedPower * 100).toInt()}%.")
                 Text("Précision en charge... tape pour lancer.")
                 LiveOscillatingBar(
@@ -99,9 +102,17 @@ fun ThrowScreen() {
 
             is ThrowState.Landed -> {
                 val result = current.result
-                Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
-                if (result.isPerfect) Text("✨ Lancer parfait !")
-                Text("Tape pour relancer.")
+                var flightFinished by remember(result) { mutableStateOf(false) }
+                val flightState: FlightState = animateFlight(result) { flightFinished = true }
+                ThrowCanvas(flightState = flightState)
+
+                if (flightFinished) {
+                    Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
+                    if (result.isPerfect) Text("✨ Lancer parfait !")
+                    Text("Tape pour relancer.")
+                } else {
+                    Text("En vol...")
+                }
             }
         }
 

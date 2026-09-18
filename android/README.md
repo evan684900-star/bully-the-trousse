@@ -36,25 +36,37 @@ Android) avant d'être branché à l'affichage dans `:app`.
 - Squelette Gradle multi-module (`:core` + `:app`).
 - `:core` : physique du lancer (`ThrowPhysics`), les barres de
   puissance/précision (`PowerAndAccuracy`), la machine à états du lancer en
-  3 taps (`ThrowSequence`, horloge injectable pour des tests déterministes)
-  et l'économie (`Economy.moneyEarned` / `Economy.upgradeCost`) — tout porté
-  formule par formule depuis `index.html` (voir les commentaires de chaque
-  fichier pour la correspondance exacte avec le code web), avec 15 tests
-  unitaires dont les valeurs attendues ont été calculées directement depuis
-  les formules JS.
+  3 taps (`ThrowSequence`, horloge injectable pour des tests déterministes),
+  l'économie (`Economy.moneyEarned` / `Economy.upgradeCost`), l'intégration
+  physique du vol image par image (`FlightSimulator`, portage de la boucle
+  "flying" de `gameLoop()`) et la conversion coordonnées monde → écran +
+  caméra suiveuse (`Camera`, portage de `worldToScreen()` et de la mise à
+  jour de `cameraX`/`cameraY`) — tout porté formule par formule depuis
+  `index.html` (voir les commentaires de chaque fichier pour la
+  correspondance exacte avec le code web), avec 21 tests unitaires dont les
+  valeurs attendues ont été calculées directement depuis les formules JS
+  (y compris un test qui fait converger l'intégration pas à pas vers la
+  même distance que la formule fermée, pour vérifier que le portage de la
+  boucle de vol est fidèle).
 - `:app` : un écran Compose avec la vraie interaction en 3 taps (idle →
   charge de puissance → charge de précision → lancé) via `ThrowSequence`,
-  et les barres de puissance/précision qui s'animent en temps réel pendant
-  la charge (`LiveOscillatingBar`, `LaunchedEffect` + `withFrameNanos`,
-  calé sur `System.currentTimeMillis()` pour rester sur la même horloge que
-  `ThrowSequence` — la valeur affichée au moment du tap est donc bien celle
-  qui se verrouille). Pas encore de rendu de la trousse elle-même (juste du
-  texte et des barres de progression).
+  les barres de puissance/précision qui s'animent en temps réel pendant la
+  charge (`LiveOscillatingBar`, `LaunchedEffect` + `withFrameNanos`, calé
+  sur `System.currentTimeMillis()` pour rester sur la même horloge que
+  `ThrowSequence`), et maintenant un rendu `Canvas` du ciel/sol et de la
+  trousse (`ThrowCanvas.kt`) : après le 3e tap, la trousse vole réellement
+  à l'écran (animée pas à pas via `FlightSimulator`/`animateFlight`,
+  caméra qui la suit) jusqu'à l'atterrissage, avant d'afficher le résultat.
+  Pour l'instant la trousse est un simple rectangle qui tourne (pas encore
+  de sprite/asset réel) et il n'y a pas encore de décor (parasols,
+  serviettes...).
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
-1. **Rendu de la trousse et du décor** — `Canvas` Compose, en portant
-   `drawTrousse()`/les fonctions `drawXxx()` de skins depuis le JS.
+1. **Vrais sprites et décor** — remplacer le rectangle de `ThrowCanvas` par
+   un vrai sprite de trousse (+ ses variantes de skins) et ajouter le décor
+   des mondes (parasols/serviettes/châteaux plage, etc.), portage des
+   fonctions `drawXxx()` du JS.
 2. **Sauvegarde locale** — équivalent de `defaultSave()`/`loadSave()`
    (DataStore ou fichier JSON), avec la migration des champs si jamais on
    veut un jour importer une sauvegarde depuis la version web.
