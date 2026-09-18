@@ -155,7 +155,7 @@ fun ThrowScreen(
 
         when (val current = state) {
             is ThrowState.Idle -> {
-                ThrowCanvas(flightState = null)
+                ThrowCanvas(flightState = null, world = save.currentWorld)
                 Text("Tape l'écran pour commencer à charger la puissance.")
             }
 
@@ -169,7 +169,7 @@ fun ThrowScreen(
                 } else {
                     null
                 }
-                ThrowCanvas(flightState = restingFlightState)
+                ThrowCanvas(flightState = restingFlightState, world = save.currentWorld)
                 if (current.bounceCount > 0) {
                     // Portage du hint "hintBasketBounce" côté web : la trousse a
                     // rebondi (tryBasketBounce()), il faut retaper la charge.
@@ -187,7 +187,7 @@ fun ThrowScreen(
             }
 
             is ThrowState.ChargingAccuracy -> {
-                ThrowCanvas(flightState = null)
+                ThrowCanvas(flightState = null, world = save.currentWorld)
                 Text("Puissance figée à ${(current.lockedPower * 100).toInt()}%.")
                 Text("Précision en charge... tape pour lancer.")
                 LiveOscillatingBar(
@@ -232,7 +232,7 @@ fun ThrowScreen(
                 } else {
                     flightState
                 }
-                ThrowCanvas(flightState = displayedFlightState)
+                ThrowCanvas(flightState = displayedFlightState, world = save.currentWorld)
 
                 val throwResolved = flightFinished && skidDecided && (!isSkidding || skidFinished)
                 var earnings by remember(result) { mutableStateOf<SkinEarningsResult?>(null) }

@@ -15,40 +15,54 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Beach
+import com.bullythetrousse.core.BeachDecor
 import com.bullythetrousse.core.BeachEvents
 import com.bullythetrousse.core.BeachLandingOutcome
+import com.bullythetrousse.core.BeachPropType
 import com.bullythetrousse.core.Camera
 import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.FlightSimulator
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.Skid
 import com.bullythetrousse.core.ThrowResult
+import com.bullythetrousse.core.VolcanoDecor
 import com.bullythetrousse.core.rotationSpeed
 import com.bullythetrousse.core.toInitialFlightState
 import kotlin.math.max
 
+/** Palette de fond (ciel haut/bas, sol haut/bas) pour un monde donné, portage
+ *  des dégradés de drawBackground()/drawVolcanoBackground()/
+ *  drawBeachBackground() côté web (thème "jour" uniquement — voir
+ *  android/README.md, le thème clair/sombre n'est pas encore porté). */
+private data class WorldPalette(val skyTop: Color, val skyBottom: Color, val groundTop: Color, val groundBottom: Color)
+
+private fun paletteFor(world: String): WorldPalette = when (world) {
+    "volcans" -> WorldPalette(Color(0xFF8D2415), Color(0xFFDD7C4C), Color(0xFF8B3520), Color(0xFF4D1A10))
+    "plage" -> WorldPalette(Color(0xFF4EC3EA), Color(0xFFFFE9BD), Color(0xFFF2D98B), Color(0xFFCFA958))
+    else -> WorldPalette(Color(0xFF7EC8E3), Color(0xFFD8F3FF), Color(0xFF9AA0AB), Color(0xFF6F7480))
+}
+
 /**
- * Rendu Canvas du monde "Cour d'école" (ciel, bâtiments, arbres, sol) et de
- * la trousse en vol, portage visuel de drawBackground()/drawBuilding()/
- * drawTree()/drawTrousse() côté web. Le placement du décor vient de
- * [CourDecor] (testé dans :core) ; ici on ne fait QUE le dessin. Toujours
- * pas de vrai sprite pour la trousse (juste une forme vectorielle stylisée,
- * comme le fait le web pour les skins "coin"/"iron" — voir android/README.md
- * pour les prochaines étapes : skins et traînées).
+ * Rendu Canvas du monde en cours (ciel, décor, sol) et de la trousse en vol,
+ * portage visuel de drawBackground()/drawVolcanoBackground()/
+ * drawBeachBackground() et de leurs fonctions de décor associées côté web.
+ * Le placement du décor vient de [CourDecor]/[VolcanoDecor]/[BeachDecor]
+ * (testés dans `:core`) ; ici on ne fait QUE le dessin. Toujours pas de
+ * vrai sprite pour la trousse (juste une forme vectorielle stylisée, comme
+ * le fait le web pour les skins "coin"/"iron").
  *
  * `flightState` vaut `null` tant qu'aucun lancer n'est en vol : on affiche
- * alors juste le décor, avec la trousse posée à l'origine.
+ * alors juste le décor, avec la trousse posée à l'origine. `world` est
+ * `save.currentWorld` ("cour", "volcans" ou "plage").
  */
 @Composable
-fun ThrowCanvas(flightState: FlightState?, groundVerticalFraction: Float = 0.68f) {
-    val skyTop = Color(0xFF7EC8E3)
-    val skyBottom = Color(0xFFD8F3FF)
-    val groundTop = Color(0xFF9AA0AB)
-    val groundBottom = Color(0xFF6F7480)
+fun ThrowCanvas(flightState: FlightState?, world: String = "cour", groundVerticalFraction: Float = 0.68f) {
+    val palette = paletteFor(world)
 
     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
         val groundScreenY = size.height * groundVerticalFraction
@@ -56,7 +70,7 @@ fun ThrowCanvas(flightState: FlightState?, groundVerticalFraction: Float = 0.68f
         // Ciel (dégradé) puis sol (dégradé), comme drawBackground() côté web.
         drawRect(
             brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                colors = listOf(skyTop, skyBottom),
+                colors = listOf(palette.skyTop, palette.skyBottom),
                 startY = 0f,
                 endY = groundScreenY,
             ),
@@ -64,7 +78,7 @@ fun ThrowCanvas(flightState: FlightState?, groundVerticalFraction: Float = 0.68f
         )
         drawRect(
             brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                colors = listOf(groundTop, groundBottom),
+                colors = listOf(palette.groundTop, palette.groundBottom),
                 startY = groundScreenY,
                 endY = size.height,
             ),
@@ -77,19 +91,10 @@ fun ThrowCanvas(flightState: FlightState?, groundVerticalFraction: Float = 0.68f
         // logique de gameLoop côté web).
         val cameraX = if (flightState != null) Camera.followX(flightState.worldX, size.width.toDouble()) else 0.0
 
-        // Bâtiments au loin (parallaxe) puis arbres sur la ligne d'horizon,
-        // dans le même ordre que drawBackground() (les arbres recouvrent
-        // les bâtiments qui défilent derrière eux).
-        for (index in CourDecor.visibleBuildingIndices(cameraX, size.width.toDouble())) {
-            val bx = CourDecor.buildingScreenX(index, cameraX)
-            if (bx < -220.0 || bx > size.width + 40.0) continue
-            drawCourBuilding(bx.toFloat(), groundScreenY, index)
-        }
-        for (index in CourDecor.visibleTreeIndices(cameraX, size.width.toDouble())) {
-            val worldPos = CourDecor.treeWorldX(index)
-            val sx = worldPos - cameraX
-            if (sx < -40.0 || sx > size.width + 40.0) continue
-            drawCourTree(sx.toFloat(), groundScreenY + 6f, index)
+        when (world) {
+            "volcans" -> drawVolcanoDecor(cameraX, size.width.toDouble(), groundScreenY, size.height)
+            "plage" -> drawBeachDecor(cameraX, size.width.toDouble(), groundScreenY)
+            else -> drawCourDecor(cameraX, size.width.toDouble(), groundScreenY)
         }
 
         val worldY = flightState?.worldY ?: 0.0
@@ -104,6 +109,138 @@ fun ThrowCanvas(flightState: FlightState?, groundVerticalFraction: Float = 0.68f
             pivot = Offset(screen.sx.toFloat(), screen.sy.toFloat()),
         ) {
             drawTrousse(centerX = screen.sx.toFloat(), centerY = screen.sy.toFloat(), size = 30.dp.toPx())
+        }
+    }
+}
+
+/** Bâtiments en parallaxe puis arbres sur la ligne d'horizon, portage du
+ *  corps de drawBackground() côté web (les arbres recouvrent les bâtiments
+ *  qui défilent derrière eux, d'où l'ordre). */
+private fun DrawScope.drawCourDecor(cameraX: Double, screenWidth: Double, groundScreenY: Float) {
+    for (index in CourDecor.visibleBuildingIndices(cameraX, screenWidth)) {
+        val bx = CourDecor.buildingScreenX(index, cameraX)
+        if (bx < -220.0 || bx > screenWidth + 40.0) continue
+        drawCourBuilding(bx.toFloat(), groundScreenY, index)
+    }
+    for (index in CourDecor.visibleTreeIndices(cameraX, screenWidth)) {
+        val worldPos = CourDecor.treeWorldX(index)
+        val sx = worldPos - cameraX
+        if (sx < -40.0 || sx > screenWidth + 40.0) continue
+        drawCourTree(sx.toFloat(), groundScreenY + 6f, index)
+    }
+}
+
+/** Deux couches de volcans en parallaxe puis fissures incandescentes au
+ *  sol, portage du corps de drawVolcanoBackground() côté web (thème jour
+ *  uniquement, pas de lune/cendres animées — voir android/README.md). */
+private fun DrawScope.drawVolcanoDecor(cameraX: Double, screenWidth: Double, groundScreenY: Float, screenHeight: Float) {
+    VolcanoDecor.LAYERS.forEachIndexed { layerIndex, layer ->
+        val body = if (layerIndex == 0) Color(0xFF5D1C12) else Color(0xFF71271A)
+        val glow = if (layerIndex == 0) Color(0xFFFF9640).copy(alpha = 0.75f) else Color(0xFFFFAA46).copy(alpha = 0.85f)
+        for (index in VolcanoDecor.visibleVolcanoIndices(layer, cameraX, screenWidth)) {
+            val sx = VolcanoDecor.volcanoScreenX(layer, index, cameraX)
+            if (sx < -layer.width || sx > screenWidth + layer.width) continue
+            val seed = VolcanoDecor.volcanoSeed(index, layerIndex)
+            val vw = VolcanoDecor.volcanoWidth(layer, seed)
+            val vh = VolcanoDecor.volcanoHeight(layer, seed)
+            drawVolcanoShape(sx.toFloat(), groundScreenY + 4f, vw.toFloat(), vh.toFloat(), body, glow)
+        }
+    }
+    for (index in VolcanoDecor.visibleCrackIndices(cameraX, screenWidth)) {
+        val sx = VolcanoDecor.crackWorldX(index) - cameraX
+        if (sx < -60.0 || sx > screenWidth + 60.0) continue
+        val cy = groundScreenY + 16f + CourDecor.seededRand(index.toDouble()).toFloat() * (screenHeight - groundScreenY - 30f)
+        drawCrack(sx.toFloat(), cy)
+    }
+}
+
+/** Sable/dunes/coquillages puis les accessoires décoratifs (parasol/
+ *  serviette/château), portage du corps de drawBeachBackground() côté web
+ *  (pas de mer/vagues animées — voir android/README.md). */
+private fun DrawScope.drawBeachDecor(cameraX: Double, screenWidth: Double, groundScreenY: Float) {
+    for (index in BeachDecor.visibleDuneIndices(cameraX, screenWidth)) {
+        val sx = BeachDecor.duneScreenX(index, cameraX)
+        val dw = BeachDecor.duneWidth(index)
+        if (sx < -dw || sx > screenWidth + dw) continue
+        drawDune(sx.toFloat(), groundScreenY, dw.toFloat(), BeachDecor.duneHeight(index).toFloat())
+    }
+    for (index in BeachDecor.visibleSandBumpIndices(cameraX, screenWidth)) {
+        val worldPos = BeachDecor.sandBumpWorldX(index)
+        val sx = worldPos - cameraX
+        if (sx < -140.0 || sx > screenWidth + 140.0) continue
+        if (BeachDecor.hasShell(index)) {
+            drawCircle(color = Color(0xFFFFF3E0), radius = 3f, center = Offset(sx.toFloat() + 34f, groundScreenY + 34f))
+        }
+    }
+    for (prop in beachDecorProps) {
+        val sx = prop.worldX - cameraX
+        if (sx < -160.0 || sx > screenWidth + 160.0) continue
+        drawBeachProp(prop.type, sx.toFloat(), groundScreenY + prop.depth.toFloat(), prop.scale.toFloat())
+    }
+}
+
+/** Générée une seule fois (déterministe, voir BeachDecor.decorativeProps) :
+ *  pas besoin de la recalculer à chaque frame. */
+private val beachDecorProps by lazy { BeachDecor.decorativeProps() }
+
+private fun DrawScope.drawVolcanoShape(sx: Float, baseY: Float, vw: Float, vh: Float, body: Color, glow: Color) {
+    val path = Path().apply {
+        moveTo(sx - vw / 2f, baseY)
+        lineTo(sx - vw * 0.13f, baseY - vh)
+        lineTo(sx + vw * 0.13f, baseY - vh)
+        lineTo(sx + vw / 2f, baseY)
+        close()
+    }
+    drawPath(path, color = body)
+    drawRect(color = glow, topLeft = Offset(sx - vw * 0.13f, baseY - vh - 3f), size = Size(vw * 0.26f, 7f))
+}
+
+private fun DrawScope.drawCrack(sx: Float, cy: Float) {
+    val path = Path().apply {
+        moveTo(sx - 26f, cy)
+        lineTo(sx - 6f, cy + 5f)
+        lineTo(sx + 12f, cy - 4f)
+        lineTo(sx + 32f, cy + 3f)
+    }
+    drawPath(path, color = Color(0xFFFF7828).copy(alpha = 0.4f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5f))
+}
+
+private fun DrawScope.drawDune(sx: Float, groundScreenY: Float, dw: Float, dh: Float) {
+    val path = Path().apply {
+        moveTo(sx - dw / 2f, groundScreenY + 2f)
+        quadraticTo(sx, groundScreenY - dh, sx + dw / 2f, groundScreenY + 2f)
+        close()
+    }
+    drawPath(path, color = Color(0xFFE0C173))
+}
+
+private fun DrawScope.drawBeachProp(type: BeachPropType, sx: Float, baseY: Float, scale: Float) {
+    when (type) {
+        BeachPropType.PARASOL -> {
+            val r = 28f * scale
+            drawLine(color = Color(0xFF6B4A2F), start = Offset(sx, baseY), end = Offset(sx, baseY - r * 1.4f), strokeWidth = 3f)
+            val canopy = Path().apply {
+                moveTo(sx - r, baseY - r * 1.3f)
+                quadraticTo(sx, baseY - r * 2.1f, sx + r, baseY - r * 1.3f)
+                close()
+            }
+            drawPath(canopy, color = Color(0xFFE74C3C))
+        }
+        BeachPropType.TOWEL -> drawRoundRect(
+            color = Color(0xFF5CA9E0),
+            topLeft = Offset(sx - 20f * scale, baseY - 4f * scale),
+            size = Size(40f * scale, 10f * scale),
+            cornerRadius = CornerRadius(2f * scale, 2f * scale),
+        )
+        BeachPropType.CASTLE -> {
+            val path = Path().apply {
+                moveTo(sx - 16f * scale, baseY)
+                lineTo(sx - 10f * scale, baseY - 18f * scale)
+                lineTo(sx + 10f * scale, baseY - 18f * scale)
+                lineTo(sx + 16f * scale, baseY)
+                close()
+            }
+            drawPath(path, color = Color(0xFFCFA958))
         }
     }
 }

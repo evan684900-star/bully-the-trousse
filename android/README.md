@@ -167,17 +167,29 @@ Android) avant d'être branché à l'affichage dans `:app`.
   (`bcFinish()` est toujours atteint) — le séquencement porte donc les
   vraies durées de chaque phase, mais pas les mini-séquences interactives
   du web (course-poursuite de crabes, visée, dialogues), qui n'influencent
-  que l'habillage là-bas. Toujours pas de décor visuel (parasols/
-  serviettes/châteaux/bus dessinés) dans `ThrowCanvas`.
+  que l'habillage là-bas.
+
+- **Décor des mondes Volcan et Plage** : `VolcanoDecor` (deux couches de
+  volcans en parallaxe + fissures incandescentes au sol, portage de
+  `drawVolcanoBackground()`) et `BeachDecor` (dunes lointaines, bosses de
+  sable + coquillages, accessoires décoratifs parasol/serviette/château,
+  portage de `drawBeachBackground()`/`generateBeachDecor()`) dans `:core`,
+  testés (129 tests au total). `generateBeachDecor()` utilise
+  `Math.random()` côté web ; `BeachDecor.decorativeProps()` utilise
+  `seededRand` à la place pour rester déterministe et testable (la position
+  exacte de ces accessoires est purement décorative). Branché dans
+  `:app` (`ThrowCanvas` prend maintenant un paramètre `world` et choisit sa
+  palette + son décor en conséquence) : la Cour, le Volcan et la Plage ont
+  chacun leur ciel/sol/décor visuellement distincts. Simplifications
+  assumées : thème "jour" uniquement (pas de variante nuit), pas de lune/
+  cendres/mer animées, formes vectorielles simples pour les accessoires
+  (comme la trousse elle-même).
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
-1. **Vrai sprite pour la trousse + décor des mondes** — remplacer la forme
-   vectorielle de `ThrowCanvas` par un vrai sprite (+ ses variantes de
-   skins, maintenant que la liste des skins existe) si des assets sont
-   fournis, et porter le décor des mondes Volcan et Plage (leurs mécaniques
-   sont déjà là, juste pas leur habillage visuel), sur le même principe que
-   `CourDecor` (placement testé dans `:core`, dessin dans `:app`).
+1. **Vrai sprite pour la trousse** — remplacer sa forme vectorielle par un
+   vrai sprite (+ ses variantes de skins, maintenant que la liste des skins
+   existe), si des assets sont fournis.
 2. **Écrans séparés (menu / jeu / boutique) + sélecteur de monde** —
    actuellement tout est sur un seul écran, et il n'y a pas de bouton
    "retour à la Cour" une fois sur un autre monde (seulement les boutons
