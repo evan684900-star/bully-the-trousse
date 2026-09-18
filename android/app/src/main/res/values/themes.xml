@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Compose gère son propre thème (voir BullyTheTrousseTheme.kt) ; celui-ci
+         ne sert qu'au thème système avant que Compose prenne la main
+         (écran de démarrage), donc reste minimal. -->
+    <style name="Theme.BullyTheTrousse" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>
