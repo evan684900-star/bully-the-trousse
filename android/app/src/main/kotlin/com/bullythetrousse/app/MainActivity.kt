@@ -35,8 +35,11 @@ import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.PhysicsConstants
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.Shop
+import com.bullythetrousse.core.SkinEarnings
+import com.bullythetrousse.core.SkinEarningsResult
 import com.bullythetrousse.core.Skid
 import com.bullythetrousse.core.Skin
 import com.bullythetrousse.core.SkinShop
@@ -50,12 +53,15 @@ import com.bullythetrousse.core.ThrowState
 import com.bullythetrousse.core.VolcanoCinematic
 
 /**
- * Huitième tranche du portage natif : skins et traînées (Skins/Trails, voir
- * :core) — la physique et les gains utilisent maintenant les stats
- * effectives (niveau acheté + bonus du skin équipé, via SkinStats),
- * exactement comme totalPuissance()/totalVitesse() côté web. Toujours pas
- * de mécaniques spéciales par skin (pièce, rebonds, vampire...), ni de
- * rendu visuel différent par skin (voir android/README.md).
+ * Neuvième tranche du portage natif : mécaniques spéciales de skins qui ne
+ * demandaient pas de refonte d'architecture — Trousse Claude (fenêtre du
+ * lancer parfait élargie), Trousse Pièce (multiplicateur aléatoire de gain)
+ * et Trousse Vampire (tribut prélevé sur le gain, proportionnel à la
+ * distance), portées via SkinEarnings (:core) et branchées dans l'écran de
+ * résultat. Le rebond de la Trousse à Baskets n'est PAS porté : il
+ * demanderait de relancer une charge de puissance/précision en accumulant
+ * la position, ce que la machine à états actuelle de ThrowSequence ne gère
+ * pas (voir android/README.md).
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -102,7 +108,14 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
 
     fun tap() {
-        state = sequence.tap(SkinStats.totalPuissance(save), SkinStats.totalVitesse(save))
+        // Trousse Claude : fenêtre du lancer parfait élargie de 75%, voir
+        // PhysicsConstants.PERFECT_WINDOW_CLAUDE (portage de isClaude côté web).
+        val perfectWindow = if (Skins.find(save.equippedSkin).isClaude) {
+            PhysicsConstants.PERFECT_WINDOW_CLAUDE
+        } else {
+            PhysicsConstants.PERFECT_WINDOW
+        }
+        state = sequence.tap(SkinStats.totalPuissance(save), SkinStats.totalVitesse(save), perfectWindow)
     }
 
     Column(
@@ -174,20 +187,27 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                 ThrowCanvas(flightState = displayedFlightState)
 
                 val throwResolved = flightFinished && skidDecided && (!isSkidding || skidFinished)
+                var earnings by remember(result) { mutableStateOf<SkinEarningsResult?>(null) }
 
-                // Porté de onLanded()/persist() côté web : argent gagné, record,
-                // nombre de lancers et coût en durabilité d'un dérapage éventuel,
-                // mis à jour puis sauvegardés une seule fois par lancer, une fois
-                // le vol ET un éventuel dérapage entièrement résolus.
+                // Porté de onLanded()/persist() côté web : argent gagné (avec les
+                // bonus/malus de skin — Trousse Pièce, Trousse Vampire, voir
+                // SkinEarnings), record, nombre de lancers et coût en durabilité
+                // d'un dérapage éventuel, mis à jour puis sauvegardés une seule
+                // fois par lancer, une fois le vol ET un éventuel dérapage
+                // entièrement résolus.
                 LaunchedEffect(throwResolved, result) {
                     if (!throwResolved) return@LaunchedEffect
+                    val equippedSkin = Skins.find(save.equippedSkin)
                     val totalLevels = SkinStats.totalPuissance(save) + SkinStats.totalVitesse(save)
-                    val earned = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels)
+                    val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels)
+                    val skinEarnings = SkinEarnings.apply(baseEarn, equippedSkin, result.distanceMeters)
+                    earnings = skinEarnings
                     var updated = save.copy(
-                        money = save.money + earned,
-                        totalMoneyEarned = save.totalMoneyEarned + earned,
+                        money = save.money + skinEarnings.finalEarn,
+                        totalMoneyEarned = save.totalMoneyEarned + skinEarnings.finalEarn,
                         bestDistance = maxOf(save.bestDistance, result.distanceMeters),
                         totalThrows = save.totalThrows + 1,
+                        hasJackpot = save.hasJackpot || skinEarnings.hasJackpot,
                     )
                     if (isSkidding) updated = Skid.applyDurabilityCost(updated)
                     onSaveChange(updated)
@@ -200,6 +220,10 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                         Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
                         if (result.isPerfect) Text("✨ Lancer parfait !")
                         if (isSkidding) Text("💥 Dérapage : -${Skid.DURABILITY_COST} durabilité")
+                        earnings?.coinMultiplier?.let { Text("🪙 Multiplicateur x$it !") }
+                        earnings?.takeIf { it.vampireStolen > 0 }?.let {
+                            Text("🦇 -${it.vampireStolen}$ volés par la malédiction (${it.vampireStealPct.toInt()}%)")
+                        }
                         Text("Tape pour relancer.")
                     }
                 }

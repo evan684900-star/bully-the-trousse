@@ -24,11 +24,14 @@ class ThrowSequence(private val clock: () -> Long = System::currentTimeMillis) {
 
     /**
      * Un tap fait avancer la machine à états d'un cran, comme handleTap()
-     * côté web. "puissanceLevel"/"vitesseLevel" ne sont utiles qu'au tout
-     * dernier tap (celui qui calcule le lancer), mais sont demandés à
-     * chaque appel pour rester simple à utiliser depuis l'UI.
+     * côté web. "puissanceLevel"/"vitesseLevel"/"perfectWindow" ne sont
+     * utiles qu'au tout dernier tap (celui qui calcule le lancer), mais
+     * sont demandés à chaque appel pour rester simple à utiliser depuis
+     * l'UI. `perfectWindow` élargi (voir PhysicsConstants.PERFECT_WINDOW_CLAUDE)
+     * pour la Trousse Claude, comme `getSkin(save.equippedSkin).isClaude`
+     * côté web (lockAccuracyAndLaunch).
      */
-    fun tap(puissanceLevel: Int, vitesseLevel: Int): ThrowState {
+    fun tap(puissanceLevel: Int, vitesseLevel: Int, perfectWindow: Double = PhysicsConstants.PERFECT_WINDOW): ThrowState {
         val now = clock()
         state = when (val current = state) {
             is ThrowState.Idle ->
@@ -49,6 +52,7 @@ class ThrowSequence(private val clock: () -> Long = System::currentTimeMillis) {
                         vitesseLevel = vitesseLevel,
                         lockedPower = current.lockedPower,
                         accuracyValue = accuracyValue,
+                        perfectWindow = perfectWindow,
                     )
                 )
                 ThrowState.Landed(result)

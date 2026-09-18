@@ -106,11 +106,26 @@ Android) avant d'être branché à l'affichage dans `:app`.
   (65 tests au total). Branchés dans `:app` (`SkinsRow`/`TrailsRow`,
   listes déroulantes horizontales) : acheter/équiper marche vraiment, et la
   physique du lancer + les gains utilisent désormais les stats *effectives*
-  (niveau acheté + bonus du skin équipé), pas juste le niveau acheté. Les
-  mécaniques spéciales par skin (Trousse Pièce, rebonds de la Trousse à
-  Baskets, vol de la Trousse Vampire, etc. — les flags `is*` de `Skin`) ne
-  sont pas encore branchées au gameplay, ni le rendu visuel différent par
-  skin (toujours la même silhouette orange dans `ThrowCanvas`).
+  (niveau acheté + bonus du skin équipé), pas juste le niveau acheté.
+
+- **Mécaniques spéciales de skins (partiel)** : `SkinEarnings` dans `:core`
+  (bonus/malus de gains de la Trousse Pièce — 50% de chance d'un
+  multiplicateur aléatoire x1.6 à x10, avec jackpot au-delà de x5 — et de la
+  Trousse Vampire — tribut de 5 à 40% du gain selon la distance —, portage
+  du bloc correspondant de `onLanded()`, dans le même ordre : pièce
+  d'abord, vampire ensuite) et fenêtre du lancer parfait élargie pour la
+  Trousse Claude (`ThrowSequence.tap()` prend maintenant un `perfectWindow`,
+  porté depuis `isClaude`), testés (73 tests au total). Branchés dans
+  `:app` : le résultat affiche le multiplicateur pièce et le vol vampire
+  quand ils se déclenchent. Le rebond de la Trousse à Baskets n'est PAS
+  porté : contrairement aux autres mécaniques, il demanderait de relancer
+  une charge de puissance/précision en accumulant la position déjà
+  parcourue, ce que la machine à états actuelle de `ThrowSequence` ne gère
+  pas (elle calcule tout le lancer en un coup au 3e tap plutôt que
+  d'détecter un atterrissage intermédiaire pendant le vol). Les mécaniques
+  liées à l'espace (Trousse Lunaire, Fusée, Avion) ne sont pas non plus
+  portées, faute de séquence spatiale côté Android. Toujours pas de rendu
+  visuel différent par skin (même silhouette orange dans `ThrowCanvas`).
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
@@ -121,10 +136,10 @@ Android) avant d'être branché à l'affichage dans `:app`.
    sont déjà là, juste pas leur habillage visuel riche) et de la Plage, sur
    le même principe que `CourDecor` (placement testé dans `:core`, dessin
    dans `:app`).
-2. **Mécaniques spéciales par skin** — brancher les flags `is*` de `Skin`
-   au gameplay (Trousse Pièce, rebonds de la Trousse à Baskets, vol de la
-   Trousse Vampire déjà en partie fait côté vitesse mais pas le tribut
-   d'argent, etc.), un skin à la fois.
+2. **Rebond de la Trousse à Baskets** — nécessite d'étendre `ThrowSequence`
+   (ou une machine à états parallèle) pour représenter un atterrissage
+   intermédiaire qui relance une charge, en accumulant la distance déjà
+   parcourue plutôt que de tout calculer au 3e tap.
 3. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
    seul écran ; découper en vraies destinations (navigation Compose) une
    fois qu'il y a plus d'un écran à afficher.

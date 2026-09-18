@@ -65,6 +65,26 @@ class ThrowSequenceTest {
     }
 
     @Test
+    fun `perfectWindow personnalise (Trousse Claude) est bien transmis au calcul du lancer`() {
+        val sequence = ThrowSequence(clock = fakeClock(0L, 500L, 1200L))
+        sequence.tap(puissanceLevel = 0, vitesseLevel = 0)
+        sequence.tap(puissanceLevel = 0, vitesseLevel = 0)
+        val state = sequence.tap(puissanceLevel = 0, vitesseLevel = 0, perfectWindow = PhysicsConstants.PERFECT_WINDOW_CLAUDE)
+
+        val result = (state as ThrowState.Landed).result
+        val expectedPower = PowerAndAccuracy.powerFraction(0.5)
+        val expectedAccuracy = PowerAndAccuracy.accuracyValue(0.7)
+        val expected = ThrowPhysics.simulateThrow(
+            ThrowInput(
+                puissanceLevel = 0, vitesseLevel = 0,
+                lockedPower = expectedPower, accuracyValue = expectedAccuracy,
+                perfectWindow = PhysicsConstants.PERFECT_WINDOW_CLAUDE,
+            )
+        )
+        assertTrue(result.isPerfect == expected.isPerfect)
+    }
+
+    @Test
     fun `reset repart de idle`() {
         val sequence = ThrowSequence(clock = fakeClock(0L))
         sequence.tap(0, 0)
