@@ -5,8 +5,14 @@
 // include(":app") dans settings.gradle.kts automatiquement.
 plugins {
     id("com.android.application") version "8.5.2"
-    id("org.jetbrains.kotlin.android") version "2.0.21"
-    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+    // Sans version ici : le plugin Kotlin (2.0.21) est déjà résolu via
+    // "kotlin("jvm") version "2.0.21" apply false" dans le build.gradle.kts
+    // racine (:core l'applique pareil, sans version). Redéclarer une
+    // version ici provoquait "plugin already on the classpath with an
+    // unknown version" — les deux plugins viennent du même artefact
+    // kotlin-gradle-plugin que celui déjà chargé pour :core.
+    id("org.jetbrains.kotlin.android")
+    id("org.jetbrains.kotlin.plugin.compose")
     // Firebase (comptes/sauvegarde cloud/classement, voir FirebaseSaveRepository.kt
     // et android/README.md) : ce plugin lit app/google-services.json, qui n'existe
     // pas encore (il vient de la console Firebase, propre à CE projet). L'appliquer
