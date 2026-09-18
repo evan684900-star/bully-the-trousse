@@ -32,6 +32,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.bullythetrousse.core.Achievements
+import com.bullythetrousse.core.BumpMode
+import com.bullythetrousse.core.DailyChallenge
+import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
@@ -51,16 +55,14 @@ import com.bullythetrousse.core.Trails
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 import com.bullythetrousse.core.VolcanoCinematic
+import java.time.LocalDate
 
 /**
- * Dixième tranche du portage natif : rebond de la Trousse à Baskets — un
- * atterrissage peut désormais relancer une charge de puissance/précision
- * (jusqu'à 2 fois, 20% puis 6% de chance) au lieu de conclure le lancer,
- * en accumulant la distance déjà parcourue (voir ThrowSequence.tap() dans
- * :core, paramètre basketBounceChances). Pas d'animation de vol pour les
- * segments intermédiaires (juste un message "🏀 Rebond !") : seul le tout
- * dernier segment (celui qui atterrit pour de bon) est animé sur le Canvas,
- * comme pour un lancer normal.
+ * Onzième tranche du portage natif : les 47 succès (Achievements) et les
+ * défis quotidiens (DailyChallenges), portés dans :core et branchés après
+ * chaque lancer/achat — save.unlockedAchievements et save.dailyChallenges
+ * se mettent maintenant à jour pour de vrai, avec un petit panneau dédié
+ * sous la boutique.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -106,6 +108,15 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
 
+    // Porté de bumpDailyChallenge("spend", cost, "add") côté web, appelé
+    // après tout achat (niveau, skin, traînée) : fait progresser le défi
+    // "spend" du montant dépensé, puis vérifie les succès.
+    fun applyPurchase(updated: GameSave, cost: Int) {
+        var s = DailyChallenges.ensure(updated, LocalDate.now().toString(), SkinStats.totalPuissance(updated), SkinStats.totalVitesse(updated))
+        s = DailyChallenges.bump(s, "spend", cost.toDouble(), BumpMode.ADD)
+        onSaveChange(Achievements.apply(s))
+    }
+
     fun tap() {
         // Trousse Claude : fenêtre du lancer parfait élargie de 75%, voir
         // PhysicsConstants.PERFECT_WINDOW_CLAUDE (portage de isClaude côté web).
@@ -135,7 +146,16 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
             }
 
             is ThrowState.ChargingPower -> {
-                ThrowCanvas(flightState = null)
+                // Après un rebond (Trousse à Baskets), la trousse reste posée à
+                // sa position cumulée plutôt que de sauter à l'origine (voir
+                // tryBasketBounce() côté web : worldX n'est jamais réinitialisé
+                // entre deux segments, seuls vx/vy/rotation repartent de zéro).
+                val restingFlightState = if (current.bounceCount > 0) {
+                    FlightState(worldX = current.cumulativeDistanceMeters * PhysicsConstants.SCALE, worldY = 0.0, vx = 0.0, vy = 0.0)
+                } else {
+                    null
+                }
+                ThrowCanvas(flightState = restingFlightState)
                 if (current.bounceCount > 0) {
                     // Portage du hint "hintBasketBounce" côté web : la trousse a
                     // rebondi (tryBasketBounce()), il faut retaper la charge.
@@ -203,8 +223,9 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                 LaunchedEffect(throwResolved, result) {
                     if (!throwResolved) return@LaunchedEffect
                     val equippedSkin = Skins.find(save.equippedSkin)
-                    val totalLevels = SkinStats.totalPuissance(save) + SkinStats.totalVitesse(save)
-                    val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels)
+                    val totalPuissance = SkinStats.totalPuissance(save)
+                    val totalVitesse = SkinStats.totalVitesse(save)
+                    val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalPuissance + totalVitesse)
                     val skinEarnings = SkinEarnings.apply(baseEarn, equippedSkin, result.distanceMeters)
                     earnings = skinEarnings
                     var updated = save.copy(
@@ -215,7 +236,20 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                         hasJackpot = save.hasJackpot || skinEarnings.hasJackpot,
                     )
                     if (isSkidding) updated = Skid.applyDurabilityCost(updated)
-                    onSaveChange(updated)
+
+                    // Progression des défis quotidiens (voir bumpDailyChallenge()
+                    // côté web) : nombre de lancers, distance (record du jour),
+                    // distance cumulée, argent gagné, lancers parfaits.
+                    updated = DailyChallenges.ensure(updated, LocalDate.now().toString(), totalPuissance, totalVitesse)
+                    updated = DailyChallenges.bump(updated, "throws", 1.0, BumpMode.ADD)
+                    updated = DailyChallenges.bump(updated, "distance", result.distanceMeters, BumpMode.MAX)
+                    updated = DailyChallenges.bump(updated, "distanceCumul", result.distanceMeters, BumpMode.ADD)
+                    updated = DailyChallenges.bump(updated, "earn", skinEarnings.finalEarn.toDouble(), BumpMode.ADD)
+                    if (result.isPerfect) updated = DailyChallenges.bump(updated, "perfect", 1.0, BumpMode.ADD)
+                    if (isSkidding) updated = DailyChallenges.bump(updated, "skid", 1.0, BumpMode.ADD)
+                    if (result.isPerfect) updated = updated.copy(hasPerfectThrow = true)
+
+                    onSaveChange(Achievements.apply(updated))
                 }
 
                 when {
@@ -239,10 +273,12 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
             Text("Tap")
         }
 
-        ShopRow(save = save, onPurchase = onSaveChange)
+        ShopRow(save = save, onPurchase = ::applyPurchase)
         VolcanoRow(save = save, onStartVolcanoCinematic = onStartVolcanoCinematic)
-        SkinsRow(save = save, onSaveChange = onSaveChange)
-        TrailsRow(save = save, onSaveChange = onSaveChange)
+        SkinsRow(save = save, onSaveChange = onSaveChange, onPurchase = ::applyPurchase)
+        TrailsRow(save = save, onSaveChange = onSaveChange, onPurchase = ::applyPurchase)
+        DailyChallengesPanel(save = save, onSaveChange = onSaveChange)
+        Text("🏆 ${save.unlockedAchievements.size} / ${Achievements.ALL.size} succès débloqués")
     }
 }
 
@@ -253,7 +289,7 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
  * boutique dédiée (voir android/README.md).
  */
 @Composable
-private fun SkinsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
+private fun SkinsRow(save: GameSave, onSaveChange: (GameSave) -> Unit, onPurchase: (GameSave, Int) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(Skins.ALL) { skin: Skin ->
             val owned = save.ownedSkins.contains(skin.id)
@@ -265,7 +301,7 @@ private fun SkinsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
                 cost = skin.cost,
                 onBuy = {
                     val result = SkinShop.buy(save, skin.id)
-                    if (result is SkinShop.PurchaseResult.Success) onSaveChange(result.save)
+                    if (result is SkinShop.PurchaseResult.Success) onPurchase(result.save, skin.cost)
                 },
                 onEquip = { onSaveChange(SkinShop.equip(save, skin.id)) },
             )
@@ -279,7 +315,7 @@ private fun SkinsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
  * "Équiper" séparée pour un achat).
  */
 @Composable
-private fun TrailsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
+private fun TrailsRow(save: GameSave, onSaveChange: (GameSave) -> Unit, onPurchase: (GameSave, Int) -> Unit) {
     LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         items(Trails.ALL) { trail: Trail ->
             val owned = save.ownedTrails.contains(trail.id)
@@ -291,7 +327,7 @@ private fun TrailsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
                 cost = trail.cost,
                 onBuy = {
                     val result = TrailShop.buy(save, trail.id)
-                    if (result is TrailShop.PurchaseResult.Success) onSaveChange(result.save)
+                    if (result is TrailShop.PurchaseResult.Success) onPurchase(result.save, trail.cost)
                 },
                 onEquip = { onSaveChange(TrailShop.equip(save, trail.id)) },
             )
@@ -305,6 +341,42 @@ private fun CosmeticButton(label: String, owned: Boolean, equipped: Boolean, cos
         equipped -> OutlinedButton(onClick = {}, enabled = false) { Text("✅ $label") }
         owned -> Button(onClick = onEquip) { Text(label) }
         else -> Button(onClick = onBuy) { Text("$label ($cost)") }
+    }
+}
+
+/**
+ * Panneau des défis quotidiens, portage minimal de la carte "défis" du menu
+ * web : un défi par ligne (progression, cible, bouton "Réclamer" une fois
+ * la cible atteinte). Les défis se génèrent tout seuls au premier lancer/
+ * achat de la journée (voir DailyChallenges.ensure(), appelé dans
+ * applyPurchase()/l'effet de résultat du lancer) — cette liste peut donc
+ * être vide tant qu'aucun des deux n'a encore eu lieu aujourd'hui.
+ */
+@Composable
+private fun DailyChallengesPanel(save: GameSave, onSaveChange: (GameSave) -> Unit) {
+    if (save.dailyChallenges.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text("📅 Défis du jour", style = MaterialTheme.typography.titleSmall)
+        save.dailyChallenges.forEachIndexed { index, challenge: DailyChallenge ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "${challenge.kind} : ${challenge.progress.toInt()}/${challenge.target.toInt()} (+${challenge.reward}$)",
+                    modifier = Modifier.weight(1f),
+                )
+                when {
+                    challenge.claimed -> Text("✅")
+                    challenge.progress >= challenge.target -> Button(onClick = {
+                        val result = DailyChallenges.claim(save, index)
+                        if (result is DailyChallenges.ClaimResult.Success) onSaveChange(Achievements.apply(result.save))
+                    }) { Text("Réclamer") }
+                    else -> Unit
+                }
+            }
+        }
     }
 }
 
@@ -335,7 +407,7 @@ private fun VolcanoRow(save: GameSave, onStartVolcanoCinematic: () -> Unit) {
  * lancer, pas encore dans un écran dédié (voir android/README.md).
  */
 @Composable
-private fun ShopRow(save: GameSave, onPurchase: (GameSave) -> Unit) {
+private fun ShopRow(save: GameSave, onPurchase: (GameSave, Int) -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -344,7 +416,7 @@ private fun ShopRow(save: GameSave, onPurchase: (GameSave) -> Unit) {
             modifier = Modifier.weight(1f),
             onClick = {
                 val result = Shop.buyPuissance(save)
-                if (result is Shop.PurchaseResult.Success) onPurchase(result.save)
+                if (result is Shop.PurchaseResult.Success) onPurchase(result.save, result.cost)
             },
         ) {
             Text("⚡ Puissance Nv.${save.puissanceLevel} (${Economy.upgradeCost(save.puissanceLevel)})")
@@ -353,7 +425,7 @@ private fun ShopRow(save: GameSave, onPurchase: (GameSave) -> Unit) {
             modifier = Modifier.weight(1f),
             onClick = {
                 val result = Shop.buyVitesse(save)
-                if (result is Shop.PurchaseResult.Success) onPurchase(result.save)
+                if (result is Shop.PurchaseResult.Success) onPurchase(result.save, result.cost)
             },
         ) {
             Text("💨 Vitesse Nv.${save.vitesseLevel} (${Economy.upgradeCost(save.vitesseLevel)})")

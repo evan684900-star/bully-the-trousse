@@ -130,10 +130,25 @@ Android) avant d'être branché à l'affichage dans `:app`.
   jusqu'à 2 fois ; la distance finale cumule tous les segments, testé
   (78 tests au total). Branché dans `:app` : équiper la Trousse à Baskets
   active vraiment les rebonds, avec un message "🏀 Rebond !" pendant la
-  charge suivante. Simplification assumée : aucune animation de vol pour
-  les segments intermédiaires (contrairement au web, où la trousse reste
-  visible en l'air pendant qu'on retape) — seul le tout dernier segment,
-  celui qui atterrit pour de bon, est animé sur le Canvas.
+  charge suivante, la trousse posée à sa position cumulée entre deux
+  segments (vérifié contre le comportement web : `tryBasketBounce()` ne
+  réinitialise jamais `worldX`, et il n'y a en fait *pas* d'animation de vol
+  entre deux segments côté web non plus — la trousse reste simplement
+  visible, immobile, à l'endroit où elle vient de rebondir, pendant que la
+  charge redémarre. Le portage Android fait donc déjà la bonne chose ici).
+
+- **Succès et défis quotidiens** : `Achievements` (les 47 succès, portage
+  exact de `ACHIEVEMENTS` — mêmes ids/émojis/conditions) et
+  `DailyChallenges`/`ChallengePool` (génération de 3 défis parmi 10 types,
+  progression, réclamation — portage de `CHALLENGE_POOL`/
+  `generateDailyChallenges()`/`ensureDailyChallenges()`/
+  `bumpDailyChallenge()`/`claimDailyChallenge()`) dans `:core`, testés (98
+  tests au total). Branchés dans `:app` : les défis du jour se génèrent
+  tout seuls au premier lancer/achat de la journée, progressent vraiment
+  (lancers, distance, distance cumulée, argent gagné, lancers parfaits,
+  dérapages, dépenses) et peuvent être réclamés depuis un petit panneau ;
+  les succès se débloquent automatiquement après chaque lancer/achat, avec
+  un compteur "🏆 X / 47" affiché en bas de l'écran.
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
@@ -144,22 +159,23 @@ Android) avant d'être branché à l'affichage dans `:app`.
    sont déjà là, juste pas leur habillage visuel riche) et de la Plage, sur
    le même principe que `CourDecor` (placement testé dans `:core`, dessin
    dans `:app`).
-2. **Animation de vol pendant un rebond** — afficher la trousse en l'air
-   entre deux segments d'un rebond (Trousse à Baskets) au lieu de sauter
-   directement à l'écran de charge suivant.
-3. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
+2. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
    seul écran ; découper en vraies destinations (navigation Compose) une
    fois qu'il y a plus d'un écran à afficher.
-4. **Sélecteur de monde + monde Plage** — pour l'instant, `currentWorld`
+3. **Sélecteur de monde + monde Plage** — pour l'instant, `currentWorld`
    ne bascule sur "volcans" qu'en réussissant sa cinématique (comme côté
    web), sans écran pour choisir/revenir sur "cour" ; le monde Plage
    (parasols/serviettes/châteaux, bus, cinématique dédiée) n'est pas
    commencé.
-5. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
-   les comptes, le classement, les cadeaux, les succès — probablement la
-   partie la plus longue, vu tout ce qui a été construit et corrigé côté
-   web cette session (comptes multi-appareils, cadeaux, etc.).
-6. **Les 47 succès** et les défis quotidiens.
+4. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
+   les comptes, le classement, les cadeaux — la synchronisation cloud des
+   succès/défis déjà portés localement inclue. Probablement la partie la
+   plus longue, vu tout ce qui a été construit et corrigé côté web cette
+   session (comptes multi-appareils, cadeaux, etc.) — **et pas vérifiable
+   dans ce bac à sable** : le SDK Firebase Android a le même problème que
+   l'Android Gradle Plugin (dépôt Google Maven injoignable ici), et il
+   faudrait de vrais identifiants de projet Firebase. À faire dans Android
+   Studio directement.
 
 Chaque étape devrait suivre le même principe que celle-ci : porter la
 logique dans `:core` avec des tests dont les valeurs de référence viennent
