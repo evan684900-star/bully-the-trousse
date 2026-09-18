@@ -5,6 +5,14 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
+
+plugins {
+    // Corrige l'avertissement "Undefined Toolchain Download Repositories" :
+    // sans ce plugin, Gradle ne sait pas où télécharger un JDK si celui
+    // requis par le projet (17) n'est pas déjà installé localement.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "0.8.0"
+}
+
 dependencyResolutionManagement {
     repositories {
         google()
