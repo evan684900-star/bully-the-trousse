@@ -185,17 +185,31 @@ Android) avant d'être branché à l'affichage dans `:app`.
   cendres/mer animées, formes vectorielles simples pour les accessoires
   (comme la trousse elle-même).
 
+- **Écrans séparés et sélecteur de monde** : l'app est découpée en vraies
+  destinations (`Screen` scellé dans `MainActivity.kt`, dispatché par
+  `GameRoot` — pas de pile d'historique, juste "où on est", chaque écran
+  sait revenir au Menu) au lieu d'un unique écran fourre-tout :
+  - `MenuScreen.kt` — résumé (argent, record, succès), `WorldSelector`
+    (portage de `buildWorldsRow()`/`handleWorldCardClick()` : Cour toujours
+    accessible, Volcan/Plage verrouillés/lancent leur cinématique si besoin,
+    impossible de changer de monde tant qu'on est coincé sur la plage sans
+    payer le bus), défis du jour, et les boutons vers Jeu/Boutique.
+  - `GameScreen.kt` — uniquement la trousse (Canvas + boucle de lancer).
+  - `ShopScreen.kt` — niveaux, skins, traînées.
+  - `Purchases.kt` — `applyPurchase()` (progression du défi "spend" +
+    vérification des succès), factorisé puisque plusieurs écrans achètent
+    des choses (Boutique, mais aussi Claquettes/billet de bus sur le Menu).
+
+  Simplification assumée (documentée dans `GameScreen.kt`) : revenir au
+  Menu en pleine charge (avant le 3e tap) abandonne ce lancer plutôt que de
+  le mettre en pause — un nouvel écran Jeu repart toujours de `Idle`.
+
 ## Ce qu'il reste à faire (dans un ordre logique)
 
 1. **Vrai sprite pour la trousse** — remplacer sa forme vectorielle par un
    vrai sprite (+ ses variantes de skins, maintenant que la liste des skins
    existe), si des assets sont fournis.
-2. **Écrans séparés (menu / jeu / boutique) + sélecteur de monde** —
-   actuellement tout est sur un seul écran, et il n'y a pas de bouton
-   "retour à la Cour" une fois sur un autre monde (seulement les boutons
-   d'accès Volcan/Plage) ; découper en vraies destinations une fois qu'il y
-   a plus d'un écran à afficher.
-3. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
+2. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
    les comptes, le classement, les cadeaux — la synchronisation cloud des
    succès/défis déjà portés localement inclue. Probablement la partie la
    plus longue, vu tout ce qui a été construit et corrigé côté web cette
