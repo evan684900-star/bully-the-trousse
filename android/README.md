@@ -150,24 +150,40 @@ Android) avant d'être branché à l'affichage dans `:app`.
   les succès se débloquent automatiquement après chaque lancer/achat, avec
   un compteur "🏆 X / 47" affiché en bas de l'écran.
 
+- **Monde Plage** : `Beach` dans `:core` (accès via la Trousse à Claquettes/
+  le billet de bus, argent oublié à la première arrivée, rebond sur un
+  parasol pendant le vol — priorité parasol > serviette > château, portage
+  de `enterBeachProfile()`/`leaveBeachProfile()`/`tryBeachParasolBounce()`/
+  `beachFinalizeLanding()`) et `BeachCinematic` (séquencement de la
+  cinématique de déblocage, mêmes 30 durées exactes que `BCINE` côté web),
+  testés (112 tests au total). Branché dans `:app` : `BeachRow` (achat
+  Claquettes → cinématique → aller à la plage → billet de bus du retour),
+  `animateBeachFlight` (le rebond sur un parasol continue vraiment le vol
+  au lieu d'atterrir), record/argent/compteurs (`plageBestDistance`,
+  `plageThrows`, `plageMoneyEarned`, `plageParasolBounces`, etc.) tous mis
+  à jour pour de vrai. **Simplification assumée et documentée dans le code**
+  (`BeachCinematicScreen.kt`) : contrairement à la cinématique du volcan,
+  celle de la plage n'a pas d'issue possible autre que le succès côté web
+  (`bcFinish()` est toujours atteint) — le séquencement porte donc les
+  vraies durées de chaque phase, mais pas les mini-séquences interactives
+  du web (course-poursuite de crabes, visée, dialogues), qui n'influencent
+  que l'habillage là-bas. Toujours pas de décor visuel (parasols/
+  serviettes/châteaux/bus dessinés) dans `ThrowCanvas`.
+
 ## Ce qu'il reste à faire (dans un ordre logique)
 
-1. **Vrai sprite pour la trousse + décor des autres mondes** — remplacer la
-   forme vectorielle de `ThrowCanvas` par un vrai sprite (+ ses variantes de
+1. **Vrai sprite pour la trousse + décor des mondes** — remplacer la forme
+   vectorielle de `ThrowCanvas` par un vrai sprite (+ ses variantes de
    skins, maintenant que la liste des skins existe) si des assets sont
-   fournis, et porter le décor du monde Volcan (le mini-jeu et le dérapage
-   sont déjà là, juste pas leur habillage visuel riche) et de la Plage, sur
-   le même principe que `CourDecor` (placement testé dans `:core`, dessin
-   dans `:app`).
-2. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
-   seul écran ; découper en vraies destinations (navigation Compose) une
-   fois qu'il y a plus d'un écran à afficher.
-3. **Sélecteur de monde + monde Plage** — pour l'instant, `currentWorld`
-   ne bascule sur "volcans" qu'en réussissant sa cinématique (comme côté
-   web), sans écran pour choisir/revenir sur "cour" ; le monde Plage
-   (parasols/serviettes/châteaux, bus, cinématique dédiée) n'est pas
-   commencé.
-4. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
+   fournis, et porter le décor des mondes Volcan et Plage (leurs mécaniques
+   sont déjà là, juste pas leur habillage visuel), sur le même principe que
+   `CourDecor` (placement testé dans `:core`, dessin dans `:app`).
+2. **Écrans séparés (menu / jeu / boutique) + sélecteur de monde** —
+   actuellement tout est sur un seul écran, et il n'y a pas de bouton
+   "retour à la Cour" une fois sur un autre monde (seulement les boutons
+   d'accès Volcan/Plage) ; découper en vraies destinations une fois qu'il y
+   a plus d'un écran à afficher.
+3. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
    les comptes, le classement, les cadeaux — la synchronisation cloud des
    succès/défis déjà portés localement inclue. Probablement la partie la
    plus longue, vu tout ce qui a été construit et corrigé côté web cette

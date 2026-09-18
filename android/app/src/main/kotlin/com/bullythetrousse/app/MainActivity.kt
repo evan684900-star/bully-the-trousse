@@ -33,6 +33,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Achievements
+import com.bullythetrousse.core.Beach
+import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.BumpMode
 import com.bullythetrousse.core.DailyChallenge
 import com.bullythetrousse.core.DailyChallenges
@@ -58,11 +60,11 @@ import com.bullythetrousse.core.VolcanoCinematic
 import java.time.LocalDate
 
 /**
- * Onzième tranche du portage natif : les 47 succès (Achievements) et les
- * défis quotidiens (DailyChallenges), portés dans :core et branchés après
- * chaque lancer/achat — save.unlockedAchievements et save.dailyChallenges
- * se mettent maintenant à jour pour de vrai, avec un petit panneau dédié
- * sous la boutique.
+ * Douzième tranche du portage natif : le monde Plage — accès (Trousse à
+ * Claquettes, billet de bus), argent oublié à l'arrivée, rebond sur un
+ * parasol pendant le vol, et sa cinématique de déblocage (déroulement
+ * fidèle aux vraies durées de BCINE, habillage très simplifié — voir
+ * BeachCinematicScreen.kt et android/README.md).
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,28 +85,38 @@ fun GameRoot() {
     val repository = remember { SaveRepository(context) }
     var save by remember { mutableStateOf(repository.load()) }
     var showingVolcanoCinematic by remember { mutableStateOf(false) }
+    var showingBeachCinematic by remember { mutableStateOf(false) }
 
     fun updateSave(updated: GameSave) {
         save = updated
         repository.save(updated)
     }
 
-    if (showingVolcanoCinematic) {
-        VolcanoCinematicScreen(onFinished = { outcome ->
+    when {
+        showingVolcanoCinematic -> VolcanoCinematicScreen(onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
             showingVolcanoCinematic = false
         })
-    } else {
-        ThrowScreen(
+        showingBeachCinematic -> BeachCinematicScreen(onFinished = {
+            updateSave(BeachCinematic.applyOutcome(save))
+            showingBeachCinematic = false
+        })
+        else -> ThrowScreen(
             save = save,
             onSaveChange = ::updateSave,
             onStartVolcanoCinematic = { showingVolcanoCinematic = true },
+            onStartBeachCinematic = { showingBeachCinematic = true },
         )
     }
 }
 
 @Composable
-fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcanoCinematic: () -> Unit) {
+fun ThrowScreen(
+    save: GameSave,
+    onSaveChange: (GameSave) -> Unit,
+    onStartVolcanoCinematic: () -> Unit,
+    onStartBeachCinematic: () -> Unit,
+) {
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
 
@@ -136,7 +148,9 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
         Text("🎒 Bully the Trousse", style = MaterialTheme.typography.headlineMedium)
-        Text("💰 ${save.money}   Record : ${"%.1f".format(save.bestDistance)} m")
+        // Record par monde : le monde normal et la plage ont chacun le leur.
+        val displayedRecord = if (save.currentWorld == "plage") save.plageBestDistance else save.bestDistance
+        Text("💰 ${save.money}   Record : ${"%.1f".format(displayedRecord)} m")
         Text("Puissance ${SkinStats.totalPuissance(save)}   Vitesse ${SkinStats.totalVitesse(save)}   Durabilité ${save.durability}/${SkinStats.maxDurability(save)}")
 
         when (val current = state) {
@@ -187,8 +201,17 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
 
             is ThrowState.Landed -> {
                 val result = current.result
+                val isBeach = save.currentWorld == "plage"
                 var flightFinished by remember(result) { mutableStateOf(false) }
-                val flightState: FlightState = animateFlight(result) { flightFinished = true }
+                var beachOutcome by remember(result) { mutableStateOf<BeachFlightOutcome?>(null) }
+                val flightState: FlightState = if (isBeach) {
+                    animateBeachFlight(result) { finalState, outcome ->
+                        beachOutcome = outcome
+                        flightFinished = true
+                    }
+                } else {
+                    animateFlight(result) { flightFinished = true }
+                }
 
                 // Monde Volcan : la poussière rouge rend le sol glissant (25% de
                 // chance), voir Skid dans :core (portage de SKID_CHANCE et du
@@ -228,14 +251,29 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                     val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalPuissance + totalVitesse)
                     val skinEarnings = SkinEarnings.apply(baseEarn, equippedSkin, result.distanceMeters)
                     earnings = skinEarnings
-                    var updated = save.copy(
-                        money = save.money + skinEarnings.finalEarn,
-                        totalMoneyEarned = save.totalMoneyEarned + skinEarnings.finalEarn,
-                        bestDistance = maxOf(save.bestDistance, result.distanceMeters),
-                        totalThrows = save.totalThrows + 1,
-                        hasJackpot = save.hasJackpot || skinEarnings.hasJackpot,
+                    // Record par monde : le monde normal et la plage ont chacun
+                    // le leur (voir le commentaire de recordField côté web).
+                    var updated = if (isBeach) {
+                        save.copy(
+                            plageBestDistance = maxOf(save.plageBestDistance, result.distanceMeters),
+                            plageThrows = save.plageThrows + 1,
+                            plageMoneyEarned = save.plageMoneyEarned + skinEarnings.finalEarn,
+                        )
+                    } else {
+                        save.copy(bestDistance = maxOf(save.bestDistance, result.distanceMeters))
+                    }
+                    updated = updated.copy(
+                        money = updated.money + skinEarnings.finalEarn,
+                        totalMoneyEarned = updated.totalMoneyEarned + skinEarnings.finalEarn,
+                        totalThrows = updated.totalThrows + 1,
+                        hasJackpot = updated.hasJackpot || skinEarnings.hasJackpot,
                     )
                     if (isSkidding) updated = Skid.applyDurabilityCost(updated)
+                    beachOutcome?.let { outcome ->
+                        if (outcome.parasolBounced) updated = updated.copy(plageParasolBounces = updated.plageParasolBounces + 1)
+                        if (outcome.towelFound) updated = updated.copy(plageTowelsFound = updated.plageTowelsFound + 1)
+                        if (outcome.castleCrushed) updated = updated.copy(plageCastlesCrushed = updated.plageCastlesCrushed + 1)
+                    }
 
                     // Progression des défis quotidiens (voir bumpDailyChallenge()
                     // côté web) : nombre de lancers, distance (record du jour),
@@ -263,6 +301,9 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                         earnings?.takeIf { it.vampireStolen > 0 }?.let {
                             Text("🦇 -${it.vampireStolen}$ volés par la malédiction (${it.vampireStealPct.toInt()}%)")
                         }
+                        beachOutcome?.takeIf { it.parasolBounced }?.let { Text("⛱️ Rebond sur un parasol !") }
+                        beachOutcome?.takeIf { it.towelFound }?.let { Text("🧺 Atterri dans une serviette !") }
+                        beachOutcome?.takeIf { it.castleCrushed }?.let { Text("🏰 Un château s'est écroulé !") }
                         Text("Tape pour relancer.")
                     }
                 }
@@ -275,6 +316,7 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
 
         ShopRow(save = save, onPurchase = ::applyPurchase)
         VolcanoRow(save = save, onStartVolcanoCinematic = onStartVolcanoCinematic)
+        BeachRow(save = save, onSaveChange = onSaveChange, onPurchase = ::applyPurchase, onStartBeachCinematic = onStartBeachCinematic)
         SkinsRow(save = save, onSaveChange = onSaveChange, onPurchase = ::applyPurchase)
         TrailsRow(save = save, onSaveChange = onSaveChange, onPurchase = ::applyPurchase)
         DailyChallengesPanel(save = save, onSaveChange = onSaveChange)
@@ -397,6 +439,49 @@ private fun VolcanoRow(save: GameSave, onStartVolcanoCinematic: () -> Unit) {
         Button(onClick = onStartVolcanoCinematic, modifier = Modifier.fillMaxWidth()) {
             Text("🌋 Découvrir le volcan")
         }
+    }
+}
+
+/**
+ * Accès au monde Plage, portage simplifié de handlePlageCardClick()/
+ * buildClaquettesCard()/buildBusTicketCard() côté web : achat de la Trousse
+ * à Claquettes (donne accès à la cinématique), puis bouton pour la lancer,
+ * puis (une fois débloqué) aller/revenir de la plage et payer le bus du
+ * retour. Pas de tutoriel/modale "revivre la cinématique" ici (voir
+ * android/README.md).
+ */
+@Composable
+private fun BeachRow(
+    save: GameSave,
+    onSaveChange: (GameSave) -> Unit,
+    onPurchase: (GameSave, Int) -> Unit,
+    onStartBeachCinematic: () -> Unit,
+) {
+    when {
+        save.inPlage -> Button(
+            onClick = {
+                val result = Beach.buyBusTicket(save)
+                if (result is Beach.PurchaseResult.Success) onPurchase(result.save, Beach.BUS_TICKET_COST)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("🚌 Reprendre le bus (${Beach.BUS_TICKET_COST}$)") }
+
+        save.plageUnlocked -> Button(
+            onClick = { onSaveChange(Beach.enter(save)) },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("🏖️ Aller à la plage") }
+
+        save.hasClaquettes -> Button(onClick = onStartBeachCinematic, modifier = Modifier.fillMaxWidth()) {
+            Text("🏖️ Prendre le bus pour la plage")
+        }
+
+        else -> Button(
+            onClick = {
+                val result = Beach.buyClaquettes(save)
+                if (result is Beach.PurchaseResult.Success) onPurchase(result.save, Beach.CLAQUETTES_COST)
+            },
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("🩴 Trousse à Claquettes (${Beach.CLAQUETTES_COST}$)") }
     }
 }
 

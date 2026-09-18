@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
+import com.bullythetrousse.core.Beach
+import com.bullythetrousse.core.BeachEvents
+import com.bullythetrousse.core.BeachLandingOutcome
 import com.bullythetrousse.core.Camera
 import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.FlightSimulator
@@ -218,6 +221,65 @@ fun animateFlight(result: ThrowResult, onLanded: () -> Unit): FlightState {
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
         }
         onLanded()
+    }
+
+    return state
+}
+
+/** Ce qui s'est passé au fil d'un lancer plage, voir [animateBeachFlight]. */
+data class BeachFlightOutcome(val parasolBounced: Boolean, val towelFound: Boolean, val castleCrushed: Boolean)
+
+/**
+ * Anime un lancer dans le monde Plage : comme [animateFlight], mais gère en
+ * plus le rebond sur un parasol (voir [Beach], `:core`) — si l'atterrissage
+ * tombe sur un parasol tiré au sort pour ce lancer, le vol continue avec une
+ * nouvelle vitesse au lieu de s'arrêter, jusqu'à un atterrissage "normal"
+ * (éventuellement sur une serviette/un château, purement narratifs).
+ * `onLanded` reçoit l'état final ET ce qui s'est déclenché pendant le vol.
+ */
+@Composable
+fun animateBeachFlight(result: ThrowResult, onLanded: (FlightState, BeachFlightOutcome) -> Unit): FlightState {
+    var state by remember(result) { mutableStateOf(result.toInitialFlightState()) }
+    val rotSpeed = remember(result) { rotationSpeed(result.initialSpeed) }
+
+    LaunchedEffect(result) {
+        // Tiré une seule fois pour tout le lancer, comme beachOnLaunch() côté
+        // web (qui prédit la distance AVANT tout rebond pour ce tirage).
+        val events = Beach.rollEvents(result.distanceMeters)
+        var used = BeachEvents()
+        var parasolBounced = false
+        var towelFound = false
+        var castleCrushed = false
+
+        var lastFrameMillis = System.currentTimeMillis()
+        while (true) {
+            withFrameNanos { }
+            val now = System.currentTimeMillis()
+            val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
+            lastFrameMillis = now
+            state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
+            if (state.hasLanded) {
+                when (Beach.landingOutcome(events, used, inSpaceMode = false)) {
+                    BeachLandingOutcome.PARASOL_BOUNCE -> {
+                        used = used.copy(parasol = true)
+                        parasolBounced = true
+                        state = Beach.applyParasolBounce(state)
+                    }
+                    BeachLandingOutcome.TOWEL_FOUND -> {
+                        used = used.copy(towel = true)
+                        towelFound = true
+                        break
+                    }
+                    BeachLandingOutcome.CASTLE_CRUSHED -> {
+                        used = used.copy(castle = true)
+                        castleCrushed = true
+                        break
+                    }
+                    BeachLandingOutcome.NORMAL -> break
+                }
+            }
+        }
+        onLanded(state, BeachFlightOutcome(parasolBounced, towelFound, castleCrushed))
     }
 
     return state
