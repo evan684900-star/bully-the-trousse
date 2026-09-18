@@ -16,22 +16,27 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 
 /**
- * Deuxième tranche du portage natif : la vraie interaction en 3 taps
- * (idle → charge de puissance → charge de précision → lancé), portée
- * depuis handleTap()/lockPower()/lockAccuracyAndLaunch() côté web. Pas
- * encore d'animation de barre en temps réel ni de rendu de la trousse —
- * juste le texte d'état, pour valider la mécanique avant de l'habiller.
+ * Troisième tranche du portage natif : les barres de puissance/précision
+ * s'animent maintenant en temps réel pendant la charge (avant, seul le
+ * texte d'état s'affichait), en suivant les mêmes oscillations que
+ * PowerAndAccuracy — donc la valeur affichée à l'écran au moment du tap
+ * est bien celle qui sera verrouillée. Toujours pas de rendu de la
+ * trousse (voir android/README.md).
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,13 +76,25 @@ fun ThrowScreen() {
 
             is ThrowState.ChargingPower -> {
                 Text("Puissance en charge... tape pour la figer.")
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(8.dp))
+                LiveOscillatingBar(
+                    startedAtMillis = current.startedAtMillis,
+                    valueAt = PowerAndAccuracy::powerFraction,
+                    // powerFraction oscille dans [0.4, 1.0] : la barre reste
+                    // donc toujours au moins un peu remplie.
+                    toProgress = { it.toFloat() },
+                )
             }
 
             is ThrowState.ChargingAccuracy -> {
                 Text("Puissance figée à ${(current.lockedPower * 100).toInt()}%.")
                 Text("Précision en charge... tape pour lancer.")
-                LinearProgressIndicator(modifier = Modifier.fillMaxWidth().height(8.dp))
+                LiveOscillatingBar(
+                    startedAtMillis = current.startedAtMillis,
+                    valueAt = PowerAndAccuracy::accuracyValue,
+                    // accuracyValue oscille dans [-1, 1], 0 = visée parfaite
+                    // (le milieu de la barre) : on recentre pour la jauge.
+                    toProgress = { ((it + 1.0) / 2.0).toFloat() },
+                )
             }
 
             is ThrowState.Landed -> {
@@ -92,4 +109,40 @@ fun ThrowScreen() {
             Text("Tap")
         }
     }
+}
+
+/**
+ * Barre qui suit une oscillation dépendant du temps (voir PowerAndAccuracy),
+ * recalculée à chaque frame tant que l'écran est composé. Utilise
+ * System.currentTimeMillis() (pas l'horloge de frame de Compose, qui n'a
+ * pas la même origine) pour rester sur exactement la même base de temps que
+ * ThrowSequence — sans ça, la valeur affichée pendant l'animation
+ * divergerait de celle réellement verrouillée au moment du tap.
+ */
+@Composable
+private fun LiveOscillatingBar(
+    startedAtMillis: Long,
+    valueAt: (elapsedSeconds: Double) -> Double,
+    toProgress: (Double) -> Float,
+) {
+    val liveValue = remember(startedAtMillis) { mutableDoubleStateOf(valueAt(0.0)) }
+
+    LaunchedEffect(startedAtMillis) {
+        while (true) {
+            // La valeur du timestamp de frame n'est pas utilisée : withFrameNanos
+            // sert juste à caler la boucle sur le rafraîchissement de l'écran
+            // plutôt que de spin-looper en continu. L'écart réel se calcule à
+            // partir de System.currentTimeMillis(), la même horloge que
+            // ThrowSequence, pour que la valeur affichée ici corresponde
+            // exactement à celle qui serait verrouillée en tapant maintenant.
+            withFrameNanos { }
+            val elapsedSeconds = (System.currentTimeMillis() - startedAtMillis) / 1000.0
+            liveValue.doubleValue = valueAt(elapsedSeconds)
+        }
+    }
+
+    LinearProgressIndicator(
+        progress = { toProgress(liveValue.doubleValue) },
+        modifier = Modifier.fillMaxWidth().height(8.dp),
+    )
 }

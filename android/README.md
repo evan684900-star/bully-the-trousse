@@ -42,30 +42,31 @@ Android) avant d'être branché à l'affichage dans `:app`.
   fichier pour la correspondance exacte avec le code web), avec 15 tests
   unitaires dont les valeurs attendues ont été calculées directement depuis
   les formules JS.
-- `:app` : un écran Compose qui utilise la vraie interaction en 3 taps
-  (idle → charge de puissance → charge de précision → lancé) via
-  `ThrowSequence`. Pas encore d'animation de barre en temps réel (le texte
-  affiche juste l'état courant) ni de rendu de la trousse.
+- `:app` : un écran Compose avec la vraie interaction en 3 taps (idle →
+  charge de puissance → charge de précision → lancé) via `ThrowSequence`,
+  et les barres de puissance/précision qui s'animent en temps réel pendant
+  la charge (`LiveOscillatingBar`, `LaunchedEffect` + `withFrameNanos`,
+  calé sur `System.currentTimeMillis()` pour rester sur la même horloge que
+  `ThrowSequence` — la valeur affichée au moment du tap est donc bien celle
+  qui se verrouille). Pas encore de rendu de la trousse elle-même (juste du
+  texte et des barres de progression).
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
-1. **Animation des barres en temps réel** — afficher l'oscillation
-   puissance/précision pendant la charge (actuellement seule la valeur
-   figée au moment du tap est visible), via `LaunchedEffect` + un timer.
-2. **Rendu de la trousse et du décor** — `Canvas` Compose, en portant
+1. **Rendu de la trousse et du décor** — `Canvas` Compose, en portant
    `drawTrousse()`/les fonctions `drawXxx()` de skins depuis le JS.
-3. **Sauvegarde locale** — équivalent de `defaultSave()`/`loadSave()`
+2. **Sauvegarde locale** — équivalent de `defaultSave()`/`loadSave()`
    (DataStore ou fichier JSON), avec la migration des champs si jamais on
    veut un jour importer une sauvegarde depuis la version web.
-4. **Les 3 mondes** (Cour, Volcans, Plage) et leurs mécaniques propres
+3. **Les 3 mondes** (Cour, Volcans, Plage) et leurs mécaniques propres
    (dérapage, parasols/serviettes/châteaux, cinématiques de déblocage).
-5. **Les skins et traînées** — un module `:core` supplémentaire pour la
+4. **Les skins et traînées** — un module `:core` supplémentaire pour la
    liste des skins et leurs bonus/mécaniques spéciales, séparé du rendu.
-6. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
+5. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
    les comptes, le classement, les cadeaux, les succès — probablement la
    partie la plus longue, vu tout ce qui a été construit et corrigé côté
    web cette session (comptes multi-appareils, cadeaux, etc.).
-7. **Les 47 succès** et les défis quotidiens.
+6. **Les 47 succès** et les défis quotidiens.
 
 Chaque étape devrait suivre le même principe que celle-ci : porter la
 logique dans `:core` avec des tests dont les valeurs de référence viennent
