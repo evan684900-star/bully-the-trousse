@@ -98,24 +98,41 @@ Android) avant d'être branché à l'affichage dans `:app`.
   animé (secousse d'écran, éclair, particules) du web, juste le
   déroulement/l'issue, qui eux sont fidèles.
 
+- **Skins et traînées** : `Skins`/`SkinShop`/`SkinStats` et `Trails`/
+  `TrailShop` dans `:core` (portage des 14 skins et 15 traînées de
+  `SKINS`/`TRAILS`, de `getSkin()`/`getTrail()`, de `totalPuissance()`/
+  `totalVitesse()`/`maxDurability()`, et des gestionnaires d'achat/
+  équipement de `buildSkinCard()`/`buildTrailCard()`/`equipSkin()`), testés
+  (65 tests au total). Branchés dans `:app` (`SkinsRow`/`TrailsRow`,
+  listes déroulantes horizontales) : acheter/équiper marche vraiment, et la
+  physique du lancer + les gains utilisent désormais les stats *effectives*
+  (niveau acheté + bonus du skin équipé), pas juste le niveau acheté. Les
+  mécaniques spéciales par skin (Trousse Pièce, rebonds de la Trousse à
+  Baskets, vol de la Trousse Vampire, etc. — les flags `is*` de `Skin`) ne
+  sont pas encore branchées au gameplay, ni le rendu visuel différent par
+  skin (toujours la même silhouette orange dans `ThrowCanvas`).
+
 ## Ce qu'il reste à faire (dans un ordre logique)
 
 1. **Vrai sprite pour la trousse + décor des autres mondes** — remplacer la
    forme vectorielle de `ThrowCanvas` par un vrai sprite (+ ses variantes de
-   skins) si des assets sont fournis, et porter le décor du monde Volcan
-   (le mini-jeu et le dérapage sont déjà là, juste pas leur habillage
-   visuel riche) et de la Plage, sur le même principe que `CourDecor`
-   (placement testé dans `:core`, dessin dans `:app`).
-2. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
+   skins, maintenant que la liste des skins existe) si des assets sont
+   fournis, et porter le décor du monde Volcan (le mini-jeu et le dérapage
+   sont déjà là, juste pas leur habillage visuel riche) et de la Plage, sur
+   le même principe que `CourDecor` (placement testé dans `:core`, dessin
+   dans `:app`).
+2. **Mécaniques spéciales par skin** — brancher les flags `is*` de `Skin`
+   au gameplay (Trousse Pièce, rebonds de la Trousse à Baskets, vol de la
+   Trousse Vampire déjà en partie fait côté vitesse mais pas le tribut
+   d'argent, etc.), un skin à la fois.
+3. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
    seul écran ; découper en vraies destinations (navigation Compose) une
    fois qu'il y a plus d'un écran à afficher.
-3. **Sélecteur de monde + monde Plage** — pour l'instant, `currentWorld`
+4. **Sélecteur de monde + monde Plage** — pour l'instant, `currentWorld`
    ne bascule sur "volcans" qu'en réussissant sa cinématique (comme côté
    web), sans écran pour choisir/revenir sur "cour" ; le monde Plage
    (parasols/serviettes/châteaux, bus, cinématique dédiée) n'est pas
    commencé.
-4. **Les skins et traînées** — un module `:core` supplémentaire pour la
-   liste des skins et leurs bonus/mécaniques spéciales, séparé du rendu.
 5. **Firebase** (SDK Android, différent du SDK JS utilisé côté web) pour
    les comptes, le classement, les cadeaux, les succès — probablement la
    partie la plus longue, vu tout ce qui a été construit et corrigé côté

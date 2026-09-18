@@ -12,9 +12,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,18 +38,24 @@ import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.Shop
 import com.bullythetrousse.core.Skid
+import com.bullythetrousse.core.Skin
+import com.bullythetrousse.core.SkinShop
+import com.bullythetrousse.core.SkinStats
+import com.bullythetrousse.core.Skins
+import com.bullythetrousse.core.Trail
+import com.bullythetrousse.core.TrailShop
+import com.bullythetrousse.core.Trails
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 import com.bullythetrousse.core.VolcanoCinematic
 
 /**
- * Septième tranche du portage natif : mécaniques du monde Volcan — dérapage
- * à l'atterrissage (Skid, voir :core) quand save.currentWorld == "volcans",
- * et la cinématique de déblocage du volcan (VolcanoCinematic, mini-jeu
- * d'esquive des roches + QTE de descente), accessible tant que le monde
- * n'est pas débloqué. Toujours pas d'écran de sélection de monde à part
- * entière (voir android/README.md) : basculer vers "volcans" se fait
- * uniquement en réussissant la cinématique, comme côté web.
+ * Huitième tranche du portage natif : skins et traînées (Skins/Trails, voir
+ * :core) — la physique et les gains utilisent maintenant les stats
+ * effectives (niveau acheté + bonus du skin équipé, via SkinStats),
+ * exactement comme totalPuissance()/totalVitesse() côté web. Toujours pas
+ * de mécaniques spéciales par skin (pièce, rebonds, vampire...), ni de
+ * rendu visuel différent par skin (voir android/README.md).
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -93,7 +102,7 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
 
     fun tap() {
-        state = sequence.tap(save.puissanceLevel, save.vitesseLevel)
+        state = sequence.tap(SkinStats.totalPuissance(save), SkinStats.totalVitesse(save))
     }
 
     Column(
@@ -105,6 +114,7 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
     ) {
         Text("🎒 Bully the Trousse", style = MaterialTheme.typography.headlineMedium)
         Text("💰 ${save.money}   Record : ${"%.1f".format(save.bestDistance)} m")
+        Text("Puissance ${SkinStats.totalPuissance(save)}   Vitesse ${SkinStats.totalVitesse(save)}   Durabilité ${save.durability}/${SkinStats.maxDurability(save)}")
 
         when (val current = state) {
             is ThrowState.Idle -> {
@@ -171,7 +181,7 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
                 // le vol ET un éventuel dérapage entièrement résolus.
                 LaunchedEffect(throwResolved, result) {
                     if (!throwResolved) return@LaunchedEffect
-                    val totalLevels = save.puissanceLevel + save.vitesseLevel
+                    val totalLevels = SkinStats.totalPuissance(save) + SkinStats.totalVitesse(save)
                     val earned = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels)
                     var updated = save.copy(
                         money = save.money + earned,
@@ -202,6 +212,70 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
 
         ShopRow(save = save, onPurchase = onSaveChange)
         VolcanoRow(save = save, onStartVolcanoCinematic = onStartVolcanoCinematic)
+        SkinsRow(save = save, onSaveChange = onSaveChange)
+        TrailsRow(save = save, onSaveChange = onSaveChange)
+    }
+}
+
+/**
+ * Liste des trousses cosmétiques, portage de buildSkinCard() côté web :
+ * bouton "Prix" si pas possédée, "Équiper" si possédée mais pas équipée,
+ * "Équipée" (désactivé) sinon. Défilement horizontal plutôt qu'une vraie
+ * boutique dédiée (voir android/README.md).
+ */
+@Composable
+private fun SkinsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(Skins.ALL) { skin: Skin ->
+            val owned = save.ownedSkins.contains(skin.id)
+            val equipped = save.equippedSkin == skin.id
+            CosmeticButton(
+                label = skin.id,
+                owned = owned,
+                equipped = equipped,
+                cost = skin.cost,
+                onBuy = {
+                    val result = SkinShop.buy(save, skin.id)
+                    if (result is SkinShop.PurchaseResult.Success) onSaveChange(result.save)
+                },
+                onEquip = { onSaveChange(SkinShop.equip(save, skin.id)) },
+            )
+        }
+    }
+}
+
+/**
+ * Liste des traînées cosmétiques, portage de buildTrailCard() côté web :
+ * contrairement à un skin, l'achat équipe directement (pas d'étape
+ * "Équiper" séparée pour un achat).
+ */
+@Composable
+private fun TrailsRow(save: GameSave, onSaveChange: (GameSave) -> Unit) {
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(Trails.ALL) { trail: Trail ->
+            val owned = save.ownedTrails.contains(trail.id)
+            val equipped = save.equippedTrail == trail.id
+            CosmeticButton(
+                label = trail.id,
+                owned = owned,
+                equipped = equipped,
+                cost = trail.cost,
+                onBuy = {
+                    val result = TrailShop.buy(save, trail.id)
+                    if (result is TrailShop.PurchaseResult.Success) onSaveChange(result.save)
+                },
+                onEquip = { onSaveChange(TrailShop.equip(save, trail.id)) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun CosmeticButton(label: String, owned: Boolean, equipped: Boolean, cost: Int, onBuy: () -> Unit, onEquip: () -> Unit) {
+    when {
+        equipped -> OutlinedButton(onClick = {}, enabled = false) { Text("✅ $label") }
+        owned -> Button(onClick = onEquip) { Text(label) }
+        else -> Button(onClick = onBuy) { Text("$label ($cost)") }
     }
 }
 
