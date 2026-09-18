@@ -117,15 +117,23 @@ Android) avant d'être branché à l'affichage dans `:app`.
   Trousse Claude (`ThrowSequence.tap()` prend maintenant un `perfectWindow`,
   porté depuis `isClaude`), testés (73 tests au total). Branchés dans
   `:app` : le résultat affiche le multiplicateur pièce et le vol vampire
-  quand ils se déclenchent. Le rebond de la Trousse à Baskets n'est PAS
-  porté : contrairement aux autres mécaniques, il demanderait de relancer
-  une charge de puissance/précision en accumulant la position déjà
-  parcourue, ce que la machine à états actuelle de `ThrowSequence` ne gère
-  pas (elle calcule tout le lancer en un coup au 3e tap plutôt que
-  d'détecter un atterrissage intermédiaire pendant le vol). Les mécaniques
-  liées à l'espace (Trousse Lunaire, Fusée, Avion) ne sont pas non plus
-  portées, faute de séquence spatiale côté Android. Toujours pas de rendu
-  visuel différent par skin (même silhouette orange dans `ThrowCanvas`).
+  quand ils se déclenchent. Les mécaniques liées à l'espace (Trousse
+  Lunaire, Fusée, Avion) ne sont pas portées, faute de séquence spatiale
+  côté Android. Toujours pas de rendu visuel différent par skin (même
+  silhouette orange dans `ThrowCanvas`).
+
+- **Rebond de la Trousse à Baskets** : `ThrowSequence.tap()` accepte
+  maintenant `basketBounceChances` (`Skins.BASKET_BOUNCE_CHANCES`, 20% puis
+  6%, portage de `BASKET_BOUNCE_CHANCES`/`tryBasketBounce()`) — au 3e tap,
+  un tirage peut relancer une charge de puissance (`ChargingPower` avec
+  `cumulativeDistanceMeters`/`bounceCount`) au lieu de conclure le lancer,
+  jusqu'à 2 fois ; la distance finale cumule tous les segments, testé
+  (78 tests au total). Branché dans `:app` : équiper la Trousse à Baskets
+  active vraiment les rebonds, avec un message "🏀 Rebond !" pendant la
+  charge suivante. Simplification assumée : aucune animation de vol pour
+  les segments intermédiaires (contrairement au web, où la trousse reste
+  visible en l'air pendant qu'on retape) — seul le tout dernier segment,
+  celui qui atterrit pour de bon, est animé sur le Canvas.
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
@@ -136,10 +144,9 @@ Android) avant d'être branché à l'affichage dans `:app`.
    sont déjà là, juste pas leur habillage visuel riche) et de la Plage, sur
    le même principe que `CourDecor` (placement testé dans `:core`, dessin
    dans `:app`).
-2. **Rebond de la Trousse à Baskets** — nécessite d'étendre `ThrowSequence`
-   (ou une machine à états parallèle) pour représenter un atterrissage
-   intermédiaire qui relance une charge, en accumulant la distance déjà
-   parcourue plutôt que de tout calculer au 3e tap.
+2. **Animation de vol pendant un rebond** — afficher la trousse en l'air
+   entre deux segments d'un rebond (Trousse à Baskets) au lieu de sauter
+   directement à l'écran de charge suivant.
 3. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
    seul écran ; découper en vraies destinations (navigation Compose) une
    fois qu'il y a plus d'un écran à afficher.

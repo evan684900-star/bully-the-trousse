@@ -53,15 +53,14 @@ import com.bullythetrousse.core.ThrowState
 import com.bullythetrousse.core.VolcanoCinematic
 
 /**
- * Neuvième tranche du portage natif : mécaniques spéciales de skins qui ne
- * demandaient pas de refonte d'architecture — Trousse Claude (fenêtre du
- * lancer parfait élargie), Trousse Pièce (multiplicateur aléatoire de gain)
- * et Trousse Vampire (tribut prélevé sur le gain, proportionnel à la
- * distance), portées via SkinEarnings (:core) et branchées dans l'écran de
- * résultat. Le rebond de la Trousse à Baskets n'est PAS porté : il
- * demanderait de relancer une charge de puissance/précision en accumulant
- * la position, ce que la machine à états actuelle de ThrowSequence ne gère
- * pas (voir android/README.md).
+ * Dixième tranche du portage natif : rebond de la Trousse à Baskets — un
+ * atterrissage peut désormais relancer une charge de puissance/précision
+ * (jusqu'à 2 fois, 20% puis 6% de chance) au lieu de conclure le lancer,
+ * en accumulant la distance déjà parcourue (voir ThrowSequence.tap() dans
+ * :core, paramètre basketBounceChances). Pas d'animation de vol pour les
+ * segments intermédiaires (juste un message "🏀 Rebond !") : seul le tout
+ * dernier segment (celui qui atterrit pour de bon) est animé sur le Canvas,
+ * comme pour un lancer normal.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -110,12 +109,12 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
     fun tap() {
         // Trousse Claude : fenêtre du lancer parfait élargie de 75%, voir
         // PhysicsConstants.PERFECT_WINDOW_CLAUDE (portage de isClaude côté web).
-        val perfectWindow = if (Skins.find(save.equippedSkin).isClaude) {
-            PhysicsConstants.PERFECT_WINDOW_CLAUDE
-        } else {
-            PhysicsConstants.PERFECT_WINDOW
-        }
-        state = sequence.tap(SkinStats.totalPuissance(save), SkinStats.totalVitesse(save), perfectWindow)
+        val equippedSkin = Skins.find(save.equippedSkin)
+        val perfectWindow = if (equippedSkin.isClaude) PhysicsConstants.PERFECT_WINDOW_CLAUDE else PhysicsConstants.PERFECT_WINDOW
+        // Trousse à Baskets : chance de rebondir plutôt que de conclure le
+        // lancer, voir Skins.BASKET_BOUNCE_CHANCES et ThrowSequence.tap().
+        val bounceChances = if (equippedSkin.isBasket) Skins.BASKET_BOUNCE_CHANCES else emptyList()
+        state = sequence.tap(SkinStats.totalPuissance(save), SkinStats.totalVitesse(save), perfectWindow, bounceChances)
     }
 
     Column(
@@ -137,7 +136,13 @@ fun ThrowScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onStartVolcano
 
             is ThrowState.ChargingPower -> {
                 ThrowCanvas(flightState = null)
-                Text("Puissance en charge... tape pour la figer.")
+                if (current.bounceCount > 0) {
+                    // Portage du hint "hintBasketBounce" côté web : la trousse a
+                    // rebondi (tryBasketBounce()), il faut retaper la charge.
+                    Text("🏀 Rebond ! (${"%.1f".format(current.cumulativeDistanceMeters)} m déjà parcourus) Tape à nouveau !")
+                } else {
+                    Text("Puissance en charge... tape pour la figer.")
+                }
                 LiveOscillatingBar(
                     startedAtMillis = current.startedAtMillis,
                     valueAt = PowerAndAccuracy::powerFraction,

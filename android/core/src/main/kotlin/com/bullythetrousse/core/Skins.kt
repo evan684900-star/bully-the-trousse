@@ -44,6 +44,10 @@ object Skins {
 
     /** `getSkin(id)` côté web : introuvable -> la trousse classique, jamais d'exception. */
     fun find(id: String): Skin = ALL.firstOrNull { it.id == id } ?: ALL.first()
+
+    /** `BASKET_BOUNCE_CHANCES` côté web : 20% de chance pour le 1er rebond de
+     *  la Trousse à Baskets, 6% pour le 2nd, jamais de 3e. */
+    val BASKET_BOUNCE_CHANCES: List<Double> = listOf(0.20, 0.06)
 }
 
 /**
