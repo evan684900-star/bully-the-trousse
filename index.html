@@ -1382,7 +1382,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.2.1</div>
+                <div class="version-tag" id="version-tag">v10.2.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2211,6 +2211,7 @@
         giftMaxBtn: { fr: "Max", en: "Max" },
         giftInvalidAmount: { fr: "Entre un montant valide.", en: "Enter a valid amount." },
         giftNotEnoughMoney: { fr: "Tu n'as pas assez d'argent.", en: "You don't have enough money." },
+        giftCooldown: { fr: "Attends encore {seconds}s avant d'envoyer un autre cadeau.", en: "Wait {seconds}s more before sending another gift." },
         giftSent: { fr: "🎁 {amount} $ envoyés !", en: "🎁 Sent {amount}$!" },
         giftError: { fr: "Envoi impossible, réessaie plus tard.", en: "Couldn't send, try again later." },
         giftsReceivedTitle: { fr: "🎁 Cadeaux reçus !", en: "🎁 Gifts received!" },
@@ -9390,6 +9391,12 @@
         });
     }
 
+    // Cooldown global (tous destinataires confondus) entre deux envois de
+    // cadeau : sans ça, rien n'empêche un script (ou un double-clic répété)
+    // d'enchaîner les écritures Firestore, chacune facturée, en boucle.
+    const GIFT_COOLDOWN_MS = 30000;
+    let lastGiftSentAt = 0;
+
     // Envoie effectivement le cadeau : débite l'argent localement tout de
     // suite (pour l'UX), puis écrit un document dans "gifts" que le
     // destinataire ramassera à sa prochaine connexion (voir
@@ -9399,6 +9406,12 @@
         const amount = Math.floor(Number(inputEl.value));
         if (!Number.isFinite(amount) || amount <= 0) { showToast(tr("giftInvalidAmount")); return; }
         if (amount > save.money) { showToast(tr("giftNotEnoughMoney")); return; }
+        const sinceLastGift = Date.now() - lastGiftSentAt;
+        if (sinceLastGift < GIFT_COOLDOWN_MS) {
+            showToast(tr("giftCooldown").replace("{seconds}", Math.ceil((GIFT_COOLDOWN_MS - sinceLastGift) / 1000)));
+            return;
+        }
+        lastGiftSentAt = Date.now();
         btnEl.disabled = true;
         save.money -= amount;
         persist();
@@ -9423,6 +9436,7 @@
         }).catch((err) => {
             console.error("Envoi du cadeau impossible :", err);
             save.money += amount;
+            lastGiftSentAt = 0; // rien n'est vraiment parti : le cooldown ne doit pas s'appliquer
             persist();
             refreshMenu();
             showToast(tr("giftError"));
@@ -9868,8 +9882,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.2.1";
+    const VERSION_NUMBER = "10.2.2";
     const CHANGELOG = [
+        {
+            version: "10.2.2",
+            major: [],
+            minor: [
+                { fr: "Ajoute un délai de 30s entre deux envois de cadeaux, pour empêcher le spam", en: "Added a 30s cooldown between gift sends, to prevent spamming" },
+            ],
+        },
         {
             version: "10.2.1",
             major: [],
