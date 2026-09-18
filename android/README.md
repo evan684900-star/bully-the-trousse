@@ -182,8 +182,18 @@ Android) avant d'être branché à l'affichage dans `:app`.
   palette + son décor en conséquence) : la Cour, le Volcan et la Plage ont
   chacun leur ciel/sol/décor visuellement distincts. Simplifications
   assumées : thème "jour" uniquement (pas de variante nuit), pas de lune/
-  cendres/mer animées, formes vectorielles simples pour les accessoires
-  (comme la trousse elle-même).
+  cendres animées, formes vectorielles simples pour les accessoires (comme
+  la trousse elle-même).
+
+- **Petits détails d'ambiance animés** (ajout, pas un portage — le web n'a
+  pas de nuages sur ces mondes, et sa mer y est figée) : `ThrowCanvas` a
+  maintenant une horloge d'ambiance (`animationTimeSeconds`, tourne en
+  continu tant que le Canvas est affiché, même hors d'un lancer) qui anime
+  des nuages qui dérivent lentement dans le ciel des 3 mondes (teinte
+  différente par monde : blanche à la Cour, orangée au Volcan, blanche à la
+  Plage) et une mer animée à l'horizon de la Plage (crêtes de vagues qui
+  ondulent). Uniquement visuel, pur `:app`, aucune conséquence sur le
+  gameplay ni de nouveau code `:core`.
 
 - **Écrans séparés et sélecteur de monde** : l'app est découpée en vraies
   destinations (`Screen` scellé dans `MainActivity.kt`, dispatché par

@@ -64,6 +64,18 @@ private fun paletteFor(world: String): WorldPalette = when (world) {
 fun ThrowCanvas(flightState: FlightState?, world: String = "cour", groundVerticalFraction: Float = 0.68f) {
     val palette = paletteFor(world)
 
+    // Horloge d'ambiance (nuages, vagues) : tourne en continu tant que le
+    // Canvas est affiché, indépendamment de l'état du lancer — sans elle,
+    // ces détails resteraient figés tant qu'aucun lancer n'est en cours.
+    var animationTimeSeconds by remember { mutableStateOf(0f) }
+    LaunchedEffect(Unit) {
+        val start = System.currentTimeMillis()
+        while (true) {
+            withFrameNanos { }
+            animationTimeSeconds = (System.currentTimeMillis() - start) / 1000f
+        }
+    }
+
     Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
         val groundScreenY = size.height * groundVerticalFraction
 
@@ -92,9 +104,19 @@ fun ThrowCanvas(flightState: FlightState?, world: String = "cour", groundVertica
         val cameraX = if (flightState != null) Camera.followX(flightState.worldX, size.width.toDouble()) else 0.0
 
         when (world) {
-            "volcans" -> drawVolcanoDecor(cameraX, size.width.toDouble(), groundScreenY, size.height)
-            "plage" -> drawBeachDecor(cameraX, size.width.toDouble(), groundScreenY)
-            else -> drawCourDecor(cameraX, size.width.toDouble(), groundScreenY)
+            "volcans" -> {
+                drawClouds(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds, tint = Color(0xFFFFD9C2).copy(alpha = 0.5f))
+                drawVolcanoDecor(cameraX, size.width.toDouble(), groundScreenY, size.height)
+            }
+            "plage" -> {
+                drawClouds(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds, tint = Color.White.copy(alpha = 0.6f))
+                drawSea(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds)
+                drawBeachDecor(cameraX, size.width.toDouble(), groundScreenY)
+            }
+            else -> {
+                drawClouds(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds, tint = Color.White.copy(alpha = 0.7f))
+                drawCourDecor(cameraX, size.width.toDouble(), groundScreenY)
+            }
         }
 
         val worldY = flightState?.worldY ?: 0.0
@@ -182,6 +204,69 @@ private fun DrawScope.drawBeachDecor(cameraX: Double, screenWidth: Double, groun
 /** Générée une seule fois (déterministe, voir BeachDecor.decorativeProps) :
  *  pas besoin de la recalculer à chaque frame. */
 private val beachDecorProps by lazy { BeachDecor.decorativeProps() }
+
+/** Modulo qui reste toujours positif (contrairement à `%` en Kotlin comme en
+ *  JS, qui garde le signe du dividende) : utile pour les motifs qui
+ *  bouclent en boucle infinie (vagues, nuages). */
+private fun mod(a: Double, n: Double): Double = ((a % n) + n) % n
+
+/**
+ * Petits nuages qui dérivent lentement dans le ciel, un détail purement
+ * décoratif ajouté au portage (le web n'a pas de nuages sur ces 3 mondes) :
+ * dérive constante dans le temps + très légère parallaxe avec la caméra,
+ * positions/tailles variées via [CourDecor.seededRand].
+ */
+private fun DrawScope.drawClouds(cameraX: Double, screenWidth: Double, groundScreenY: Float, timeSeconds: Float, tint: Color) {
+    val spacing = 260.0
+    val parallax = 0.05
+    val driftSpeed = 6.0 // px/s
+    val parX = cameraX * parallax + timeSeconds * driftSpeed
+    val start = kotlin.math.floor((parX - 90.0) / spacing).toInt()
+    val end = kotlin.math.ceil((parX + screenWidth + 90.0) / spacing).toInt()
+    for (index in start..end) {
+        val sx = index * spacing - parX
+        val cy = groundScreenY * (0.12f + CourDecor.seededRand(index.toDouble()).toFloat() * 0.28f)
+        val scale = (0.7 + CourDecor.seededRand(index + 1.0) * 0.7).toFloat()
+        drawCloud(sx.toFloat(), cy, scale, tint)
+    }
+}
+
+private fun DrawScope.drawCloud(sx: Float, sy: Float, scale: Float, tint: Color) {
+    drawCircle(color = tint, radius = 16f * scale, center = Offset(sx, sy))
+    drawCircle(color = tint, radius = 12f * scale, center = Offset(sx - 15f * scale, sy + 4f * scale))
+    drawCircle(color = tint, radius = 13f * scale, center = Offset(sx + 15f * scale, sy + 3f * scale))
+    drawCircle(color = tint, radius = 9f * scale, center = Offset(sx + 26f * scale, sy + 6f * scale))
+}
+
+/**
+ * Bande de mer à l'horizon avec des crêtes de vagues qui ondulent, ajoutée
+ * au portage (voir "il y a bien une mer côté web, mais figée" —
+ * android/README.md) : portage visuel de la mer de `drawBeachBackground()`,
+ * avec les crêtes qui ondulent vraiment dans le temps.
+ */
+private fun DrawScope.drawSea(cameraX: Double, screenWidth: Double, groundScreenY: Float, timeSeconds: Float) {
+    val seaHeight = 46f
+    val seaTop = groundScreenY - seaHeight
+    drawRect(
+        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+            colors = listOf(Color(0xFF1F8FC4), Color(0xFF4FC4E0)),
+            startY = seaTop,
+            endY = groundScreenY,
+        ),
+        topLeft = Offset(0f, seaTop),
+        size = Size(screenWidth.toFloat(), seaHeight),
+    )
+    val wrapWidth = screenWidth + 160.0
+    for (i in 0 until 18) {
+        val sx = mod(i * 137.0 + kotlin.math.sin(timeSeconds * 0.7 + i) * 14.0 - cameraX * 0.08, wrapWidth) - 80.0
+        val sy = seaTop + 8f + ((i * 37) % (seaHeight - 14).toInt())
+        val path = Path().apply {
+            moveTo(sx.toFloat(), sy)
+            quadraticTo(sx.toFloat() + 9f, sy - 3f, sx.toFloat() + 18f, sy)
+        }
+        drawPath(path, color = Color.White.copy(alpha = 0.55f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
+    }
+}
 
 private fun DrawScope.drawVolcanoShape(sx: Float, baseY: Float, vw: Float, vh: Float, body: Color, glow: Color) {
     val path = Path().apply {
