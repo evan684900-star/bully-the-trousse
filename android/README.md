@@ -73,6 +73,15 @@ Android) avant d'être branché à l'affichage dans `:app`.
   lancers) à chaque atterrissage. Pas encore de migration d'anciens champs
   (pas nécessaire : aucune sauvegarde Android n'existe encore) ni de
   synchronisation cloud (voir Firebase plus bas).
+- **Boutique Puissance/Vitesse** : `Shop` dans `:core` (portage des deux
+  gestionnaires de clic quasi-identiques de la boutique web — débite
+  `save.money` de `Economy.upgradeCost(niveau)`, incrémente le niveau,
+  refuse si pas assez d'argent), testé (36 tests au total). Branché dans
+  `:app` (`ShopRow`, deux boutons sous le bouton de lancer) : acheter met
+  vraiment à jour la sauvegarde et la persiste, et les niveaux achetés
+  pilotent réellement la physique du lancer suivant (`Shop.buyPuissance`
+  n'est pas encore accessible depuis un écran de boutique dédié — juste des
+  boutons directement sur l'écran de jeu pour l'instant).
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
@@ -81,10 +90,9 @@ Android) avant d'être branché à l'affichage dans `:app`.
    skins) si des assets sont fournis, et porter le décor des mondes Volcan
    et Plage (parasols/serviettes/châteaux, dérapage) sur le même principe
    que `CourDecor` (placement testé dans `:core`, dessin dans `:app`).
-2. **Boutique et niveaux** — écran pour dépenser `save.money` sur
-   `Economy.upgradeCost()` (Puissance/Vitesse), déjà calculé dans `:core`
-   mais pas encore accessible en jeu (`save.puissanceLevel`/`vitesseLevel`
-   pilotent déjà la physique, juste pas encore modifiables depuis l'UI).
+2. **Écrans séparés (menu / jeu / boutique)** — actuellement tout est sur un
+   seul écran ; découper en vraies destinations (navigation Compose) une
+   fois qu'il y a plus d'un écran à afficher.
 3. **Les 3 mondes** (Cour, Volcans, Plage) et leurs mécaniques propres
    (dérapage, parasols/serviettes/châteaux, cinématiques de déblocage).
 4. **Les skins et traînées** — un module `:core` supplémentaire pour la

@@ -6,10 +6,12 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.weight
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -29,17 +31,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
+import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.PowerAndAccuracy
+import com.bullythetrousse.core.Shop
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 
 /**
- * Cinquième tranche du portage natif : la sauvegarde locale (GameSave, voir
- * :core) est chargée au lancement et mise à jour/persistée (argent gagné,
- * meilleure distance, nombre de lancers) à chaque atterrissage, comme
- * persist() côté web. Toujours une seule trousse fixe (pas de boutique de
- * niveaux/skins branchée), mais save.puissanceLevel/vitesseLevel pilotent
- * déjà réellement la physique du lancer.
+ * Sixième tranche du portage natif : boutique Puissance/Vitesse (Shop, voir
+ * :core), qui débite save.money et pilote réellement la physique du lancer
+ * suivant. La sauvegarde locale (GameSave) est chargée au lancement et
+ * mise à jour/persistée (argent gagné, meilleure distance, nombre de
+ * lancers, niveaux achetés) à chaque évènement, comme persist() côté web.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -142,6 +145,44 @@ fun ThrowScreen() {
 
         Button(onClick = { tap() }) {
             Text("Tap")
+        }
+
+        ShopRow(save = save, onPurchase = { updated ->
+            save = updated
+            repository.save(updated)
+        })
+    }
+}
+
+/**
+ * Boutique Puissance/Vitesse, portage des deux boutons quasi-identiques de
+ * la boutique web (voir Shop.buyPuissance/buyVitesse dans :core pour la
+ * logique de débit/incrément exacte). Toujours affichée sous le bouton de
+ * lancer, pas encore dans un écran dédié (voir android/README.md).
+ */
+@Composable
+private fun ShopRow(save: GameSave, onPurchase: (GameSave) -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Button(
+            modifier = Modifier.weight(1f),
+            onClick = {
+                val result = Shop.buyPuissance(save)
+                if (result is Shop.PurchaseResult.Success) onPurchase(result.save)
+            },
+        ) {
+            Text("⚡ Puissance Nv.${save.puissanceLevel} (${Economy.upgradeCost(save.puissanceLevel)})")
+        }
+        Button(
+            modifier = Modifier.weight(1f),
+            onClick = {
+                val result = Shop.buyVitesse(save)
+                if (result is Shop.PurchaseResult.Success) onPurchase(result.save)
+            },
+        ) {
+            Text("💨 Vitesse Nv.${save.vitesseLevel} (${Economy.upgradeCost(save.vitesseLevel)})")
         }
     }
 }
