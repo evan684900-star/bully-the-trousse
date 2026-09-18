@@ -25,17 +25,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 
 /**
- * Quatrième tranche du portage natif : la trousse et le sol se dessinent
- * maintenant sur un Canvas (ThrowCanvas.kt) et la trousse vole réellement
- * (animée image par image via FlightSimulator) entre le 3e tap et
- * l'atterrissage, plutôt que de sauter directement au résultat final.
+ * Cinquième tranche du portage natif : la sauvegarde locale (GameSave, voir
+ * :core) est chargée au lancement et mise à jour/persistée (argent gagné,
+ * meilleure distance, nombre de lancers) à chaque atterrissage, comme
+ * persist() côté web. Toujours une seule trousse fixe (pas de boutique de
+ * niveaux/skins branchée), mais save.puissanceLevel/vitesseLevel pilotent
+ * déjà réellement la physique du lancer.
  */
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,22 +56,26 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun ThrowScreen() {
-    // Niveaux fixes pour l'instant (pas encore de sauvegarde/boutique
-    // portés) : voir android/README.md pour la suite prévue.
-    val puissanceLevel = 0
-    val vitesseLevel = 0
+    val context = LocalContext.current
+    val repository = remember { SaveRepository(context) }
+    var save by remember { mutableStateOf(repository.load()) }
 
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
+
+    fun tap() {
+        state = sequence.tap(save.puissanceLevel, save.vitesseLevel)
+    }
 
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp)
-            .clickable { state = sequence.tap(puissanceLevel, vitesseLevel) },
+            .clickable { tap() },
         verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
     ) {
         Text("🎒 Bully the Trousse", style = MaterialTheme.typography.headlineMedium)
+        Text("💰 ${save.money}   Record : ${"%.1f".format(save.bestDistance)} m")
 
         when (val current = state) {
             is ThrowState.Idle -> {
@@ -106,6 +114,22 @@ fun ThrowScreen() {
                 val flightState: FlightState = animateFlight(result) { flightFinished = true }
                 ThrowCanvas(flightState = flightState)
 
+                // Porté de onLanded()/persist() côté web : argent gagné, record et
+                // nombre de lancers mis à jour puis sauvegardés dès l'atterrissage,
+                // une seule fois par lancer (clé = ce `result` précis, voir remember).
+                LaunchedEffect(flightFinished, result) {
+                    if (!flightFinished) return@LaunchedEffect
+                    val totalLevels = save.puissanceLevel + save.vitesseLevel
+                    val earned = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalLevels)
+                    save = save.copy(
+                        money = save.money + earned,
+                        totalMoneyEarned = save.totalMoneyEarned + earned,
+                        bestDistance = maxOf(save.bestDistance, result.distanceMeters),
+                        totalThrows = save.totalThrows + 1,
+                    )
+                    repository.save(save)
+                }
+
                 if (flightFinished) {
                     Text("Distance : ${"%.1f".format(result.distanceMeters)} m")
                     if (result.isPerfect) Text("✨ Lancer parfait !")
@@ -116,7 +140,7 @@ fun ThrowScreen() {
             }
         }
 
-        Button(onClick = { state = sequence.tap(puissanceLevel, vitesseLevel) }) {
+        Button(onClick = { tap() }) {
             Text("Tap")
         }
     }

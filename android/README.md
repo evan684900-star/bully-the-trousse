@@ -33,7 +33,8 @@ Android) avant d'être branché à l'affichage dans `:app`.
 
 ## Ce qui est fait
 
-- Squelette Gradle multi-module (`:core` + `:app`).
+- Squelette Gradle multi-module (`:core` + `:app`, avec le plugin Kotlin
+  `plugin.serialization` en plus sur `:core` pour la sauvegarde).
 - `:core` : physique du lancer (`ThrowPhysics`), les barres de
   puissance/précision (`PowerAndAccuracy`), la machine à états du lancer en
   3 taps (`ThrowSequence`, horloge injectable pour des tests déterministes),
@@ -61,8 +62,17 @@ Android) avant d'être branché à l'affichage dans `:app`.
   placement calculé et testé dans `:core` (`CourDecor`, portage de
   `drawBackground()`/`drawBuilding()`/`drawTree()`/`seededRand()`) ; la
   trousse elle-même reste une forme vectorielle stylisée (corps + rabat +
-  fermeture éclair), pas encore le vrai sprite bitmap du web — voir
-  "Ce qu'il reste à faire" ci-dessous.
+  fermeture éclair), pas encore le vrai sprite bitmap du web.
+- **Sauvegarde locale** : `GameSave` dans `:core` (portage champ par champ de
+  `defaultSave()`), sérialisée en JSON par `SaveCodec` (kotlinx.serialization,
+  `ignoreUnknownKeys` + valeurs par défaut pour les champs absents — le même
+  esprit que `Object.assign(defaultSave(), parsed)` côté web), persistée
+  côté `:app` dans un fichier privé de l'app (`SaveRepository`). Branchée
+  dans `MainActivity` : la sauvegarde se charge au lancement et se met à
+  jour/persiste (argent gagné via `Economy.moneyEarned`, record, nombre de
+  lancers) à chaque atterrissage. Pas encore de migration d'anciens champs
+  (pas nécessaire : aucune sauvegarde Android n'existe encore) ni de
+  synchronisation cloud (voir Firebase plus bas).
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
@@ -71,9 +81,10 @@ Android) avant d'être branché à l'affichage dans `:app`.
    skins) si des assets sont fournis, et porter le décor des mondes Volcan
    et Plage (parasols/serviettes/châteaux, dérapage) sur le même principe
    que `CourDecor` (placement testé dans `:core`, dessin dans `:app`).
-2. **Sauvegarde locale** — équivalent de `defaultSave()`/`loadSave()`
-   (DataStore ou fichier JSON), avec la migration des champs si jamais on
-   veut un jour importer une sauvegarde depuis la version web.
+2. **Boutique et niveaux** — écran pour dépenser `save.money` sur
+   `Economy.upgradeCost()` (Puissance/Vitesse), déjà calculé dans `:core`
+   mais pas encore accessible en jeu (`save.puissanceLevel`/`vitesseLevel`
+   pilotent déjà la physique, juste pas encore modifiables depuis l'UI).
 3. **Les 3 mondes** (Cour, Volcans, Plage) et leurs mécaniques propres
    (dérapage, parasols/serviettes/châteaux, cinématiques de déblocage).
 4. **Les skins et traînées** — un module `:core` supplémentaire pour la
