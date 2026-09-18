@@ -53,20 +53,24 @@ Android) avant d'être branché à l'affichage dans `:app`.
   les barres de puissance/précision qui s'animent en temps réel pendant la
   charge (`LiveOscillatingBar`, `LaunchedEffect` + `withFrameNanos`, calé
   sur `System.currentTimeMillis()` pour rester sur la même horloge que
-  `ThrowSequence`), et maintenant un rendu `Canvas` du ciel/sol et de la
+  `ThrowSequence`), et un rendu `Canvas` du monde "Cour d'école" et de la
   trousse (`ThrowCanvas.kt`) : après le 3e tap, la trousse vole réellement
-  à l'écran (animée pas à pas via `FlightSimulator`/`animateFlight`,
-  caméra qui la suit) jusqu'à l'atterrissage, avant d'afficher le résultat.
-  Pour l'instant la trousse est un simple rectangle qui tourne (pas encore
-  de sprite/asset réel) et il n'y a pas encore de décor (parasols,
-  serviettes...).
+  à l'écran (animée pas à pas via `FlightSimulator`/`animateFlight`, caméra
+  qui la suit) jusqu'à l'atterrissage, avant d'afficher le résultat. Le
+  décor (bâtiments en parallaxe, arbres) est dessiné en pur Canvas, avec son
+  placement calculé et testé dans `:core` (`CourDecor`, portage de
+  `drawBackground()`/`drawBuilding()`/`drawTree()`/`seededRand()`) ; la
+  trousse elle-même reste une forme vectorielle stylisée (corps + rabat +
+  fermeture éclair), pas encore le vrai sprite bitmap du web — voir
+  "Ce qu'il reste à faire" ci-dessous.
 
 ## Ce qu'il reste à faire (dans un ordre logique)
 
-1. **Vrais sprites et décor** — remplacer le rectangle de `ThrowCanvas` par
-   un vrai sprite de trousse (+ ses variantes de skins) et ajouter le décor
-   des mondes (parasols/serviettes/châteaux plage, etc.), portage des
-   fonctions `drawXxx()` du JS.
+1. **Vrai sprite pour la trousse + décor des autres mondes** — remplacer la
+   forme vectorielle de `ThrowCanvas` par un vrai sprite (+ ses variantes de
+   skins) si des assets sont fournis, et porter le décor des mondes Volcan
+   et Plage (parasols/serviettes/châteaux, dérapage) sur le même principe
+   que `CourDecor` (placement testé dans `:core`, dessin dans `:app`).
 2. **Sauvegarde locale** — équivalent de `defaultSave()`/`loadSave()`
    (DataStore ou fichier JSON), avec la migration des champs si jamais on
    veut un jour importer une sauvegarde depuis la version web.
