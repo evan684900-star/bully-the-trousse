@@ -13,7 +13,9 @@ repositories {
 }
 
 dependencies {
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
+    // 1.6.3 (pas 1.7.x, qui exige Kotlin 2.0+) : voir build.gradle.kts racine
+    // pour pourquoi ce projet est resté sur Kotlin 1.9.24.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
     testImplementation(kotlin("test"))
 }
 

@@ -12,7 +12,6 @@ plugins {
     // unknown version" — les deux plugins viennent du même artefact
     // kotlin-gradle-plugin que celui déjà chargé pour :core.
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose")
     // Firebase (comptes/sauvegarde cloud/classement, voir FirebaseSaveRepository.kt
     // et android/README.md) : ce plugin lit app/google-services.json, qui n'existe
     // pas encore (il vient de la console Firebase, propre à CE projet). L'appliquer
@@ -36,6 +35,12 @@ android {
     buildFeatures {
         compose = true
     }
+    composeOptions {
+        // Compilateur Compose "classique" (Kotlin < 2.0 n'a pas le plugin
+        // org.jetbrains.kotlin.plugin.compose intégré) : version alignée sur
+        // Kotlin 1.9.24 (voir build.gradle.kts racine).
+        kotlinCompilerExtensionVersion = "1.5.14"
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -49,7 +54,10 @@ android {
 dependencies {
     implementation(project(":core"))
 
-    implementation(platform("androidx.compose:compose-bom:2024.09.00"))
+    // BOM alignée sur le compilateur Compose 1.5.14 ci-dessus (une BOM plus
+    // récente demanderait un compilateur Compose plus récent, qui lui-même
+    // demanderait Kotlin 2.0+ — voir la note sur Kotlin 1.9.24 plus haut).
+    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.material3:material3")
