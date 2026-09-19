@@ -4,7 +4,12 @@
 // qui installera ce qu'il faut et proposera de décommenter
 // include(":app") dans settings.gradle.kts automatiquement.
 plugins {
-    id("com.android.application") version "8.5.2"
+    // 8.4.1 (pas 8.5.2) : voir la note dans le build.gradle.kts racine sur
+    // l'incompatibilité "com/android/build/gradle/api/BaseVariant" — le
+    // problème persistait avec Kotlin 2.0.21 ET 1.9.24, donc c'est bien AGP
+    // 8.5.2 lui-même le dénominateur commun. 8.4.1 est la version stable
+    // précédente, largement utilisée avec Kotlin 1.9.24.
+    id("com.android.application") version "8.4.1"
     // Sans version ici : le plugin Kotlin (2.0.21) est déjà résolu via
     // "kotlin("jvm") version "2.0.21" apply false" dans le build.gradle.kts
     // racine (:core l'applique pareil, sans version). Redéclarer une
