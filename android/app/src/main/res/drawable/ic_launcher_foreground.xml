@@ -1,11 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Icône provisoire (simple pastille) en attendant un vrai logo -->
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="108dp"
-    android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <path
-        android:fillColor="#F4C542"
-        android:pathData="M54,29 C69.9,29 82.8,41.9 82.8,57.8 C82.8,73.7 69.9,86.6 54,86.6 C38.1,86.6 25.2,73.7 25.2,57.8 C25.2,41.9 38.1,29 54,29 Z" />
-</vector>
+<!-- Le vrai sprite de la trousse (le même que le site), replacé dans la zone
+     sûre d'une icône adaptative : Android rogne les bords selon la forme
+     choisie par le lanceur, donc le sujet doit rester au centre. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:drawable="@drawable/trousse_skin_1"
+    android:inset="26%" />

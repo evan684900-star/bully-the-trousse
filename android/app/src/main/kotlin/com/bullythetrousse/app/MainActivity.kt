@@ -3,9 +3,10 @@ package com.bullythetrousse.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,9 +30,17 @@ import com.bullythetrousse.core.VolcanoCinematic
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Vrai plein écran : le contenu s'étend derrière la barre de statut/
+        // navigation (comme le jeu web, qui occupe toute la fenêtre) au lieu
+        // de laisser Android réserver une bande grise au-dessus.
+        enableEdgeToEdge()
         setContent {
-            MaterialTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
+            BullyTheTrousseTheme {
+                // Pas de marge ici : chaque écran peint son propre fond en
+                // pleine largeur (le ciel du menu passe derrière la barre de
+                // statut, comme sur le site) et applique lui-même la marge de
+                // sécurité à son contenu.
+                Box(modifier = Modifier.fillMaxSize().background(AppBg)) {
                     GameRoot()
                 }
             }
@@ -48,6 +57,10 @@ sealed interface Screen {
     data object Menu : Screen
     data object Game : Screen
     data object Shop : Screen
+    data object Leaderboard : Screen
+    data object Profile : Screen
+    data object AchievementsList : Screen
+    data object Challenges : Screen
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
 }
@@ -70,8 +83,24 @@ fun GameRoot() {
             onSaveChange = ::updateSave,
             onPlay = { screen = Screen.Game },
             onOpenShop = { screen = Screen.Shop },
+            onOpenLeaderboard = { screen = Screen.Leaderboard },
+            onOpenProfile = { screen = Screen.Profile },
+            onOpenAchievements = { screen = Screen.AchievementsList },
+            onOpenChallenges = { screen = Screen.Challenges },
             onStartVolcanoCinematic = { screen = Screen.VolcanoCinematic },
             onStartBeachCinematic = { screen = Screen.BeachCinematic },
+        )
+
+        Screen.Leaderboard -> LeaderboardScreen(onBack = { screen = Screen.Menu })
+
+        Screen.Profile -> ProfileScreen(save = save, onBack = { screen = Screen.Menu })
+
+        Screen.AchievementsList -> AchievementsScreen(save = save, onBack = { screen = Screen.Menu })
+
+        Screen.Challenges -> ChallengesScreen(
+            save = save,
+            onSaveChange = ::updateSave,
+            onBack = { screen = Screen.Menu },
         )
 
         Screen.Game -> GameScreen(
