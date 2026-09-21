@@ -1,8 +1,7 @@
 package com.bullythetrousse.app
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,7 +60,13 @@ private fun paletteFor(world: String): WorldPalette = when (world) {
  * `save.currentWorld` ("cour", "volcans" ou "plage").
  */
 @Composable
-fun ThrowCanvas(flightState: FlightState?, world: String = "cour", groundVerticalFraction: Float = 0.68f) {
+fun ThrowCanvas(
+    flightState: FlightState?,
+    world: String = "cour",
+    groundVerticalFraction: Float = 0.68f,
+    // `#game-canvas` occupe tout l'écran côté web.
+    modifier: Modifier = Modifier.fillMaxSize(),
+) {
     val palette = paletteFor(world)
 
     // Horloge d'ambiance (nuages, vagues) : tourne en continu tant que le
@@ -76,7 +81,7 @@ fun ThrowCanvas(flightState: FlightState?, world: String = "cour", groundVertica
         }
     }
 
-    Canvas(modifier = Modifier.fillMaxWidth().height(220.dp)) {
+    Canvas(modifier = modifier) {
         val groundScreenY = size.height * groundVerticalFraction
 
         // Ciel (dégradé) puis sol (dégradé), comme drawBackground() côté web.

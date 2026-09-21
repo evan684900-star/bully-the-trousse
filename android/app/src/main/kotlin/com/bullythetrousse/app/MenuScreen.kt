@@ -8,7 +8,6 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -16,20 +15,13 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.FlowRowScope
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -47,15 +39,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
@@ -64,15 +53,10 @@ import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.SkinStats
 
 /**
- * Écran d'accueil, porté à l'identique de `#screen-menu` côté web
- * (index.html) : ciel dégradé + voile de nuit/étoiles/lune (`.sky-anim`),
- * carte titre (`.title-card`), pastille d'argent (`.money-pill`), aperçu
- * flottant de la trousse (`#trousse-preview-wrap`), puces de stats
- * (`.stat-chip`), boutons (`.btn`) et rangée des mondes (`.world-card`,
- * avec les cartes Succès/Défis et leur badge `.achv-badge`).
- *
- * Toutes les valeurs (couleurs, tailles, espacements) viennent des règles
- * CSS correspondantes, pas d'une approximation — voir Palette.kt.
+ * Écran d'accueil, porté à l'identique de `#screen-menu` (index.html) :
+ * `.sky-anim`, `.title-card`, `.money-pill`, `#trousse-preview-wrap`,
+ * `.stats-row`, `.menu-buttons` et `.worlds-row` (avec les cartes
+ * Succès/Défis et leur `.achv-badge`), dans cet ordre.
  */
 @Composable
 fun MenuScreen(
@@ -90,7 +74,7 @@ fun MenuScreen(
     var toast by remember { mutableStateOf<String?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(ScreenBackground)) {
-        SkyAnimation()
+        SkyAnimation(heightFraction = 0.6f) // #screen-menu .sky-anim { bottom: 40% }
 
         // .menu-wrap : colonne centrée, défilable, padding 24/16/16, gap 10px.
         Column(
@@ -103,7 +87,7 @@ fun MenuScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             TitleCard()
-            MoneyPill(save.money)
+            MoneyPill("💰 ${save.money} $")
             TroussePreview()
 
             // .stats-row
@@ -170,21 +154,6 @@ private fun TitleCard() {
     }
 }
 
-/** `.money-pill` : pastille très arrondie, montant en vert. */
-@Composable
-private fun MoneyPill(money: Int) {
-    val shape = RoundedCornerShape(999.dp)
-    Box(
-        modifier = Modifier
-            .clip(shape)
-            .background(PanelBg)
-            .border(2.dp, PanelBorder, shape)
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-    ) {
-        Text("💰 $money $", color = Money, fontSize = 18.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
 /**
  * `#trousse-preview-wrap` + `@keyframes floaty` : l'image monte de 10px et
  * bascule de -3° à +3° en 2,6 s, en boucle (1,3 s par demi-cycle).
@@ -209,54 +178,6 @@ private fun TroussePreview() {
             .offset(y = (-10).dp * progress)
             .rotate(-3f + 6f * progress),
     )
-}
-
-/** `.stat-chip` : libellé en clair, valeur en doré (`.stat-chip b`). */
-@Composable
-private fun StatChip(label: String, value: String) {
-    val shape = RoundedCornerShape(10.dp)
-    Row(
-        modifier = Modifier
-            .clip(shape)
-            .background(PanelBg)
-            .border(2.dp, PanelBorder, shape)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("$label ", color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Text(value, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
-    }
-}
-
-/**
- * `.btn` / `.btn.secondary` : coins à 14px, texte 18px très gras, et
- * l'ombre "dure" de 5px en dessous (`box-shadow: 0 5px 0`).
- */
-@Composable
-private fun GameButton(label: String, secondary: Boolean = false, onClick: () -> Unit) {
-    val background = if (secondary) ButtonSecondary else Accent
-    val shadow = if (secondary) ButtonSecondaryShadow else ButtonAccentShadow
-    val content = if (secondary) Color.White else OnAccent
-    val shape = RoundedCornerShape(14.dp)
-
-    Box {
-        Box(
-            modifier = Modifier
-                .matchParentSize()
-                .offset(y = 5.dp)
-                .clip(shape)
-                .background(shadow),
-        )
-        Box(
-            modifier = Modifier
-                .clip(shape)
-                .background(background)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 30.dp, vertical = 14.dp),
-        ) {
-            Text(label, color = content, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 0.5.sp)
-        }
-    }
 }
 
 /**
@@ -300,13 +221,15 @@ private fun WorldsRow(
         }
     }
 
-    val claimableChallenges = save.dailyChallenges.count { !it.claimed && it.progress >= it.target }
+    val claimable = save.dailyChallenges.count { !it.claimed && it.progress >= it.target }
 
     FlowRowCentered(gap = 10.dp, modifier = Modifier.widthIn(max = 520.dp)) {
         WorldCard(WORLD_COUR, playable = true, selected = save.currentWorld == "cour") { click(WORLD_COUR) }
-        WorldCard(WORLD_VOLCANS, playable = save.volcanUnlocked, selected = save.currentWorld == "volcans" && save.volcanUnlocked) {
-            click(WORLD_VOLCANS)
-        }
+        WorldCard(
+            WORLD_VOLCANS,
+            playable = save.volcanUnlocked,
+            selected = save.currentWorld == "volcans" && save.volcanUnlocked,
+        ) { click(WORLD_VOLCANS) }
         WorldCard(
             World("succes", "Succès", "🏆"),
             playable = true,
@@ -320,12 +243,14 @@ private fun WorldsRow(
             playable = true,
             selected = false,
             accentBorder = true,
-            badge = "$claimableChallenges/${save.dailyChallenges.size.coerceAtLeast(3)}",
+            badge = "$claimable/${save.dailyChallenges.size.coerceAtLeast(3)}",
             onClick = onOpenChallenges,
         )
-        WorldCard(WORLD_PLAGE, playable = save.plageUnlocked, selected = save.currentWorld == "plage" && save.plageUnlocked) {
-            click(WORLD_PLAGE)
-        }
+        WorldCard(
+            WORLD_PLAGE,
+            playable = save.plageUnlocked,
+            selected = save.currentWorld == "plage" && save.plageUnlocked,
+        ) { click(WORLD_PLAGE) }
         WorldCard(WORLD_VILLE, playable = false, selected = false) { click(WORLD_VILLE) }
     }
 }
@@ -383,96 +308,6 @@ private fun WorldCard(
     }
 }
 
-/**
- * `.sky-anim` : occupe les 60 % supérieurs de l'écran. En thème sombre (le
- * thème par défaut du site), un voile nocturne, 6 étoiles et la lune.
- */
-@Composable
-private fun SkyAnimation() {
-    Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(0.6f)) {
-        // .sky-anim .tint
-        Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0xBF060A22), Color(0x4D121A40))),
-            ),
-        )
-        for ((xFraction, yFraction) in STAR_POSITIONS) {
-            PositionedAt(xFraction, yFraction) { Star() }
-        }
-        PositionedAt(xFraction = 0.68f, yFraction = 0.10f) { Moon() }
-    }
-}
-
-/** `.sky-anim .star` : 3px, blanche, halo `0 0 4px 1px rgba(255,255,255,0.8)`. */
-@Composable
-private fun Star() {
-    Canvas(modifier = Modifier.size(10.dp)) {
-        val center = Offset(size.width / 2f, size.height / 2f)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0xCCFFFFFF), Color.Transparent),
-                center = center,
-                radius = size.minDimension / 2f,
-            ),
-            radius = size.minDimension / 2f,
-            center = center,
-        )
-        drawCircle(color = Color.White.copy(alpha = 0.9f), radius = 1.5.dp.toPx(), center = center)
-    }
-}
-
-/** `.sky-anim .moon` : 48px, dégradé radial décalé à 35 %/35 %, et son halo. */
-@Composable
-private fun Moon() {
-    Canvas(modifier = Modifier.size(96.dp)) {
-        val center = Offset(size.width / 2f, size.height / 2f)
-        val moonRadius = 24.dp.toPx()
-        // box-shadow 0 0 32px 8px rgba(220,225,255,0.45)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colors = listOf(Color(0x73DCE1FF), Color.Transparent),
-                center = center,
-                radius = moonRadius * 2f,
-            ),
-            radius = moonRadius * 2f,
-            center = center,
-        )
-        // radial-gradient(circle at 35% 35%, #ffffff, #e6ebf7 60%, #b9c2da 100%)
-        drawCircle(
-            brush = Brush.radialGradient(
-                colorStops = arrayOf(0f to Color.White, 0.6f to Color(0xFFE6EBF7), 1f to Color(0xFFB9C2DA)),
-                center = Offset(center.x - moonRadius * 0.3f, center.y - moonRadius * 0.3f),
-                radius = moonRadius,
-            ),
-            radius = moonRadius,
-            center = center,
-        )
-    }
-}
-
-/** Équivalent de `position:absolute; left:X%; top:Y%` dans la boîte parente. */
-@Composable
-private fun PositionedAt(xFraction: Float, yFraction: Float, content: @Composable () -> Unit) {
-    Column(modifier = Modifier.fillMaxSize()) {
-        Spacer(modifier = Modifier.fillMaxHeight(yFraction))
-        Row(modifier = Modifier.fillMaxWidth()) {
-            Spacer(modifier = Modifier.fillMaxWidth(xFraction))
-            content()
-        }
-    }
-}
-
-/** Équivalent de `display:flex; flex-wrap:wrap; justify-content:center; gap:N`. */
-@Composable
-private fun FlowRowCentered(gap: Dp, modifier: Modifier = Modifier, content: @Composable FlowRowScope.() -> Unit) {
-    FlowRow(
-        modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(gap, Alignment.CenterHorizontally),
-        verticalArrangement = Arrangement.spacedBy(gap),
-        content = content,
-    )
-}
-
 private data class World(val id: String, val name: String, val emoji: String)
 
 /** Portage du tableau `WORLDS` côté web, dans le même ordre. */
@@ -480,13 +315,3 @@ private val WORLD_COUR = World("cour", "Cour d'école", "🏫")
 private val WORLD_VOLCANS = World("volcans", "Volcans", "🌋")
 private val WORLD_PLAGE = World("plage", "Plage", "🏖️")
 private val WORLD_VILLE = World("ville", "Ville", "🏙️")
-
-/** Positions des 6 `.star` du web, en fraction de la zone de ciel. */
-private val STAR_POSITIONS = listOf(
-    0.15f to 0.18f,
-    0.28f to 0.08f,
-    0.70f to 0.14f,
-    0.82f to 0.28f,
-    0.50f to 0.06f,
-    0.90f to 0.10f,
-)

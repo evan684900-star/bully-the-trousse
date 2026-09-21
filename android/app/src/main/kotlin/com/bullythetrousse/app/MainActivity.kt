@@ -107,6 +107,7 @@ fun GameRoot() {
             save = save,
             onSaveChange = ::updateSave,
             onBackToMenu = { screen = Screen.Menu },
+            onOpenShop = { screen = Screen.Shop },
         )
 
         Screen.Shop -> ShopScreen(
