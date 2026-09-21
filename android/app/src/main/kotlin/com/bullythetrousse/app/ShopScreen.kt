@@ -178,6 +178,7 @@ private fun SkinsTab(
                     painter = painterResource(R.drawable.trousse_skin_1),
                     contentDescription = name,
                     contentScale = ContentScale.Fit,
+                    colorFilter = rememberSkinColorFilter(skin.id),
                     modifier = Modifier.size(46.dp),
                 )
             },

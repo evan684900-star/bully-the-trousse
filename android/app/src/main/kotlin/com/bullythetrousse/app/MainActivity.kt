@@ -79,6 +79,9 @@ fun GameRoot() {
         repository.save(updated)
     }
 
+    // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
+    WorldMusic(world = save.currentWorld, muted = save.musicMuted)
+
     when (screen) {
         Screen.Menu -> MenuScreen(
             save = save,

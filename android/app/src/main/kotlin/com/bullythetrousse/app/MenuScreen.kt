@@ -88,7 +88,7 @@ fun MenuScreen(
         ) {
             TitleCard()
             MoneyPill("💰 ${save.money} $")
-            TroussePreview()
+            TroussePreview(equippedSkin = save.equippedSkin)
 
             // .stats-row
             FlowRowCentered(gap = 10.dp) {
@@ -159,7 +159,7 @@ private fun TitleCard() {
  * bascule de -3° à +3° en 2,6 s, en boucle (1,3 s par demi-cycle).
  */
 @Composable
-private fun TroussePreview() {
+private fun TroussePreview(equippedSkin: String) {
     val transition = rememberInfiniteTransition(label = "floaty")
     val progress by transition.animateFloat(
         initialValue = 0f,
@@ -171,6 +171,7 @@ private fun TroussePreview() {
         painter = painterResource(R.drawable.trousse_skin_1),
         contentDescription = "trousse",
         contentScale = ContentScale.Fit,
+        colorFilter = rememberSkinColorFilter(equippedSkin),
         modifier = Modifier
             .widthIn(max = 220.dp)
             .fillMaxWidth(0.38f)
