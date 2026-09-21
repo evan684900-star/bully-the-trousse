@@ -61,6 +61,8 @@ sealed interface Screen {
     data object Profile : Screen
     data object AchievementsList : Screen
     data object Challenges : Screen
+    data object Settings : Screen
+    data object Links : Screen
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
 }
@@ -114,7 +116,16 @@ fun GameRoot() {
             save = save,
             onSaveChange = ::updateSave,
             onBackToMenu = { screen = Screen.Menu },
+            onBackToGame = { screen = Screen.Game },
         )
+
+        Screen.Settings -> SettingsScreen(
+            save = save,
+            onSaveChange = ::updateSave,
+            onBack = { screen = Screen.Menu },
+        )
+
+        Screen.Links -> LinksScreen(onBack = { screen = Screen.Menu })
 
         Screen.VolcanoCinematic -> VolcanoCinematicScreen(onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
@@ -125,5 +136,18 @@ fun GameRoot() {
             updateSave(BeachCinematic.applyOutcome(save))
             screen = Screen.Menu
         })
+    }
+
+    // .links-btn + .corner-icons-right : en position:fixed côté web, donc
+    // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
+    // qui occupent l'écran entier.
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    if (!inCinematic) {
+        BottomBar(
+            musicMuted = save.musicMuted,
+            onOpenLinks = { screen = Screen.Links },
+            onToggleMute = { updateSave(save.copy(musicMuted = !save.musicMuted)) },
+            onOpenSettings = { screen = Screen.Settings },
+        )
     }
 }

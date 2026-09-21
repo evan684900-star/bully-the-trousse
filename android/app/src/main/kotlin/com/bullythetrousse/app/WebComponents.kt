@@ -13,12 +13,18 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.FlowRowScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -234,6 +240,160 @@ fun FlowRowCentered(gap: Dp, modifier: Modifier = Modifier, content: @Composable
         verticalArrangement = Arrangement.spacedBy(gap),
         content = content,
     )
+}
+
+/**
+ * `.links-btn` + `.corner-icons-right` : la barre flottante présente sur
+ * TOUS les écrans du site (position: fixed) — "Mes liens" en bas à gauche,
+ * son et réglages en bas à droite, en pastilles de 42px.
+ */
+@Composable
+fun BottomBar(
+    musicMuted: Boolean,
+    onOpenLinks: () -> Unit,
+    onToggleMute: () -> Unit,
+    onOpenSettings: () -> Unit,
+) {
+    // env(safe-area-inset-*) côté web : la barre ne doit pas passer sous la
+    // barre de navigation du téléphone.
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(10.dp),
+    ) {
+        // .links-btn : pastille allongée, texte "text-dim"
+        Box(
+            modifier = Modifier
+                .align(Alignment.BottomStart)
+                .height(42.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(PanelBg)
+                .border(2.dp, PanelBorder, RoundedCornerShape(999.dp))
+                .clickable(onClick = onOpenLinks)
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text("🔗 Mes liens", color = TextDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+        // .corner-icons-right : deux ronds de 42px
+        Row(
+            modifier = Modifier.align(Alignment.BottomEnd),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RoundIconButton(if (musicMuted) "🔇" else "🔊", onToggleMute)
+            RoundIconButton("⚙️", onOpenSettings)
+        }
+    }
+}
+
+/** `.mute-btn` / `.theme-btn` : rond de 42px, fond panneau, bordure. */
+@Composable
+private fun RoundIconButton(emoji: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(42.dp)
+            .clip(CircleShape)
+            .background(PanelBg)
+            .border(2.dp, PanelBorder, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(emoji, fontSize = 18.sp)
+    }
+}
+
+/**
+ * `.tabs` + `.tab-btn` : le rail d'onglets de la boutique. L'onglet actif
+ * porte la pastille dorée qui glisse derrière lui côté web ; ici elle est
+ * simplement posée sous l'onglet sélectionné.
+ */
+@Composable
+fun ShopTabs(tabs: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardBg)
+            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+            .padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        tabs.forEachIndexed { index, label ->
+            val active = index == selectedIndex
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(if (active) Accent else Color.Transparent)
+                    .clickable { onSelect(index) }
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    color = if (active) OnAccent else TextDim,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * `.upgrade-card` / `.skin-card` : icône à gauche (46px), titre + sous-titre
+ * au centre, bouton d'action à droite. Fond `--card-bg`, bordure 2px,
+ * coins à 14px.
+ */
+@Composable
+fun ShopCard(
+    title: String,
+    description: String,
+    levelBadge: String? = null,
+    leading: @Composable () -> Unit,
+    action: @Composable () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .background(CardBg)
+            .border(2.dp, PanelBorder, RoundedCornerShape(14.dp))
+            .padding(14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        // .upgrade-card .icon : colonne de 46px, contenu centré
+        Box(modifier = Modifier.width(46.dp), contentAlignment = Alignment.Center) { leading() }
+        Column(modifier = Modifier.weight(1f)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, color = TextColor, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                if (levelBadge != null) {
+                    Box(
+                        modifier = Modifier
+                            .padding(start = 6.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Accent)
+                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                    ) {
+                        Text(levelBadge, color = OnAccent, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            }
+            if (description.isNotEmpty()) {
+                Text(
+                    description,
+                    color = TextDim,
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+        }
+        action()
+    }
 }
 
 /** Positions des 6 `.star` du web, en fraction de la zone de ciel. */

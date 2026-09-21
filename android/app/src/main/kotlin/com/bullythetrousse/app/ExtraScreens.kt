@@ -164,6 +164,68 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
 }
 
 /**
+ * `#settings-modal` : thème, langue, et le rappel du tutoriel. Le thème
+ * clair et le bilingue ne sont pas encore portés, donc leurs boutons
+ * affichent l'état courant sans le changer.
+ */
+@Composable
+fun SettingsScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: () -> Unit) {
+    ModalScreen("⚙️ Réglages", onBack) {
+        SettingsRow("Musique") {
+            GameButton(
+                if (save.musicMuted) "🔇" else "🔊",
+                secondary = true,
+                small = true,
+            ) { onSaveChange(save.copy(musicMuted = !save.musicMuted)) }
+        }
+        SettingsRow("Thème") { GameButton("🌙", secondary = true, small = true) {} }
+        SettingsRow("Langue") { GameButton("FR", secondary = true, small = true) {} }
+    }
+}
+
+/** `.settings-row` : libellé à gauche, contrôle à droite. */
+@Composable
+private fun SettingsRow(label: String, control: @Composable () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardBg)
+            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        control()
+    }
+}
+
+/** `#links-modal` : les deux liens du site, repris tels quels. */
+@Composable
+fun LinksScreen(onBack: () -> Unit) {
+    ModalScreen("🔗 Mes liens", onBack) {
+        LinkRow("🌐 evyverse.vercel.app", "Mon site")
+        LinkRow("💬 Chaîne WhatsApp", "Actus de ce jeu")
+    }
+}
+
+@Composable
+private fun LinkRow(title: String, subtitle: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardBg)
+            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(title, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(subtitle, color = TextDim, fontSize = 12.sp)
+    }
+}
+
+/**
  * Classement : côté web il vient de Firestore (`#screen-leaderboard`), qui
  * n'est pas encore branché dans l'app (voir FirebaseSaveRepository.kt et
  * android/README.md) — l'écran existe donc, mais sans données pour l'instant.
