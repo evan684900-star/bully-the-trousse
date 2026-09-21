@@ -2,6 +2,7 @@
 
 package com.bullythetrousse.app
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,8 +17,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -26,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -33,6 +37,7 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.SkinStats
 
 /**
  * Écrans ouverts depuis le menu (Succès, Défis, Classement, Profil). Côté
@@ -242,22 +247,94 @@ fun LeaderboardScreen(onBack: () -> Unit) {
     }
 }
 
-/** Profil (`#screen-profile` côté web) : pseudo, avatar, stats détaillées. */
+/**
+ * Profil, porté de `#screen-profile` / `paintProfile()` : l'en-tête
+ * (avatar rond bordé de doré, pseudo, statut), la rangée de trois cartes
+ * `.profile-card` (trousse équipée + nombre de skins, abonnements,
+ * abonnés), puis les statistiques détaillées.
+ *
+ * Abonnements/abonnés viennent de Firestore côté web : pas encore branché
+ * ici, donc affichés à "—" comme le fait le site avant chargement.
+ */
 @Composable
 fun ProfileScreen(save: GameSave, onBack: () -> Unit) {
     ModalScreen("👤 Profil", onBack) {
+        // .profile-header
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            ProfileRow("Pseudo", save.pseudo.ifBlank { "—" })
+            Box(
+                modifier = Modifier
+                    .size(84.dp)
+                    .clip(CircleShape)
+                    .background(CardBg)
+                    .border(3.dp, Accent, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(save.avatarEmoji.ifBlank { "🎒" }, fontSize = 40.sp)
+            }
+            Text(
+                save.pseudo.ifBlank { "?" },
+                color = TextColor,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text("Hors ligne", color = TextDim, fontSize = 12.5.sp)
+        }
+
+        // .profile-top-row : trois cartes côte à côte.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            ProfileCard(modifier = Modifier.weight(1f)) {
+                Image(
+                    painter = painterResource(R.drawable.trousse_skin_1),
+                    contentDescription = "trousse équipée",
+                    colorFilter = rememberSkinColorFilter(save.equippedSkin),
+                    modifier = Modifier.size(40.dp),
+                )
+                Text("+${save.ownedSkins.size}", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            ProfileCard(modifier = Modifier.weight(1f)) {
+                Text("—", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text("Abonnements", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
+            }
+            ProfileCard(modifier = Modifier.weight(1f)) {
+                Text("—", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text("Abonnés", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
+            }
+        }
+
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             ProfileRow("Lancers", save.totalThrows.toString())
             ProfileRow("Record", "${"%.1f".format(save.bestDistance)} m")
             ProfileRow("Record plage", "${"%.1f".format(save.plageBestDistance)} m")
             ProfileRow("Argent gagné", "${save.totalMoneyEarned} $")
             ProfileRow("Succès", "${save.unlockedAchievements.size} / ${Achievements.ALL.size}")
+            ProfileRow("Puissance", SkinStats.totalPuissance(save).toString())
+            ProfileRow("Vitesse", SkinStats.totalVitesse(save).toString())
         }
+    }
+}
+
+/** `.profile-card` : carte carrée, contenu centré. */
+@Composable
+private fun ProfileCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(CardBg)
+            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+            .padding(vertical = 12.dp, horizontal = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        content()
     }
 }
 

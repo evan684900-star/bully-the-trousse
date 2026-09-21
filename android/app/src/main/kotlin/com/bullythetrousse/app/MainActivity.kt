@@ -141,6 +141,13 @@ fun GameRoot() {
         })
     }
 
+    // Tutoriel du tout premier lancement (showTutorialIfNeeded() côté web) :
+    // il recouvre tout tant qu'il n'est pas terminé ou passé.
+    if (!save.tutorialSeen) {
+        TutorialOverlay(onDone = { updateSave(save.copy(tutorialSeen = true)) })
+        return
+    }
+
     // .links-btn + .corner-icons-right : en position:fixed côté web, donc
     // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
     // qui occupent l'écran entier.
