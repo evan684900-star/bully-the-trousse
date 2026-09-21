@@ -31,7 +31,7 @@ import com.bullythetrousse.core.VolcanoCinematic
 
 /**
  * Cinématique de déblocage du volcan, portage visuel simplifié de la
- * séquence cine*/CINE_TIMES côté web : le déroulement des phases (durées,
+ * séquence CINE_TIMES côté web : le déroulement des phases (durées,
  * mini-jeu d'esquive des roches, QTE de clics) vient de [VolcanoCinematic]
  * (`:core`, testé), ici on ne fait qu'afficher la phase courante et
  * transmettre les entrées (esquive, clic). Pas encore l'habillage complet

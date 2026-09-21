@@ -262,7 +262,7 @@ private fun DrawScope.drawSea(cameraX: Double, screenWidth: Double, groundScreen
         val sy = seaTop + 8f + ((i * 37) % (seaHeight - 14).toInt())
         val path = Path().apply {
             moveTo(sx.toFloat(), sy)
-            quadraticTo(sx.toFloat() + 9f, sy - 3f, sx.toFloat() + 18f, sy)
+            quadraticBezierTo(sx.toFloat() + 9f, sy - 3f, sx.toFloat() + 18f, sy)
         }
         drawPath(path, color = Color.White.copy(alpha = 0.55f), style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2f))
     }
@@ -293,7 +293,7 @@ private fun DrawScope.drawCrack(sx: Float, cy: Float) {
 private fun DrawScope.drawDune(sx: Float, groundScreenY: Float, dw: Float, dh: Float) {
     val path = Path().apply {
         moveTo(sx - dw / 2f, groundScreenY + 2f)
-        quadraticTo(sx, groundScreenY - dh, sx + dw / 2f, groundScreenY + 2f)
+        quadraticBezierTo(sx, groundScreenY - dh, sx + dw / 2f, groundScreenY + 2f)
         close()
     }
     drawPath(path, color = Color(0xFFE0C173))
@@ -306,7 +306,7 @@ private fun DrawScope.drawBeachProp(type: BeachPropType, sx: Float, baseY: Float
             drawLine(color = Color(0xFF6B4A2F), start = Offset(sx, baseY), end = Offset(sx, baseY - r * 1.4f), strokeWidth = 3f)
             val canopy = Path().apply {
                 moveTo(sx - r, baseY - r * 1.3f)
-                quadraticTo(sx, baseY - r * 2.1f, sx + r, baseY - r * 1.3f)
+                quadraticBezierTo(sx, baseY - r * 2.1f, sx + r, baseY - r * 1.3f)
                 close()
             }
             drawPath(canopy, color = Color(0xFFE74C3C))
