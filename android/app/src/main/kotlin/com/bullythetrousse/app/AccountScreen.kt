@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.bullythetrousse.app
 
 import androidx.compose.foundation.background
