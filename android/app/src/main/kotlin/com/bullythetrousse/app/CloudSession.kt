@@ -3,6 +3,7 @@ package com.bullythetrousse.app
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -14,7 +15,8 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 /** Ce que l'app sait de sa connexion au compte en ligne, pour l'afficher
- *  (`#online-status` côté site) et pour savoir quoi proposer au joueur. */
+ *  (`#online-status`/`#account-status` côté site) et pour savoir quoi
+ *  proposer au joueur. */
 enum class CloudState {
     /** `app/google-services.json` absent : tout le volet en ligne est coupé. */
     NOT_CONFIGURED,
@@ -24,7 +26,9 @@ enum class CloudState {
     GUEST,
     /** Connecté au compte d'un code : la même partie que sur le site. */
     LINKED,
-    /** Réseau coupé ou Firebase indisponible : le jeu continue en local. */
+    /** Réseau coupé, Firebase indisponible, ou tentative échouée : le jeu
+     *  continue en local ; [rememberCloudSession] réessaie tout seul avant
+     *  de laisser ici la main au joueur (voir [CloudSession.retryConnection]). */
     OFFLINE,
 }
 
@@ -35,6 +39,15 @@ enum class CloudState {
  * bloquant : si Firebase n'est pas configuré, si le réseau est coupé ou si
  * une requête échoue, l'état bascule simplement en [CloudState.OFFLINE] et
  * le jeu continue exactement comme avant — c'est aussi ce que fait le site.
+ *
+ * Une tentative de connexion peut échouer pour une raison purement
+ * transitoire (le réseau pas encore prêt au tout premier lancement, un
+ * DNS lent...) : rester bloqué en OFFLINE pour le reste de la session
+ * serait une régression par rapport au site, qui retente sans même que le
+ * joueur s'en rende compte. [retryTrigger] est ce qui permet à
+ * [rememberCloudSession] de relancer la connexion, automatiquement au
+ * démarrage (voir [AUTO_RETRY_DELAYS_MS]) et à la demande depuis l'écran
+ * Compte.
  */
 class CloudSession(val bridge: FirebaseBridge) {
     var state by mutableStateOf(
@@ -44,6 +57,17 @@ class CloudSession(val bridge: FirebaseBridge) {
 
     var uid by mutableStateOf<String?>(null)
         internal set
+
+    internal var retryTrigger by mutableIntStateOf(0)
+
+    /** Redemande une connexion (nouvelle tentative automatique épuisée, ou
+     *  bouton "Réessayer" de l'écran Compte). Sans effet si déjà connecté. */
+    fun retryConnection() {
+        if (state == CloudState.GUEST || state == CloudState.LINKED) return
+        if (!bridge.isAvailable) return
+        state = CloudState.CONNECTING
+        retryTrigger++
+    }
 
     /**
      * Identifie CET appareil dans le document partagé (`SESSION_ID` côté
@@ -75,6 +99,18 @@ class CloudSession(val bridge: FirebaseBridge) {
     ): String? {
         if (!bridge.isAvailable) return "Le compte en ligne n'est pas configuré dans cette version."
         if (!RecoveryCode.isValid(code)) return "Un code fait 16 chiffres."
+
+        // Le compte invité de cet appareil ne sert plus à rien une fois qu'on
+        // bascule sur un vrai compte : le nettoyer maintenant évite un pseudo
+        // fantôme dans le classement (voir cleanupAbandonedAnonymousAccount()
+        // côté site — même geste que joinAccount() y fait avant de se
+        // connecter au nouveau compte).
+        if (bridge.isAnonymous) {
+            uid?.let { oldUid ->
+                runCatching { bridge.cleanupAbandonedAnonymousAccount(oldUid, currentSave.unlockedAchievements) }
+            }
+        }
+
         val joined = try {
             bridge.signInWithCode(code)
         } catch (e: Exception) {
@@ -136,13 +172,36 @@ class CloudSession(val bridge: FirebaseBridge) {
         return code
     }
 
+    /**
+     * `btn-logout` côté site : repart de zéro sur CET appareil avec un
+     * compte tout neuf. Un compte lié (un code existe) n'est jamais détruit
+     * — seul l'appareil oublie la partie, elle reste accessible par son code
+     * — un compte purement invité, lui, n'a aucun moyen d'y revenir, donc
+     * son entrée de classement et son profil partent avec lui (même geste
+     * que [joinAccount]).
+     *
+     * Renvoie la sauvegarde neuve à appliquer localement.
+     */
+    suspend fun logout(currentSave: GameSave): GameSave {
+        if (bridge.isAvailable && bridge.isAnonymous) {
+            uid?.let { id ->
+                runCatching { bridge.cleanupAbandonedAnonymousAccount(id, currentSave.unlockedAchievements) }
+            }
+        }
+        bridge.signOut()
+        uid = null
+        state = if (bridge.isAvailable) CloudState.CONNECTING else CloudState.NOT_CONFIGURED
+        retryTrigger++ // relance une connexion (nouveau compte invité), voir rememberCloudSession
+        return GameSave()
+    }
+
     val statusText: String
         get() = when (state) {
-            CloudState.NOT_CONFIGURED -> "Hors ligne : compte en ligne non configuré"
+            CloudState.NOT_CONFIGURED -> "🔌 Compte en ligne non configuré dans cette version."
             CloudState.CONNECTING -> "Connexion…"
-            CloudState.GUEST -> "En ligne (compte invité)"
-            CloudState.LINKED -> "En ligne"
-            CloudState.OFFLINE -> "Hors ligne : le jeu reste jouable"
+            CloudState.GUEST -> "📱 Partie locale à cet appareil. Crée ton code pour la retrouver ailleurs."
+            CloudState.LINKED -> "✅ Appareil connecté à ton compte — la partie se synchronise automatiquement."
+            CloudState.OFFLINE -> "🔌 Hors ligne : compte indisponible pour le moment."
         }
 }
 
@@ -155,6 +214,12 @@ class CloudSession(val bridge: FirebaseBridge) {
  * écriture de cet appareil (voir `CloudSaveSync`, porté et testé dans
  * `:core`) — sans quoi ouvrir l'app après une partie hors ligne effacerait
  * ce qui vient d'être joué.
+ *
+ * Si cette première tentative échoue (réseau pas encore prêt au tout
+ * premier lancement, par exemple), quelques nouvelles tentatives
+ * automatiques suivent ([AUTO_RETRY_DELAYS_MS]) avant de laisser le joueur
+ * réessayer lui-même depuis l'écran Compte — rester bloqué en OFFLINE pour
+ * le reste de la session serait une régression par rapport au site.
  *
  * Ensuite : chaque changement de la sauvegarde est renvoyé au cloud, mais
  * seulement une fois le calme revenu ([PUSH_DEBOUNCE_MS]). Un lancer fait
@@ -170,37 +235,47 @@ fun rememberCloudSession(
     val context = LocalContext.current
     val session = remember { CloudSession(FirebaseBridge(context)) }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(session.retryTrigger) {
         if (!session.bridge.isAvailable) return@LaunchedEffect
-        try {
-            val code = save.recoveryCode
-            // Un code déjà présent dans la sauvegarde désigne un vrai compte :
-            // on le rejoint plutôt que d'en créer un nouveau, sinon le joueur
-            // se retrouverait avec deux entrées au classement.
-            val signedIn = if (RecoveryCode.isValid(code)) {
-                runCatching { session.bridge.signInWithCode(code) }.getOrNull()
-                    ?: session.bridge.signInAnonymously()
-            } else {
-                session.bridge.signInAnonymously()
-            }
-            session.uid = signedIn
-            if (signedIn == null) {
-                session.state = CloudState.OFFLINE
-                return@LaunchedEffect
-            }
+        var attempt = 0
+        while (true) {
+            try {
+                val code = save.recoveryCode
+                // Un code déjà présent dans la sauvegarde désigne un vrai
+                // compte : on le rejoint plutôt que d'en créer un nouveau,
+                // sinon le joueur se retrouverait avec deux entrées au
+                // classement.
+                val signedIn = if (RecoveryCode.isValid(code)) {
+                    runCatching { session.bridge.signInWithCode(code) }.getOrNull()
+                        ?: session.bridge.signInAnonymously()
+                } else {
+                    session.bridge.signInAnonymously()
+                }
+                session.uid = signedIn
+                if (signedIn == null) throw IllegalStateException("Connexion Firebase sans utilisateur")
 
-            val cloud = session.bridge.fetchCloudSave(signedIn)
-            if (cloud != null &&
-                CloudSaveSync.shouldApplyRemoteSave(repository.lastPersistAtMillis, cloud.updatedAtMillis)
-            ) {
-                repository.saveFromCloud(cloud.save, cloud.updatedAtMillis)
-                onSaveChange(cloud.save)
+                val cloud = session.bridge.fetchCloudSave(signedIn)
+                if (cloud != null &&
+                    CloudSaveSync.shouldApplyRemoteSave(repository.lastPersistAtMillis, cloud.updatedAtMillis)
+                ) {
+                    repository.saveFromCloud(cloud.save, cloud.updatedAtMillis)
+                    onSaveChange(cloud.save)
+                }
+                session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
+                return@LaunchedEffect
+            } catch (e: Exception) {
+                // Réseau coupé, règles Firestore, authentification désactivée
+                // dans la console : aucune de ces situations ne doit
+                // empêcher de jouer. On retente quelques fois tout seul
+                // avant de laisser la main (voir AUTO_RETRY_DELAYS_MS) —
+                // sans ça, un simple faux départ réseau au premier lancement
+                // laisserait le joueur "hors ligne" pour toute la session.
+                session.state = CloudState.OFFLINE
+                if (attempt >= AUTO_RETRY_DELAYS_MS.size) return@LaunchedEffect
+                delay(AUTO_RETRY_DELAYS_MS[attempt])
+                attempt++
+                session.state = CloudState.CONNECTING
             }
-            session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
-        } catch (e: Exception) {
-            // Réseau coupé, règles Firestore, authentification désactivée dans
-            // la console : aucune de ces situations ne doit empêcher de jouer.
-            session.state = CloudState.OFFLINE
         }
     }
 
@@ -228,3 +303,8 @@ fun rememberCloudSession(
 /** Le site écrit à chaque `persist()` ; ici on attend que la sauvegarde
  *  arrête de bouger, pour ne pas écrire dix fois pendant un seul lancer. */
 private const val PUSH_DEBOUNCE_MS = 1500L
+
+/** Délais entre les tentatives de connexion automatiques après un premier
+ *  échec (2 s, 5 s, 12 s) : assez vite pour rattraper un réseau qui vient
+ *  tout juste de répondre, sans marteler Firebase si le problème persiste. */
+private val AUTO_RETRY_DELAYS_MS = listOf(2_000L, 5_000L, 12_000L)

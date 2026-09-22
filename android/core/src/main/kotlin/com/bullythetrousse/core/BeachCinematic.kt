@@ -12,6 +12,17 @@ enum class BeachCinePhase {
     ARRIVE, BUS_LEAVE, PIVOT, COLLAPSE, FORGOT, CHEH, AFTER_CHEH, CRAB,
     BACK_AWAY, SWARM, CHASE, AIM_INTRO, AIM, FLY1, PARASOL, FLY2, CASTLE,
     FLY3, TOWEL, FLY4, OUTRO,
+
+    /**
+     * `bcPhase = "dialog"` côté web : une boîte de dialogue "appuyer
+     * n'importe où pour continuer", qui FIGE la cinématique (aucun timer ne
+     * progresse) jusqu'à ce que le joueur ait tapé une fois par réplique en
+     * attente — voir [BeachCineState.dialogQueueRemaining] et
+     * [BeachCinematic.advanceDialog]. Entrée depuis PARASOL, CASTLE et
+     * TOWEL, jamais depuis l'ordre linéaire des autres phases (exclue de
+     * [BeachCinematic.ORDER] pour cette raison).
+     */
+    DIALOG,
 }
 
 /**
@@ -22,6 +33,10 @@ data class BeachCineState(
     val phase: BeachCinePhase = BeachCinePhase.FADE,
     val phaseElapsed: Double = 0.0,
     val finished: Boolean = false,
+    /** Répliques encore à passer avant de reprendre [dialogNextPhase], tant
+     *  que [phase] vaut [BeachCinePhase.DIALOG]. */
+    val dialogQueueRemaining: Int = 0,
+    val dialogNextPhase: BeachCinePhase? = null,
 )
 
 /**
@@ -71,7 +86,10 @@ object BeachCinematic {
     const val FLY4 = 1.8
     const val OUTRO = 4.5
 
-    private val ORDER = BeachCinePhase.entries
+    // DIALOG n'a pas sa place dans la progression linéaire par durée : elle
+    // est entrée/quittée par les déclencheurs explicites ci-dessous
+    // (DIALOG_TRIGGERS/advanceDialog), pas par indexOf+1.
+    private val ORDER = BeachCinePhase.entries.filter { it != BeachCinePhase.DIALOG }
     private val DURATIONS: Map<BeachCinePhase, Double> = mapOf(
         BeachCinePhase.FADE to FADE, BeachCinePhase.HAIL to HAIL, BeachCinePhase.BUS_IN to BUS_IN,
         BeachCinePhase.DOOR_OPEN to DOOR_OPEN, BeachCinePhase.BOARDING to BOARDING, BeachCinePhase.SEATED to SEATED,
@@ -85,11 +103,53 @@ object BeachCinematic {
         BeachCinePhase.TOWEL to TOWEL, BeachCinePhase.FLY4 to FLY4, BeachCinePhase.OUTRO to OUTRO,
     )
 
+    /**
+     * `bcShowDialogs(keys, nextPhase)` côté web : quelle phase déclenche une
+     * pause dialogue à sa fin, combien de répliques elle contient (le texte
+     * lui-même est une préoccupation d'affichage, portée côté `:app`,
+     * comme les libellés d'[Achievement]) et où reprendre ensuite.
+     */
+    private val DIALOG_TRIGGERS: Map<BeachCinePhase, Pair<Int, BeachCinePhase>> = mapOf(
+        BeachCinePhase.PARASOL to (2 to BeachCinePhase.FLY2), // bcineParasol1/2
+        BeachCinePhase.CASTLE to (1 to BeachCinePhase.FLY3), // bcineTutoAnyway
+        BeachCinePhase.TOWEL to (3 to BeachCinePhase.FLY4), // bcineTowel1/2/3
+    )
+
+    /** La barre de visée oscillante de la phase AIM (`bcAimValue =
+     *  Math.sin(bcT * 3.4)` côté web), utilisée pour l'affichage ET pour
+     *  valider un tir manuel (voir [tryLaunchFromAim]). */
+    const val AIM_OSCILLATION_SPEED = 3.4
+
+    /** `BCINE_AIM_FORBIDDEN` côté web (= `SPACE_EGG_ACCURACY_MAX`) : la
+     *  "zone verte" du début de barre, où un tir manuel est refusé. */
+    const val AIM_FORBIDDEN_MAX = -0.6
+
+    fun aimValue(phaseElapsed: Double): Double = kotlin.math.sin(phaseElapsed * AIM_OSCILLATION_SPEED)
+
     fun step(state: BeachCineState, dt: Double): BeachCineState {
         if (state.finished) return state
+        if (state.phase == BeachCinePhase.DIALOG) {
+            // Le temps continue de s'écouler (pour une éventuelle animation
+            // d'apparition côté :app), mais rien n'avance tout seul : le
+            // joueur doit taper (voir advanceDialog), exactement comme
+            // bcUpdate() côté web, dont le switch n'a pas de cas "dialog".
+            return state.copy(phaseElapsed = state.phaseElapsed + dt)
+        }
+
         val elapsed = state.phaseElapsed + dt
         val duration = DURATIONS.getValue(state.phase)
         if (elapsed < duration) return state.copy(phaseElapsed = elapsed)
+
+        val trigger = DIALOG_TRIGGERS[state.phase]
+        if (trigger != null) {
+            val (lineCount, nextPhase) = trigger
+            return state.copy(
+                phase = BeachCinePhase.DIALOG,
+                phaseElapsed = 0.0,
+                dialogQueueRemaining = lineCount,
+                dialogNextPhase = nextPhase,
+            )
+        }
 
         val nextIndex = ORDER.indexOf(state.phase) + 1
         return if (nextIndex >= ORDER.size) {
@@ -99,6 +159,42 @@ object BeachCinematic {
         }
     }
 
+    /**
+     * `bcDialogAdvance()` côté web : un tap fait passer à la réplique
+     * suivante, ou reprend la cinématique (vers [BeachCineState.dialogNextPhase])
+     * une fois la dernière passée. Sans effet hors de la phase DIALOG.
+     */
+    fun advanceDialog(state: BeachCineState): BeachCineState {
+        if (state.phase != BeachCinePhase.DIALOG) return state
+        val remaining = state.dialogQueueRemaining - 1
+        if (remaining > 0) return state.copy(dialogQueueRemaining = remaining)
+        val next = state.dialogNextPhase ?: BeachCinePhase.OUTRO
+        return state.copy(phase = next, phaseElapsed = 0.0, dialogQueueRemaining = 0, dialogNextPhase = null)
+    }
+
+    /**
+     * `bcLaunchFromAim(true)` côté web : un tir manuel pendant la phase AIM.
+     * Refusé (barre restée à l'écran) si la barre est dans la "zone verte"
+     * interdite au moment du tap ; sinon la cinématique reprend aussitôt son
+     * vol, sans attendre les 5 s de la phase (déjà couvertes par [step],
+     * qui tire automatiquement au bout de ce délai — CETTE fonction est
+     * l'ajout d'un tir plus tôt). Sans effet hors de cette phase.
+     */
+    fun tryLaunchFromAim(state: BeachCineState): AimLaunchResult {
+        if (state.phase != BeachCinePhase.AIM) return AimLaunchResult.Launched(state)
+        if (aimValue(state.phaseElapsed) <= AIM_FORBIDDEN_MAX) return AimLaunchResult.Forbidden
+        return AimLaunchResult.Launched(state.copy(phase = BeachCinePhase.FLY1, phaseElapsed = 0.0))
+    }
+
     /** `bcFinish()` côté web : débloque le monde et y dépose le joueur (voir Beach.enter). */
     fun applyOutcome(save: GameSave): GameSave = Beach.enter(save.copy(plageUnlocked = true))
+}
+
+/** Issue d'un tir manuel pendant la phase AIM, voir [BeachCinematic.tryLaunchFromAim]. */
+sealed interface AimLaunchResult {
+    data class Launched(val state: BeachCineState) : AimLaunchResult
+    /** Refusé : la barre était dans la zone verte interdite au moment du tap
+     *  (`showToast(tr("bcineNotGreen"))` côté web — le message est une
+     *  préoccupation d'affichage, portée côté `:app`). */
+    data object Forbidden : AimLaunchResult
 }

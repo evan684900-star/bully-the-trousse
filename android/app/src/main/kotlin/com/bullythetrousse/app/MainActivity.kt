@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.GraphicsQuality
@@ -78,9 +79,17 @@ fun GameRoot() {
     var save by remember { mutableStateOf(repository.load()) }
     var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
 
+    // Point de passage UNIQUE pour toute modification de la sauvegarde locale
+    // (portage de persist() côté web, qui appelle checkAchievements() à
+    // chaque appel — pas seulement après un lancer ou un achat). Sans ça,
+    // les succès qui se déclenchent sans passer par ThrowFlight/applyPurchase
+    // (débloquer le volcan, changer d'avatar, atteindre 5000 $...) ne
+    // seraient constatés qu'au prochain lancer ou achat, au lieu de l'instant
+    // où ils sont vraiment obtenus.
     fun updateSave(updated: GameSave) {
-        save = updated
-        repository.save(updated)
+        val withAchievements = Achievements.apply(updated)
+        save = withAchievements
+        repository.save(withAchievements)
     }
 
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).

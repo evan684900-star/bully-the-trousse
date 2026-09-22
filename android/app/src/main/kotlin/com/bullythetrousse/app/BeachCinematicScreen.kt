@@ -3,12 +3,16 @@ package com.bullythetrousse.app
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -38,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -46,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.BeachCinePhase
 import com.bullythetrousse.core.BeachCineState
 import com.bullythetrousse.core.BeachCinematic
+import com.bullythetrousse.core.AimLaunchResult
 import com.bullythetrousse.core.BeachPropType
 import com.bullythetrousse.core.PhysicsConstants
 import com.bullythetrousse.core.QualityProfile
@@ -53,6 +59,7 @@ import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.hypot
+import kotlinx.coroutines.delay
 import kotlin.random.Random
 import kotlin.math.max
 import kotlin.math.min
@@ -67,10 +74,14 @@ import kotlin.math.sin
  * sur la plage, les crabes qui sortent du sable, la course-poursuite et les
  * vols jusqu'au message de bienvenue.
  *
- * Simplification assumée, déjà documentée côté `:core` : les mini-séquences
- * interactives du web (boîtes de dialogue à valider, visée à ne pas poser
- * dans la zone verte) ne changent jamais l'issue — la séquence se déroule
- * donc toute seule, à la même cadence.
+ * Les boîtes de dialogue (`bcShowDialogs()`) figent vraiment la cinématique
+ * jusqu'à un tap par réplique, et la phase de visée (AIM) accepte un tir
+ * manuel plus tôt que les 5 s automatiques — refusé si la barre oscillante
+ * est dans la "zone verte" interdite (voir [BeachCinematic.advanceDialog]/
+ * [BeachCinematic.tryLaunchFromAim], `:core`, testés). Seule la
+ * course-poursuite de crabes reste purement scénarisée, comme côté web (le
+ * joueur n'y a aucune action à faire, `bcUpdate()` ne lit aucune entrée
+ * pendant "chase").
  */
 @Composable
 fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
@@ -90,6 +101,10 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
     val crabs = remember { mutableListOf<Crab>() }
     val props = remember { mutableListOf<CineProp>() }
     var message by remember { mutableStateOf<CineMessage?>(null) }
+    // "Pas dans la zone verte !" : rejet transitoire d'un tir manuel pendant
+    // AIM, affiché un instant puis effacé tout seul (voir showToast() côté
+    // web, ici sans file d'attente puisqu'un seul message à la fois suffit).
+    var aimRejectedAt by remember { mutableStateOf<Long?>(null) }
 
     // Effets d'ambiance (voir CineEffects.kt).
     val profile = LocalGraphicsQuality.current.profile
@@ -316,6 +331,15 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
     }
 
     val phase = state.phase
+
+    // Efface le rejet "pas dans la zone verte" après une seconde, sans
+    // bloquer d'autres tirs entre-temps.
+    LaunchedEffect(aimRejectedAt) {
+        val at = aimRejectedAt ?: return@LaunchedEffect
+        delay(1000)
+        if (aimRejectedAt == at) aimRejectedAt = null
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -323,6 +347,21 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
             .onSizeChanged {
                 viewWidth = it.width.toFloat()
                 viewHeight = it.height.toFloat()
+            }
+            // bcTap() côté web : un tap fait avancer un dialogue, ou tire
+            // plus tôt pendant la visée (refusé si la barre est dans la
+            // zone verte). Sans effet dans toutes les autres phases.
+            .pointerInput(phase) {
+                detectTapGestures {
+                    when (phase) {
+                        BeachCinePhase.DIALOG -> state = BeachCinematic.advanceDialog(state)
+                        BeachCinePhase.AIM -> when (val result = BeachCinematic.tryLaunchFromAim(state)) {
+                            is AimLaunchResult.Launched -> state = result.state
+                            is AimLaunchResult.Forbidden -> aimRejectedAt = System.currentTimeMillis()
+                        }
+                        else -> Unit
+                    }
+                }
             },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -405,9 +444,14 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
             }
         }
 
-        // #bcine-aim : "VISE !!!" pendant la phase de visée.
+        // #bcine-aim + #meter-wrap : "VISE !!!" et la barre oscillante,
+        // tapable pour tirer plus tôt (voir tryLaunchFromAim, :core).
         if (phase == BeachCinePhase.AIM) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(bottom = 96.dp),
+                verticalArrangement = Arrangement.Bottom,
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
                 Text(
                     "VISE !!!",
                     color = Color(0xFFFF3B30),
@@ -415,12 +459,22 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
                 )
+                Text(
+                    if (aimRejectedAt != null) "Pas dans la zone verte !" else "Touche l'écran pour tirer",
+                    color = if (aimRejectedAt != null) Color(0xFFFF3B30) else TextDim,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+                )
+                AimMeter(phaseElapsed = state.phaseElapsed)
             }
         }
 
-        // #bcine-dialog : la boîte de dialogue du site, pour les temps morts.
-        val dialogue = dialogueFor(phase)
-        if (dialogue != null) {
+        // #bcine-dialog : la boîte de dialogue du site, tapée pour avancer.
+        if (phase == BeachCinePhase.DIALOG) {
+            val lines = state.dialogNextPhase?.let { dialogueLines(it) }.orEmpty()
+            val shown = (lines.size - state.dialogQueueRemaining).coerceIn(0, (lines.size - 1).coerceAtLeast(0))
+            val text = lines.getOrNull(shown) ?: ""
             Box(
                 modifier = Modifier.fillMaxSize().padding(bottom = 40.dp),
                 contentAlignment = Alignment.BottomCenter,
@@ -435,8 +489,66 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                         .padding(horizontal = 24.dp, vertical = 22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(dialogue, color = TextColor, fontSize = 16.sp, textAlign = TextAlign.Center)
+                    Text(text, color = TextColor, fontSize = 16.sp, textAlign = TextAlign.Center)
+                    Text(
+                        "appuyer n'importe où pour continuer",
+                        color = TextDim,
+                        fontSize = 11.5.sp,
+                        modifier = Modifier.padding(top = 8.dp),
+                    )
                 }
+            }
+        }
+    }
+}
+
+/**
+ * `#meter-wrap`/`#meter-fill`/`#meter-marker` pendant la phase AIM : la
+ * barre oscillante (`bcAimValue = sin(t * 3.4)`, voir [BeachCinematic.aimValue])
+ * avec son repère central, dans le même habillage que le [Meter] du jeu
+ * normal (voir GameScreen.kt).
+ */
+@Composable
+private fun AimMeter(phaseElapsed: Double) {
+    val value = BeachCinematic.aimValue(phaseElapsed).toFloat() // -1..1
+    val forbidden = value <= BeachCinematic.AIM_FORBIDDEN_MAX.toFloat()
+    val shape = RoundedCornerShape(999.dp)
+    Box(
+        modifier = Modifier
+            .widthIn(max = 420.dp)
+            .fillMaxWidth(0.8f)
+            .height(26.dp)
+            .clip(shape)
+            .background(Color(0x8C0A0C14))
+            .border(2.dp, if (forbidden) Color(0xFFFF3B30) else Color(0xFF222633), shape),
+    ) {
+        // Zone verte interdite : le tout début de la barre (valeur ≤ -0.6).
+        val forbiddenFraction = ((BeachCinematic.AIM_FORBIDDEN_MAX.toFloat() + 1f) / 2f).coerceIn(0f, 1f)
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .fillMaxWidth(forbiddenFraction)
+                .background(Color(0xFF3DDC84).copy(alpha = 0.35f)),
+        )
+        // Repère central.
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(6.dp)
+                .fillMaxHeight()
+                .background(Color.White.copy(alpha = 0.35f)),
+        )
+        // Curseur, de -1 (gauche) à +1 (droite).
+        val markerFraction = ((value + 1f) / 2f).coerceIn(0f, 1f)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth(markerFraction)) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(Color.White),
+                )
             }
         }
     }
@@ -466,11 +578,27 @@ private const val DOOR_OFFSET = 127f // centre de la porte depuis le coin avant-
 
 
 /** Les répliques du site, affichées pendant les phases sans action. */
-private fun dialogueFor(phase: BeachCinePhase): String? = when (phase) {
-    BeachCinePhase.PARASOL -> "Aïe. Un parasol."
-    BeachCinePhase.CASTLE -> "Bon. De toute façon le tuto arrive."
-    BeachCinePhase.TOWEL -> "Une serviette. Enfin un peu de confort."
-    else -> null
+/**
+ * `bcShowDialogs()` côté web : les répliques d'une pause dialogue, dans
+ * l'ordre. Indexées par la phase où la cinématique REPREND après le
+ * dialogue ([BeachCineState.dialogNextPhase]) plutôt que par celle qui l'a
+ * déclenché — c'est la seule information que l'état conserve, PARASOL/
+ * CASTLE/TOWEL eux-mêmes ne survivant pas à l'entrée dans DIALOG.
+ */
+private fun dialogueLines(nextPhase: BeachCinePhase): List<String> = when (nextPhase) {
+    BeachCinePhase.FLY2 -> listOf(
+        "les parasols sont très utiles pour rebondir dessus !",
+        "leurs apparitions sont aléatoires, n'essaie pas de repérer l'endroit et d'y aller à chaque fois 😝",
+    )
+    BeachCinePhase.FLY3 -> listOf(
+        "en temps normal ça se serait arrêté là, mais vu que c'est un tuto...",
+    )
+    BeachCinePhase.FLY4 -> listOf(
+        "les serviettes, elles, n'ont aucun effet particulier : juste de la déco sur le sable",
+        "on continue notre lancée sans s'arrêter dessus, promis",
+        "mais c'est toujours un tuto !",
+    )
+    else -> emptyList()
 }
 
 /**

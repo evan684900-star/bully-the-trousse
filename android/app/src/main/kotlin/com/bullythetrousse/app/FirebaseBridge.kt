@@ -120,6 +120,47 @@ class FirebaseBridge(context: Context) {
         }
     }
 
+    /** `firebase.auth().signOut()` : ferme la session en cours. */
+    fun signOut() {
+        if (isAvailable) auth.signOut()
+    }
+
+    /**
+     * `cleanupAbandonedAnonymousAccount()` : purge tout ce qu'un compte
+     * invité abandonné laisserait derrière lui — sans ce nettoyage, chaque
+     * fois qu'un joueur touche à un compte invité (déconnexion, ou bascule
+     * vers le compte d'un code), son ancienne entrée de classement resterait
+     * affichée pour toujours, avec un score figé et aucun propriétaire.
+     *
+     * Ne supprime PAS le compte Firebase Auth anonyme lui-même : si la
+     * connexion au vrai compte échouait juste après, l'appareil se
+     * retrouverait sans aucune session utilisable. Un compte anonyme
+     * orphelin ne coûte rien et ne porte plus aucune donnée une fois cette
+     * purge faite.
+     */
+    suspend fun cleanupAbandonedAnonymousAccount(uid: String, unlockedAchievements: List<String>) {
+        if (!isAvailable) return
+        val docWipes = listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, "activePlayers", RECOVERY_TOKENS)
+        for (collection in docWipes) {
+            runCatching { firestore.collection(collection).document(uid).delete().await() }
+        }
+        // Les succès déjà marqués doivent partir avec le reste : "activePlayers"
+        // est le dénominateur du pourcentage de joueurs par succès et
+        // "achvUnlocks" le numérateur — n'effacer que le premier ferait
+        // grimper les pourcentages au-dessus de 100 %.
+        for (id in unlockedAchievements) {
+            runCatching {
+                firestore.collection("achvUnlocks").document(id).collection("players").document(uid).delete().await()
+            }
+        }
+        // Les abonnements de ce compte jetable, sinon ils gonflent le nombre
+        // d'abonnés des joueurs suivis avec un compte qui n'existe plus.
+        runCatching {
+            val follows = firestore.collection(FOLLOWS).whereEqualTo("follower", uid).get().await()
+            for (doc in follows.documents) runCatching { doc.reference.delete().await() }
+        }
+    }
+
     // ---- Sauvegarde cloud ----
 
     /** `db.collection("users").doc(uid).get()`. */

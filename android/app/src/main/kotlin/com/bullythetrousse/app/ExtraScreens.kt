@@ -439,7 +439,16 @@ fun ProfileScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Text("Hors ligne", color = TextDim, fontSize = 12.5.sp)
+            // .profile-status : toujours "En ligne" pour SON PROPRE profil côté
+            // site (profileOnline, sans vérifier de seuil — ce seuil ne sert
+            // qu'à afficher le profil d'un AUTRE joueur, pas encore porté ici).
+            val isOnline = session.state == CloudState.GUEST || session.state == CloudState.LINKED
+            Text(
+                if (isOnline) "🟢 En ligne" else "Hors ligne",
+                color = if (isOnline) Money else TextDim,
+                fontSize = 12.5.sp,
+                fontWeight = if (isOnline) FontWeight.Bold else FontWeight.Normal,
+            )
         }
 
         // .profile-top-row : trois cartes côte à côte.

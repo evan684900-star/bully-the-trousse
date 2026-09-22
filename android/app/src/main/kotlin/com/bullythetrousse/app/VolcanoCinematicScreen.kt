@@ -8,6 +8,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -321,6 +322,32 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                         else -> state
                     }
                 }
+            }
+            // Ajout par rapport au site (pensé pour la souris/le clavier) :
+            // un vrai geste de glissement pour esquiver, plus naturel au
+            // doigt que de viser une moitié d'écran. `move()` (:core) ignore
+            // silencieusement un appel hors de la fenêtre d'esquive, donc ce
+            // détecteur et le tap ci-dessus peuvent cohabiter sans jamais se
+            // marcher dessus ni déclencher une double esquive.
+            .pointerInput(phase) {
+                if (phase != CinePhase.ROCKS) return@pointerInput
+                val swipeThresholdPx = 40.dp.toPx()
+                var dragAccumulated = 0f
+                var alreadyDodged = false
+                detectHorizontalDragGestures(
+                    onDragStart = {
+                        dragAccumulated = 0f
+                        alreadyDodged = false
+                    },
+                    onHorizontalDrag = { change, dragAmount ->
+                        change.consume()
+                        dragAccumulated += dragAmount
+                        if (!alreadyDodged && kotlin.math.abs(dragAccumulated) > swipeThresholdPx) {
+                            alreadyDodged = true
+                            state = VolcanoCinematic.move(state, if (dragAccumulated > 0) 1 else -1)
+                        }
+                    },
+                )
             },
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
