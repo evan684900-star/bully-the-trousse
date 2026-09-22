@@ -57,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.CinePhase
 import com.bullythetrousse.core.CourDecor
+import com.bullythetrousse.core.QualityProfile
 import com.bullythetrousse.core.RockState
 import com.bullythetrousse.core.VolcanoCineOutcome
 import com.bullythetrousse.core.VolcanoCineState
@@ -102,7 +103,8 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
 
     // Effets d'ambiance (voir CineEffects.kt) : matière en suspension,
     // onde de choc de l'impact et colonne de fumée de l'éruption.
-    val particles = remember { ParticleField() }
+    val profile = LocalGraphicsQuality.current.profile
+    val particles = remember(profile) { ParticleField(profile) }
     var smoke by remember { mutableFloatStateOf(0f) }
     var shockwave by remember { mutableFloatStateOf(-1f) }
     var impactDone by remember { mutableStateOf(false) }
@@ -147,7 +149,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                             radius = 8f, life = 2.1f, color = Color(0xFF3A2A24),
                             gravity = 760f, drag = 0.2f, jitter = 50f, shrink = false, spin = 7f,
                         )
-                        smoke = 1f
+                        smoke = if (profile.ambientEffects) 1f else 0f
                     }
                 }
                 previousPhase = next.phase
@@ -328,9 +330,9 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
             val body: DrawScope.() -> Unit = {
                 when (phase) {
                     CinePhase.FADE, CinePhase.APPROACH, CinePhase.QUAKE, CinePhase.ERUPTION ->
-                        drawCineYard(phase, state.phaseElapsed, rotation, clock, smoke, sprite, equippedSkin, skinFilter)
+                        drawCineYard(phase, state.phaseElapsed, rotation, clock, smoke, profile, sprite, equippedSkin, skinFilter)
                     CinePhase.LANDING, CinePhase.OUTRO ->
-                        drawCineArrival(phase, state.phaseElapsed, rotation, clock, sprite, equippedSkin, skinFilter)
+                        drawCineArrival(phase, state.phaseElapsed, rotation, clock, profile, sprite, equippedSkin, skinFilter)
                     else ->
                         drawCineSky(
                             phase = phase,
@@ -343,6 +345,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                             rockLane = state.rockLane,
                             rockProgress = rockProgress(phase, state.rockState, state.rockElapsed),
                             rockSeed = state.rockIndex + 1,
+                            profile = profile,
                             sprite = sprite,
                             skinId = equippedSkin,
                             skinFilter = skinFilter,
@@ -381,7 +384,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                     drawLightWash(Color(0xFF9FD0FF), 0.08f)
                 else -> Unit
             }
-            drawVignette(0.42f)
+            if (profile.vignette) drawVignette(0.42f)
 
             // Éclair de l'explosion, par-dessus tout le reste.
             if (flash > 0.01f) {
@@ -561,6 +564,7 @@ private fun DrawScope.drawCineYard(
     rotation: Float,
     clock: Float,
     smoke: Float,
+    profile: QualityProfile,
     sprite: ImageBitmap,
     skinId: String,
     skinFilter: ColorFilter?,
@@ -601,7 +605,7 @@ private fun DrawScope.drawCineYard(
 
     // Colonne de fumée de l'éruption : hors du zoom, elle monte devant le
     // décor mais derrière la trousse.
-    if (smoke > 0.01f) {
+    if (smoke > 0.01f && profile.ambientEffects) {
         // Même repère que l'ombre portée : le sol zoomé descend de (26 + drop) × zoom.
         drawSmokeColumn(
             centerX = fx,
@@ -625,7 +629,7 @@ private fun DrawScope.drawCineYard(
     val trousseSize = 60f * zoom
     // Ombre portée : elle ancre la trousse au sol tant qu'elle y est, et
     // s'efface à mesure qu'elle est projetée en l'air.
-    if (erupt < 0.6f) {
+    if (erupt < 0.6f && profile.ambientEffects) {
         // Le sol est zoomé autour de (fx, fy) : la ligne d'horizon, à 26 px
         // sous la trousse au repos, se retrouve donc à 26 × zoom.
         drawGroundShadow(
@@ -635,7 +639,7 @@ private fun DrawScope.drawCineYard(
             height = max(0f, fy - ty),
         )
     }
-    drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, rot, skinFilter)
+    drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, rot, skinFilter, filterQuality = profile.spriteFilter)
 }
 
 /** `cineDrawCracks()` : les fissures qui s'ouvrent dans le sol de la cour. */
@@ -699,6 +703,7 @@ private fun DrawScope.drawCineSky(
     rockLane: Int,
     rockProgress: Float,
     rockSeed: Int,
+    profile: QualityProfile,
     sprite: ImageBitmap,
     skinId: String,
     skinFilter: ColorFilter?,
@@ -731,21 +736,26 @@ private fun DrawScope.drawCineSky(
         ),
     )
 
-    // Étoiles : visibles seulement une fois très haut, elles disent
-    // l'altitude mieux qu'un dégradé.
-    drawStars(intensity = c01((alt - 0.55f) / 0.45f) * 0.9f, clock = clock)
-    // Le soleil, juste au-dessus de la mer de nuages.
-    drawSunGlow(
-        centerX = w * 0.78f,
-        centerY = h * 0.17f,
-        radius = 26f,
-        core = Color(0xFFFFF6D8),
-        halo = Color(0xFFFFE9A8),
-    )
+    if (profile.ambientEffects) {
+        // Étoiles : visibles seulement une fois très haut, elles disent
+        // l'altitude mieux qu'un dégradé.
+        drawStars(intensity = c01((alt - 0.55f) / 0.45f) * 0.9f, clock = clock)
+        // Le soleil, juste au-dessus de la mer de nuages.
+        drawSunGlow(
+            centerX = w * 0.78f,
+            centerY = h * 0.17f,
+            radius = 26f,
+            core = Color(0xFFFFF6D8),
+            halo = Color(0xFFFFE9A8),
+        )
+    }
 
     // Deux couches de nuages : la lointaine défile moins vite et reste pâle,
-    // ce qui creuse la profondeur (le site n'en a qu'une).
-    drawCineCloudField(cloudScroll * 0.35f, count = 10, alphaMul = 0.45f, scaleMul = 1.9f)
+    // ce qui creuse la profondeur (le site n'en a qu'une). En qualité basse,
+    // seule la couche proche est dessinée.
+    if (profile.cloudLayers > 1) {
+        drawCineCloudField(cloudScroll * 0.35f, count = 10, alphaMul = 0.45f, scaleMul = 1.9f)
+    }
     drawCineCloudField(cloudScroll, count = 16, alphaMul = 0.85f)
     if (alt > 0.45f) drawCineCloudSea((alt - 0.45f) / 0.55f, clock)
 
@@ -755,7 +765,7 @@ private fun DrawScope.drawCineSky(
         CinePhase.DESCENT -> 0.85f
         else -> 0f
     }
-    drawSpeedLines(scroll = cloudScroll, intensity = speed)
+    if (profile.ambientEffects) drawSpeedLines(scroll = cloudScroll, intensity = speed)
 
     // Trousse
     val bob = sin(clock * 10.13f) * 8f
@@ -774,6 +784,7 @@ private fun DrawScope.drawCineSky(
         size = 70f,
         rotationRadians = rotation + wobble * 0.25f * sin(clock * 104.7f),
         colorFilter = skinFilter,
+        filterQuality = profile.spriteFilter,
     )
 
     // Roche volcanique en approche : elle part du haut de l'écran et fond sur
@@ -924,6 +935,7 @@ private fun DrawScope.drawCineArrival(
     phaseElapsed: Double,
     rotation: Float,
     clock: Float,
+    profile: QualityProfile,
     sprite: ImageBitmap,
     skinId: String,
     skinFilter: ColorFilter?,
@@ -973,6 +985,8 @@ private fun DrawScope.drawCineArrival(
             center = Offset(cx, groundY + 6f),
         )
     }
-    drawGroundShadow(centerX = cx, groundY = groundY + 6f, objectSize = 70f, height = max(0f, groundY - 22f - ty))
-    drawTrousseSprite(sprite, skinId, cx, ty, 70f, rotation, skinFilter)
+    if (profile.ambientEffects) {
+        drawGroundShadow(centerX = cx, groundY = groundY + 6f, objectSize = 70f, height = max(0f, groundY - 22f - ty))
+    }
+    drawTrousseSprite(sprite, skinId, cx, ty, 70f, rotation, skinFilter, filterQuality = profile.spriteFilter)
 }

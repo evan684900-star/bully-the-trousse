@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.SkinStats
 
 /**
@@ -181,9 +182,34 @@ fun SettingsScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: () 
                 small = true,
             ) { onSaveChange(save.copy(musicMuted = !save.musicMuted)) }
         }
+        // Qualité : un bouton qui fait défiler Basse → Normale → Élevée.
+        // Propre au portage Android — le site n'a pas ce réglage, mais un
+        // téléphone d'entrée de gamme en a besoin.
+        val quality = GraphicsQuality.fromId(save.graphicsQuality)
+        SettingsRow("Qualité graphique") {
+            GameButton(quality.label, secondary = true, small = true) {
+                onSaveChange(save.copy(graphicsQuality = GraphicsQuality.next(quality).id))
+            }
+        }
+        Text(
+            qualityHint(quality),
+            color = TextDim,
+            fontSize = 11.5.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
         SettingsRow("Thème") { GameButton("🌙", secondary = true, small = true) {} }
         SettingsRow("Langue") { GameButton("FR", secondary = true, small = true) {} }
     }
+}
+
+/** Ce que chaque niveau change, en une ligne : sans ça le bouton ne dit pas
+ *  au joueur ce qu'il gagne ou perd en le touchant. */
+private fun qualityHint(quality: GraphicsQuality): String = when (quality) {
+    GraphicsQuality.LOW ->
+        "Effets d'ambiance coupés et particules réduites : à choisir si le jeu saccade."
+    GraphicsQuality.MEDIUM -> "Tous les effets, en quantité mesurée. Recommandé."
+    GraphicsQuality.HIGH ->
+        "Particules, nuages en profondeur et sillages au maximum. Pour les téléphones à l'aise."
 }
 
 /** `.settings-row` : libellé à gauche, contrôle à droite. */

@@ -40,6 +40,11 @@ data class GameSave(
     val equippedTrail: String = "blanche",
     val theme: String = "dark",
     val lang: String = "",
+    /** Niveau de détail graphique (voir [GraphicsQuality]). Champ propre au
+     *  portage Android : le site n'a pas de réglage équivalent. Stocké par
+     *  identifiant plutôt que par ordinal, pour qu'ajouter un niveau plus
+     *  tard ne décale pas les sauvegardes existantes. */
+    val graphicsQuality: String = GraphicsQuality.DEFAULT.id,
     // --- Monde Volcan ---
     val currentWorld: String = "cour",
     val volcanUnlocked: Boolean = false,

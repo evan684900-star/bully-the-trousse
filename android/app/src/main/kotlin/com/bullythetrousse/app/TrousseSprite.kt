@@ -23,6 +23,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import com.bullythetrousse.core.QualityProfile
 import com.bullythetrousse.core.Skins
 import kotlin.math.abs
 import kotlin.math.max
@@ -81,9 +82,20 @@ fun TrousseSprite(
         modifier = modifier,
         contentScale = ContentScale.Fit,
         colorFilter = rememberSkinColorFilter(skinId),
-        filterQuality = FilterQuality.Medium,
+        // Le sprite est affiché bien plus petit que ses 980 px : le
+        // filtrage bilinéaire évite l'aspect crénelé, mais il se paie, d'où
+        // le repli en qualité basse (voir LocalGraphicsQuality).
+        filterQuality = spriteFilterQuality(),
     )
 }
+
+@Composable
+internal fun spriteFilterQuality(): FilterQuality = LocalGraphicsQuality.current.profile.spriteFilter
+
+/** Le même choix, pour le code de dessin qui a déjà le profil sous la main
+ *  (les cinématiques) et ne peut pas lire un CompositionLocal. */
+internal val QualityProfile.spriteFilter: FilterQuality
+    get() = if (sharpSprites) FilterQuality.Medium else FilterQuality.Low
 
 /**
  * La trousse dessinée sur un Canvas (jeu, cinématiques) — portage de
@@ -102,6 +114,7 @@ fun DrawScope.drawTrousseSprite(
     rotationRadians: Float,
     colorFilter: ColorFilter?,
     alpha: Float = 1f,
+    filterQuality: FilterQuality = FilterQuality.Medium,
 ) {
     val skin = Skins.find(skinId)
     rotateRad(rotationRadians, pivot = Offset(centerX, centerY)) {
@@ -118,7 +131,7 @@ fun DrawScope.drawTrousseSprite(
                 dstSize = IntSize(size.roundToInt(), size.roundToInt()),
                 alpha = alpha,
                 colorFilter = colorFilter,
-                filterQuality = FilterQuality.Medium,
+                filterQuality = filterQuality,
             )
         }
     }

@@ -90,6 +90,10 @@ fun ThrowCanvas(
     // (qui relit `save.equippedSkin` à chaque frame).
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
+    // Niveau de détail choisi dans les Réglages (voir LocalGraphicsQuality) :
+    // il décide de la finesse du sillage.
+    val profile = LocalGraphicsQuality.current.profile
+    val spriteFilter = spriteFilterQuality()
 
     val trailPoints = remember { mutableListOf<TrailPoint>() }
     val trailRgb = remember(equippedTrail) { Trails.ALL.firstOrNull { it.id == equippedTrail }?.rgb ?: "255,255,255" }
@@ -112,13 +116,14 @@ fun ThrowCanvas(
         } else {
             trailPoints.add(TrailPoint(flightState.worldX, flightState.worldY, nowMillis))
             trailPoints.removeAll { nowMillis - it.atMillis > TRAIL_LIFE_MS }
-            while (trailPoints.size > TRAIL_MAX_POINTS) trailPoints.removeAt(0)
+            while (trailPoints.size > profile.trailPoints) trailPoints.removeAt(0)
             drawTrail(
                 points = trailPoints,
                 cameraX = cameraX,
                 groundScreenY = groundScreenY,
                 nowMillis = nowMillis,
                 color = trailColor(trailRgb, animationTimeSeconds),
+                passes = profile.trailPasses,
             )
         }
 
@@ -137,6 +142,7 @@ fun ThrowCanvas(
             size = 56.dp.toPx(),
             rotationRadians = (flightState?.rotation ?: 0.0).toFloat(),
             colorFilter = skinFilter,
+            filterQuality = spriteFilter,
         )
     }
 }
@@ -202,7 +208,6 @@ internal fun DrawScope.drawWorldBackdrop(
 private data class TrailPoint(val worldX: Double, val worldY: Double, val atMillis: Long)
 
 private const val TRAIL_LIFE_MS = 620L // durée de vie d'un point (TRAIL_LIFE côté web)
-private const val TRAIL_MAX_POINTS = 140
 private const val TRAIL_HEAD_WIDTH = 13f // largeur près de la trousse (TRAIL_HEAD_W)
 
 /**
@@ -220,6 +225,9 @@ private fun DrawScope.drawTrail(
     groundScreenY: Float,
     nowMillis: Long,
     color: Color,
+    // Une seule passe en qualité basse : on garde le cœur du sillage et on
+    // laisse tomber la brume, qui coûte un second remplissage plein écran.
+    passes: Int = 2,
 ) {
     if (points.size < 2) return
 
@@ -230,7 +238,8 @@ private fun DrawScope.drawTrail(
     }
 
     // Deux passes : brume large et transparente, puis le cœur du sillage.
-    for ((widthMultiplier, alphaMultiplier) in listOf(3.0f to 0.09f, 1.0f to 0.42f)) {
+    val layers = if (passes >= 2) listOf(3.0f to 0.09f, 1.0f to 0.42f) else listOf(1.0f to 0.42f)
+    for ((widthMultiplier, alphaMultiplier) in layers) {
         val forward = Path()
         val backward = ArrayList<Offset>(screen.size)
         for (i in screen.indices) {

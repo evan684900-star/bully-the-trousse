@@ -8,6 +8,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -16,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.VolcanoCinematic
 
 /**
@@ -83,65 +85,92 @@ fun GameRoot() {
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
     WorldMusic(world = save.currentWorld, muted = save.musicMuted)
 
+    // Le niveau de détail choisi dans les Réglages descend jusqu'aux écrans
+    // qui dessinent, sans que les écrans intermédiaires aient à le porter
+    // (voir LocalGraphicsQuality).
+    CompositionLocalProvider(
+        LocalGraphicsQuality provides GraphicsQuality.fromId(save.graphicsQuality),
+    ) {
+        GameContent(
+            save = save,
+            screen = screen,
+            updateSave = ::updateSave,
+            goTo = { screen = it },
+        )
+    }
+}
+
+/**
+ * Le contenu de l'application : l'écran courant, le tutoriel du premier
+ * lancement et la barre du bas. Extrait de [GameRoot] pour que le
+ * fournisseur de qualité l'englobe d'un bloc.
+ */
+@Composable
+private fun GameContent(
+    save: GameSave,
+    screen: Screen,
+    updateSave: (GameSave) -> Unit,
+    goTo: (Screen) -> Unit,
+) {
     when (screen) {
         Screen.Menu -> MenuScreen(
             save = save,
-            onSaveChange = ::updateSave,
-            onPlay = { screen = Screen.Game },
-            onOpenShop = { screen = Screen.Shop },
-            onOpenLeaderboard = { screen = Screen.Leaderboard },
-            onOpenProfile = { screen = Screen.Profile },
-            onOpenAchievements = { screen = Screen.AchievementsList },
-            onOpenChallenges = { screen = Screen.Challenges },
-            onStartVolcanoCinematic = { screen = Screen.VolcanoCinematic },
-            onStartBeachCinematic = { screen = Screen.BeachCinematic },
-            onOpenChangelog = { screen = Screen.Changelog },
+            onSaveChange = updateSave,
+            onPlay = { goTo(Screen.Game) },
+            onOpenShop = { goTo(Screen.Shop) },
+            onOpenLeaderboard = { goTo(Screen.Leaderboard) },
+            onOpenProfile = { goTo(Screen.Profile) },
+            onOpenAchievements = { goTo(Screen.AchievementsList) },
+            onOpenChallenges = { goTo(Screen.Challenges) },
+            onStartVolcanoCinematic = { goTo(Screen.VolcanoCinematic) },
+            onStartBeachCinematic = { goTo(Screen.BeachCinematic) },
+            onOpenChangelog = { goTo(Screen.Changelog) },
         )
 
-        Screen.Leaderboard -> LeaderboardScreen(onBack = { screen = Screen.Menu })
+        Screen.Leaderboard -> LeaderboardScreen(onBack = { goTo(Screen.Menu) })
 
-        Screen.Profile -> ProfileScreen(save = save, onBack = { screen = Screen.Menu })
+        Screen.Profile -> ProfileScreen(save = save, onBack = { goTo(Screen.Menu) })
 
-        Screen.AchievementsList -> AchievementsScreen(save = save, onBack = { screen = Screen.Menu })
+        Screen.AchievementsList -> AchievementsScreen(save = save, onBack = { goTo(Screen.Menu) })
 
         Screen.Challenges -> ChallengesScreen(
             save = save,
-            onSaveChange = ::updateSave,
-            onBack = { screen = Screen.Menu },
+            onSaveChange = updateSave,
+            onBack = { goTo(Screen.Menu) },
         )
 
         Screen.Game -> GameScreen(
             save = save,
-            onSaveChange = ::updateSave,
-            onBackToMenu = { screen = Screen.Menu },
-            onOpenShop = { screen = Screen.Shop },
+            onSaveChange = updateSave,
+            onBackToMenu = { goTo(Screen.Menu) },
+            onOpenShop = { goTo(Screen.Shop) },
         )
 
         Screen.Shop -> ShopScreen(
             save = save,
-            onSaveChange = ::updateSave,
-            onBackToMenu = { screen = Screen.Menu },
-            onBackToGame = { screen = Screen.Game },
+            onSaveChange = updateSave,
+            onBackToMenu = { goTo(Screen.Menu) },
+            onBackToGame = { goTo(Screen.Game) },
         )
 
         Screen.Settings -> SettingsScreen(
             save = save,
-            onSaveChange = ::updateSave,
-            onBack = { screen = Screen.Menu },
+            onSaveChange = updateSave,
+            onBack = { goTo(Screen.Menu) },
         )
 
-        Screen.Links -> LinksScreen(onBack = { screen = Screen.Menu })
+        Screen.Links -> LinksScreen(onBack = { goTo(Screen.Menu) })
 
-        Screen.Changelog -> ChangelogScreen(onBack = { screen = Screen.Menu })
+        Screen.Changelog -> ChangelogScreen(onBack = { goTo(Screen.Menu) })
 
         Screen.VolcanoCinematic -> VolcanoCinematicScreen(equippedSkin = save.equippedSkin, onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
-            screen = Screen.Menu
+            goTo(Screen.Menu)
         })
 
         Screen.BeachCinematic -> BeachCinematicScreen(equippedSkin = save.equippedSkin, onFinished = {
             updateSave(BeachCinematic.applyOutcome(save))
-            screen = Screen.Menu
+            goTo(Screen.Menu)
         })
     }
 
@@ -159,9 +188,9 @@ fun GameRoot() {
     if (!inCinematic) {
         BottomBar(
             musicMuted = save.musicMuted,
-            onOpenLinks = { screen = Screen.Links },
+            onOpenLinks = { goTo(Screen.Links) },
             onToggleMute = { updateSave(save.copy(musicMuted = !save.musicMuted)) },
-            onOpenSettings = { screen = Screen.Settings },
+            onOpenSettings = { goTo(Screen.Settings) },
         )
     }
 }

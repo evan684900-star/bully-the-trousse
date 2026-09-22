@@ -9,6 +9,8 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import com.bullythetrousse.core.CourDecor
+import com.bullythetrousse.core.GraphicsQuality
+import com.bullythetrousse.core.QualityProfile
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -52,13 +54,13 @@ internal class Particle(
 )
 
 /**
- * Le nuage de particules d'une cinématique. Les anciennes sont recyclées
- * une fois [MAX] atteint plutôt que de laisser la liste enfler : une
- * cinématique dure plusieurs minutes, et le budget d'une frame sur un
- * téléphone d'entrée de gamme est vite dépassé.
+ * Le nuage de particules d'une cinématique. Les plus anciennes sont
+ * recyclées une fois le plafond du profil atteint, plutôt que de laisser la
+ * liste enfler : une cinématique dure plusieurs minutes, et le budget d'une
+ * frame sur un téléphone d'entrée de gamme est vite dépassé.
  */
-internal class ParticleField {
-    val particles = ArrayList<Particle>(MAX)
+internal class ParticleField(private val profile: QualityProfile = GraphicsQuality.DEFAULT.profile) {
+    val particles = ArrayList<Particle>(profile.maxParticles)
 
     fun clear() = particles.clear()
 
@@ -103,8 +105,11 @@ internal class ParticleField {
         shrink: Boolean = true,
         spin: Float = 0f,
     ) {
-        repeat(count) {
-            if (particles.size >= MAX) particles.removeAt(0)
+        // Le niveau de qualité agit ici, à la source : une gerbe garde sa
+        // forme, elle est juste moins fournie.
+        val scaled = max(1, (count * profile.particleScale).toInt())
+        repeat(scaled) {
+            if (particles.size >= profile.maxParticles) particles.removeAt(0)
             val l = life * (0.65f + Random.nextFloat() * 0.7f)
             particles.add(
                 Particle(
@@ -127,8 +132,6 @@ internal class ParticleField {
         }
     }
 }
-
-private const val MAX = 260
 
 /**
  * Les particules, des plus anciennes aux plus récentes. Les braises sont
