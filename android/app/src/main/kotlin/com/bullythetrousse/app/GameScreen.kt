@@ -124,6 +124,7 @@ fun GameScreen(
         ThrowCanvas(
             flightState = displayedFlight,
             world = save.currentWorld,
+            equippedTrail = save.equippedTrail,
             modifier = Modifier.fillMaxSize(),
         )
         SkyAnimation(heightFraction = 0.68f) // #screen-game .sky-anim { bottom: 32% }

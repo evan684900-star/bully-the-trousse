@@ -28,6 +28,7 @@ import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.FlightSimulator
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.Skid
+import com.bullythetrousse.core.Trails
 import com.bullythetrousse.core.ThrowResult
 import com.bullythetrousse.core.VolcanoDecor
 import com.bullythetrousse.core.rotationSpeed
@@ -63,6 +64,7 @@ private fun paletteFor(world: String): WorldPalette = when (world) {
 fun ThrowCanvas(
     flightState: FlightState?,
     world: String = "cour",
+    equippedTrail: String = "blanche",
     groundVerticalFraction: Float = 0.68f,
     // `#game-canvas` occupe tout l'écran côté web.
     modifier: Modifier = Modifier.fillMaxSize(),
@@ -80,6 +82,12 @@ fun ThrowCanvas(
             animationTimeSeconds = (System.currentTimeMillis() - start) / 1000f
         }
     }
+
+    // Positions récentes de la trousse, pour dessiner le sillage derrière
+    // elle (trailPoints côté web). Liste simple : elle est relue à chaque
+    // frame par le dessin, qui se redéclenche déjà tout seul.
+    val trailPoints = remember { mutableListOf<TrailPoint>() }
+    val trailRgb = remember(equippedTrail) { Trails.ALL.firstOrNull { it.id == equippedTrail }?.rgb ?: "255,255,255" }
 
     Canvas(modifier = modifier) {
         val groundScreenY = size.height * groundVerticalFraction
@@ -124,6 +132,24 @@ fun ThrowCanvas(
             }
         }
 
+        // Le sillage ne vit que pendant le vol : au repos on repart de zéro,
+        // sinon le ruban du lancer précédent resterait accroché à la trousse.
+        val nowMillis = System.currentTimeMillis()
+        if (flightState == null) {
+            trailPoints.clear()
+        } else {
+            trailPoints.add(TrailPoint(flightState.worldX, flightState.worldY, nowMillis))
+            trailPoints.removeAll { nowMillis - it.atMillis > TRAIL_LIFE_MS }
+            while (trailPoints.size > TRAIL_MAX_POINTS) trailPoints.removeAt(0)
+            drawTrail(
+                points = trailPoints,
+                cameraX = cameraX,
+                groundScreenY = groundScreenY,
+                nowMillis = nowMillis,
+                color = trailColor(trailRgb, animationTimeSeconds),
+            )
+        }
+
         val worldY = flightState?.worldY ?: 0.0
         val screen = Camera.worldToScreen(
             worldX = flightState?.worldX ?: 0.0,
@@ -138,6 +164,86 @@ fun ThrowCanvas(
             drawTrousse(centerX = screen.sx.toFloat(), centerY = screen.sy.toFloat(), size = 30.dp.toPx())
         }
     }
+}
+
+/**
+ * Un point du sillage : position "monde" et instant où il a été posé. Le
+ * ruban se dessine à partir des points encore vivants (voir TRAIL_LIFE).
+ */
+private data class TrailPoint(val worldX: Double, val worldY: Double, val atMillis: Long)
+
+private const val TRAIL_LIFE_MS = 620L // durée de vie d'un point (TRAIL_LIFE côté web)
+private const val TRAIL_MAX_POINTS = 140
+private const val TRAIL_HEAD_WIDTH = 13f // largeur près de la trousse (TRAIL_HEAD_W)
+
+/**
+ * `drawTrail()` côté web : un ruban fuselé derrière la trousse, large et
+ * pâle près de la queue, resserré et lumineux près de la trousse. Deux
+ * passes comme le site — une brume diffuse puis un cœur vif — plutôt que
+ * les trois du web, dont la passe additive n'a pas d'équivalent direct ici.
+ *
+ * Sans ça les 15 traînées de la boutique s'achetaient sans jamais rien
+ * afficher en vol.
+ */
+private fun DrawScope.drawTrail(
+    points: List<TrailPoint>,
+    cameraX: Double,
+    groundScreenY: Float,
+    nowMillis: Long,
+    color: Color,
+) {
+    if (points.size < 2) return
+
+    val screen = points.map { point ->
+        val p = Camera.worldToScreen(point.worldX, point.worldY, cameraX, groundScreenY.toDouble())
+        val age = (nowMillis - point.atMillis).toFloat() / TRAIL_LIFE_MS
+        Triple(p.sx.toFloat(), p.sy.toFloat(), (1f - age).coerceIn(0f, 1f))
+    }
+
+    // Deux passes : brume large et transparente, puis le cœur du sillage.
+    for ((widthMultiplier, alphaMultiplier) in listOf(3.0f to 0.09f, 1.0f to 0.42f)) {
+        val forward = Path()
+        val backward = ArrayList<Offset>(screen.size)
+        for (i in screen.indices) {
+            val (sx, sy, life) = screen[i]
+            val prev = screen[maxOf(0, i - 1)]
+            val next = screen[minOf(screen.size - 1, i + 1)]
+            val dx = next.first - prev.first
+            val dy = next.second - prev.second
+            val length = kotlin.math.hypot(dx, dy).takeIf { it > 0.001f } ?: 1f
+            // Normale à la trajectoire : c'est elle qui donne l'épaisseur.
+            val nx = -dy / length
+            val ny = dx / length
+            // Profil fuselé : fin en queue, épais près de la trousse, et qui
+            // gonfle à mesure que le point pâlit (le sillage se dilue).
+            val head = if (screen.size > 1) i.toFloat() / (screen.size - 1) else 1f
+            val taper = Math.pow(head.toDouble(), 0.55).toFloat() * (0.2f + 0.8f * minOf(1f, life * 1.4f))
+            val halfWidth = maxOf(0.3f, TRAIL_HEAD_WIDTH * 0.5f * widthMultiplier * taper * (1f + (1f - life) * 1.5f))
+
+            val ax = sx + nx * halfWidth
+            val ay = sy + ny * halfWidth
+            if (i == 0) forward.moveTo(ax, ay) else forward.lineTo(ax, ay)
+            backward.add(Offset(sx - nx * halfWidth, sy - ny * halfWidth))
+        }
+        // Retour par l'autre bord : un seul chemin rempli, donc aucune couture
+        // entre les segments (c'est exactement le choix fait côté web).
+        for (i in backward.indices.reversed()) {
+            forward.lineTo(backward[i].x, backward[i].y)
+        }
+        forward.close()
+        drawPath(forward, color = color.copy(alpha = alphaMultiplier))
+    }
+}
+
+/** La couleur d'une traînée, depuis son `rgb` ("r,g,b" ou "rainbow"). */
+private fun trailColor(rgb: String, timeSeconds: Float): Color {
+    if (rgb == "rainbow") {
+        // Teinte qui défile, comme trailRgbAt() pour l'arc-en-ciel.
+        val hue = (timeSeconds * 120f) % 360f
+        return Color.hsv(hue, 0.85f, 1f)
+    }
+    val parts = rgb.split(",").mapNotNull { it.trim().toIntOrNull() }
+    return if (parts.size == 3) Color(parts[0], parts[1], parts[2]) else Color.White
 }
 
 /** Bâtiments en parallaxe puis arbres sur la ligne d'horizon, portage du
