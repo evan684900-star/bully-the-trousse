@@ -37,6 +37,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -48,10 +49,11 @@ import com.bullythetrousse.core.BeachPropType
 import com.bullythetrousse.core.PhysicsConstants
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.cos
 import kotlin.math.hypot
+import kotlin.random.Random
 import kotlin.math.max
 import kotlin.math.min
-import kotlin.math.pow
 import kotlin.math.sin
 
 /**
@@ -86,6 +88,11 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
     val crabs = remember { mutableListOf<Crab>() }
     val props = remember { mutableListOf<CineProp>() }
     var message by remember { mutableStateOf<CineMessage?>(null) }
+
+    // Effets d'ambiance (voir CineEffects.kt).
+    val particles = remember { ParticleField() }
+    var viewWidth by remember { mutableFloatStateOf(0f) }
+    var viewHeight by remember { mutableFloatStateOf(0f) }
 
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
@@ -133,6 +140,25 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                         props.add(CineProp(BeachPropType.CASTLE, scroll + 200f * PhysicsConstants.SCALE.toFloat()))
                     BeachCinePhase.FLY3 ->
                         props.add(CineProp(BeachPropType.TOWEL, scroll + 620f * BeachCinematic.FLY3.toFloat()))
+                    // Le château explose en blocs de sable ; le parasol renvoie
+                    // la trousse dans une gerbe claire.
+                    BeachCinePhase.CASTLE ->
+                        if (viewWidth > 0f) {
+                            particles.burst(
+                                x = viewWidth * 0.42f, y = viewHeight * 0.68f + FOREGROUND_DEPTH,
+                                count = 32, spread = 260f, up = 240f, radius = 7f, life = 1.4f,
+                                color = Color(0xFFD8B06A), gravity = 700f, drag = 0.5f,
+                                jitter = 40f, shrink = false, spin = 5f,
+                            )
+                        }
+                    BeachCinePhase.PARASOL ->
+                        if (viewWidth > 0f) {
+                            particles.burst(
+                                x = viewWidth * 0.42f, y = viewHeight * 0.68f + FOREGROUND_DEPTH - 96f,
+                                count = 18, spread = 220f, up = 200f, radius = 4f, life = 0.9f,
+                                color = Color(0xFFFFF3C4), gravity = 520f, drag = 0.8f, glow = true,
+                            )
+                        }
                     BeachCinePhase.SEATED -> onBus = true
                     BeachCinePhase.BUS_OUT -> door = 0f
                     // Fin du sursaut : la trousse est de nouveau droite et posée.
@@ -242,13 +268,60 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                 }
                 else -> Unit
             }
+            // Sable soulevé, gerbes d'impact et pot d'échappement du bus.
+            if (viewWidth > 0f) {
+                val w = viewWidth
+                val h = viewHeight
+                val sandY = h * 0.68f + FOREGROUND_DEPTH
+                val trousseX = w * 0.42f
+                when (next.phase) {
+                    BeachCinePhase.ARRIVE, BeachCinePhase.BUS_LEAVE ->
+                        // Le bus fume en manœuvrant.
+                        if (Random.nextFloat() < dtf * 14f) {
+                            particles.burst(
+                                x = trousseX - 260f, y = h * 0.68f + 10f, count = 1,
+                                spread = 24f, up = 40f, radius = 9f, life = 1.5f,
+                                color = Color(0xFF9A9186), gravity = -22f, drag = 1.1f,
+                            )
+                        }
+                    BeachCinePhase.CRAB ->
+                        // Le crabe fait gicler le sable en sortant.
+                        if (t < 0.5f && Random.nextFloat() < dtf * 26f) {
+                            particles.burst(
+                                x = trousseX - 150f, y = sandY + 20f, count = 1,
+                                spread = 70f, up = 130f, radius = 3.5f, life = 0.8f,
+                                color = Color(0xFFE8CE95), gravity = 520f, drag = 0.7f,
+                            )
+                        }
+                    BeachCinePhase.CHASE, BeachCinePhase.BACK_AWAY ->
+                        // La trousse soulève du sable en reculant.
+                        if (Random.nextFloat() < dtf * 22f) {
+                            particles.burst(
+                                x = trousseX, y = sandY + 16f, count = 1,
+                                spread = 60f, up = 90f, radius = 3f, life = 0.7f,
+                                color = Color(0xFFE8CE95), gravity = 500f, drag = 0.8f,
+                            )
+                        }
+                    else -> Unit
+                }
+            }
+            particles.update(dtf)
+
             state = next
         }
         onFinished()
     }
 
     val phase = state.phase
-    Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black)
+            .onSizeChanged {
+                viewWidth = it.width.toFloat()
+                viewHeight = it.height.toFloat()
+            },
+    ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (phase != BeachCinePhase.BLACK) {
                 if (phase in YARD_PHASES) {
@@ -282,6 +355,10 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                         skinFilter = skinFilter,
                     )
                 }
+                drawParticles(particles)
+                // Étalonnage : lumière dorée de bord de mer, puis vignetage.
+                drawLightWash(Color(0xFFFFC46B), 0.10f)
+                drawVignette(0.34f)
             } else {
                 drawRect(color = Color.Black)
             }
@@ -382,10 +459,6 @@ private const val FOREGROUND_DEPTH = 74f // px sous la ligne d'horizon
 private const val TROUSSE_SIZE = 96f // plus grande qu'en jeu : elle est au premier plan
 private const val DOOR_OFFSET = 127f // centre de la porte depuis le coin avant-gauche du bus
 
-private fun cIn(t: Float) = t * t * t
-private fun cOut(t: Float) = 1f - (1f - t).pow(3)
-private fun cInOut(t: Float) = if (t < 0.5f) 2f * t * t else 1f - (-2f * t + 2f).pow(2) / 2f
-private fun c01(v: Float) = v.coerceIn(0f, 1f)
 
 /** Les répliques du site, affichées pendant les phases sans action. */
 private fun dialogueFor(phase: BeachCinePhase): String? = when (phase) {
@@ -445,7 +518,18 @@ private fun DrawScope.drawBeachCineYard(
             height = vh,
         )
         if (phase != BeachCinePhase.FADE && phase != BeachCinePhase.HAIL) {
-            drawBus(busX, vh * 0.68f, door, onBus, sprite, skinId, skinFilter)
+            val rolling = phase == BeachCinePhase.BUS_IN || phase == BeachCinePhase.BUS_OUT
+            drawBus(
+                x = busX,
+                groundY = vh * 0.68f,
+                door = door,
+                passenger = onBus,
+                sprite = sprite,
+                skinId = skinId,
+                skinFilter = skinFilter,
+                wheelAngle = busX / 22f, // périmètre de la roue : l'angle suit la distance
+                bounce = if (rolling) sin(clock * 26f) * 1.6f else 0f,
+            )
         }
     }
 
@@ -465,6 +549,12 @@ private fun DrawScope.drawBeachCineYard(
             alpha = 1f - c01((p - 0.6f) / 0.4f)
         }
         if (alpha > 0.01f) {
+            drawGroundShadow(
+                centerX = tx,
+                groundY = fy + trousseSize * 0.4f,
+                objectSize = trousseSize,
+                height = 0f,
+            )
             drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, lean, skinFilter, alpha)
         }
     }
@@ -507,6 +597,34 @@ private fun DrawScope.drawBeachCineBeach(
             height = vh,
         )
 
+        // Soleil bas sur l'horizon, ses reflets sur l'eau, et trois mouettes :
+        // le site n'a rien de tout ça, et c'est ce qui fait « bord de mer ».
+        drawSunGlow(
+            centerX = vw * 0.74f,
+            centerY = groundY - vh * 0.42f,
+            radius = 30f,
+            core = Color(0xFFFFF8E2),
+            halo = Color(0xFFFFD98A),
+        )
+        drawSeaSparkle(
+            topY = groundY - vh * 0.10f,
+            bottomY = groundY,
+            clock = clock,
+            alpha = 0.55f,
+        )
+        for (i in 0 until 3) {
+            val seed = i * 0.37f
+            val gx = mod((clock * (16f + i * 7f) + seed * vw).toDouble(), (vw + 160f).toDouble()).toFloat() - 80f
+            val gy = vh * (0.14f + i * 0.06f) + sin(clock * 0.9f + i) * 7f
+            drawGull(
+                centerX = gx,
+                centerY = gy,
+                scale = 0.85f + i * 0.2f,
+                flap = 0.45f + 0.55f * abs(sin(clock * 3.1f + i * 1.3f)),
+                color = Color(0xFF3B4658).copy(alpha = 0.55f),
+            )
+        }
+
         // Accessoires posés pendant les vols.
         for (prop in props) {
             val sx = prop.worldX - scroll + fxv
@@ -537,6 +655,8 @@ private fun DrawScope.drawBeachCineBeach(
                 sprite = sprite,
                 skinId = skinId,
                 skinFilter = skinFilter,
+                wheelAngle = busX / 22f,
+                bounce = if (phase == BeachCinePhase.BUS_LEAVE) sin(clock * 26f) * 1.6f else 0f,
             )
         }
 
@@ -561,6 +681,12 @@ private fun DrawScope.drawBeachCineBeach(
                 alpha = c01((phaseElapsed / (BeachCinematic.ARRIVE * 0.35)).toFloat())
             }
             if (alpha > 0.01f) {
+                drawGroundShadow(
+                    centerX = tx,
+                    groundY = fy + TROUSSE_SIZE * 0.4f,
+                    objectSize = TROUSSE_SIZE,
+                    height = max(0f, fy - ty),
+                )
                 drawTrousseSprite(sprite, skinId, tx, ty, TROUSSE_SIZE, lean, skinFilter, alpha)
             }
             // Le « ! » de surprise au-dessus de la trousse quand le crabe sort.
@@ -602,10 +728,14 @@ private fun DrawScope.drawBus(
     sprite: ImageBitmap,
     skinId: String,
     skinFilter: ColorFilter?,
+    // Ajouts par rapport au site : les roues tournent et la caisse tressaute
+    // tant que le bus roule — sans ça il glisse comme un décor découpé.
+    wheelAngle: Float = 0f,
+    bounce: Float = 0f,
 ) {
     val bw = 420f
     val bh = 150f
-    val top = groundY - bh
+    val top = groundY - bh + bounce
 
     // Ombre au sol.
     drawOval(
@@ -668,10 +798,21 @@ private fun DrawScope.drawBus(
         size = Size(dw, dh),
         style = Stroke(width = 2f),
     )
-    // Roues.
+    // Roues, avec des rayons qui tournent.
     for (wx in listOf(x + 88f, x + bw - 82f)) {
-        drawCircle(color = Color(0xFF22242C), radius = 22f, center = Offset(wx, groundY - 14f))
-        drawCircle(color = Color(0xFF9AA0AB), radius = 9f, center = Offset(wx, groundY - 14f))
+        val cy = groundY - 14f
+        drawCircle(color = Color(0xFF22242C), radius = 22f, center = Offset(wx, cy))
+        drawCircle(color = Color(0xFF9AA0AB), radius = 9f, center = Offset(wx, cy))
+        for (spoke in 0 until 4) {
+            val a = wheelAngle + spoke * (PI.toFloat() / 4f)
+            drawLine(
+                color = Color(0xFF6E7480),
+                start = Offset(wx + cos(a) * 5f, cy + sin(a) * 5f),
+                end = Offset(wx + cos(a) * 19f, cy + sin(a) * 19f),
+                strokeWidth = 2.5f,
+                cap = StrokeCap.Round,
+            )
+        }
     }
 }
 

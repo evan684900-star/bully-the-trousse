@@ -50,6 +50,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -62,6 +63,7 @@ import com.bullythetrousse.core.VolcanoCineState
 import com.bullythetrousse.core.VolcanoCinematic
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.hypot
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -98,6 +100,15 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
     var shakeOffset by remember { mutableStateOf(Offset.Zero) }
     var shakeRotation by remember { mutableFloatStateOf(0f) }
 
+    // Effets d'ambiance (voir CineEffects.kt) : matière en suspension,
+    // onde de choc de l'impact et colonne de fumée de l'éruption.
+    val particles = remember { ParticleField() }
+    var smoke by remember { mutableFloatStateOf(0f) }
+    var shockwave by remember { mutableFloatStateOf(-1f) }
+    var impactDone by remember { mutableStateOf(false) }
+    var viewWidth by remember { mutableFloatStateOf(0f) }
+    var viewHeight by remember { mutableFloatStateOf(0f) }
+
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
 
@@ -121,6 +132,23 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                 if (next.phase == CinePhase.ERUPTION) {
                     flash = 1f
                     shake = 26f
+                    if (viewWidth > 0f) {
+                        val fx = viewWidth * 0.45f
+                        val groundY = viewHeight * 0.68f
+                        // Braises incandescentes...
+                        particles.burst(
+                            x = fx, y = groundY, count = 54, spread = 400f, up = 700f,
+                            radius = 5f, life = 1.7f, color = Color(0xFFFFB03A),
+                            gravity = 540f, drag = 0.35f, jitter = 40f, glow = true,
+                        )
+                        // ...et les blocs de roche arrachés au sol.
+                        particles.burst(
+                            x = fx, y = groundY, count = 24, spread = 320f, up = 560f,
+                            radius = 8f, life = 2.1f, color = Color(0xFF3A2A24),
+                            gravity = 760f, drag = 0.2f, jitter = 50f, shrink = false, spin = 7f,
+                        )
+                        smoke = 1f
+                    }
                 }
                 previousPhase = next.phase
             }
@@ -168,6 +196,92 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                 else -> Unit
             }
 
+            // Émission continue des particules, selon la phase.
+            if (viewWidth > 0f) {
+                val w = viewWidth
+                val h = viewHeight
+                val groundY = h * 0.68f
+                when (next.phase) {
+                    CinePhase.APPROACH ->
+                        // Quelques grains montent déjà du sol : le volcan se réveille.
+                        if (next.phaseElapsed > VolcanoCinematic.APPROACH_DURATION - 2.2 &&
+                            Random.nextFloat() < dtf * 9f
+                        ) {
+                            particles.burst(
+                                x = Random.nextFloat() * w, y = groundY, count = 1,
+                                spread = 14f, up = 26f, radius = 2.5f, life = 1.6f,
+                                color = Color(0xFFB39784), gravity = -34f, drag = 0.9f,
+                            )
+                        }
+                    CinePhase.QUAKE -> {
+                        val p = (next.phaseElapsed / VolcanoCinematic.QUAKE_DURATION).toFloat()
+                        if (Random.nextFloat() < dtf * (10f + 34f * p)) {
+                            particles.burst(
+                                x = Random.nextFloat() * w, y = groundY + 4f, count = 1,
+                                spread = 45f, up = 120f + 220f * p, radius = 3.5f, life = 1.4f,
+                                color = Color(0xFFAA8C78), gravity = 380f, drag = 0.7f,
+                            )
+                        }
+                    }
+                    CinePhase.ASCENT ->
+                        // Traînée de braises derrière la trousse propulsée.
+                        if (Random.nextFloat() < dtf * 26f) {
+                            particles.burst(
+                                x = w / 2f, y = h * 0.62f, count = 1, spread = 60f, up = -120f,
+                                radius = 3.5f, life = 0.9f, color = Color(0xFFFF9A3C),
+                                gravity = 120f, drag = 1.2f, jitter = 50f, glow = true,
+                            )
+                        }
+                    CinePhase.ROCKS -> {
+                        // Étincelles arrachées à la roche en approche.
+                        val rp = rockProgress(next.phase, next.rockState, next.rockElapsed)
+                        if (rp > 0f && Random.nextFloat() < dtf * 34f) {
+                            val ty = h * 0.52f + sin(clock * 10.13f) * 8f
+                            val rx = w / 2f + (laneX(next.rockLane.toFloat(), w) - w / 2f) * rp
+                            val ry = h * 0.06f + (ty - h * 0.06f) * rp
+                            particles.burst(
+                                x = rx, y = ry, count = 1, spread = 70f, up = -30f,
+                                radius = 3f, life = 0.7f, color = Color(0xFFFFC24D),
+                                gravity = 60f, drag = 1.4f, jitter = 18f, glow = true,
+                            )
+                        }
+                    }
+                    CinePhase.LANDING -> {
+                        val p = (next.phaseElapsed / VolcanoCinematic.LANDING_DURATION).toFloat()
+                        if (p >= 0.58f && !impactDone) {
+                            impactDone = true
+                            shockwave = 0f
+                            shake = 16f
+                            particles.burst(
+                                x = w / 2f, y = groundY, count = 34, spread = 340f, up = 260f,
+                                radius = 9f, life = 1.5f, color = Color(0xFFBE7B5A),
+                                gravity = 620f, drag = 0.9f, jitter = 30f,
+                            )
+                            particles.burst(
+                                x = w / 2f, y = groundY, count = 14, spread = 240f, up = 380f,
+                                radius = 4f, life = 1.2f, color = Color(0xFFFFB03A),
+                                gravity = 520f, drag = 0.6f, glow = true,
+                            )
+                        }
+                    }
+                    CinePhase.DEATH ->
+                        if (state.phase != CinePhase.DEATH) {
+                            particles.burst(
+                                x = w / 2f, y = h * 0.5f, count = 30, spread = 420f, up = 260f,
+                                radius = 7f, life = 1.6f, color = Color(0xFF3A2A24),
+                                gravity = 700f, drag = 0.4f, spin = 8f, shrink = false,
+                            )
+                        }
+                    else -> Unit
+                }
+            }
+            particles.update(dtf)
+            if (shockwave >= 0f) {
+                shockwave += dtf / 0.75f
+                if (shockwave > 1f) shockwave = -1f
+            }
+            smoke = max(0f, smoke - dtf * 0.2f)
+
             // cineRender() : amortissements communs à toutes les phases.
             laneAnim += (next.lane - laneAnim) * min(1f, dtf * 11f)
             wobble = max(0f, wobble - dtf * 1.4f)
@@ -189,6 +303,10 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .onSizeChanged {
+                viewWidth = it.width.toFloat()
+                viewHeight = it.height.toFloat()
+            }
             // pointerdown : un tap n'importe où compte pour le QTE de la
             // descente ; pendant les roches, c'est le côté touché qui décide
             // du sens de l'esquive (#cine-sides côté web).
@@ -210,7 +328,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
             val body: DrawScope.() -> Unit = {
                 when (phase) {
                     CinePhase.FADE, CinePhase.APPROACH, CinePhase.QUAKE, CinePhase.ERUPTION ->
-                        drawCineYard(phase, state.phaseElapsed, rotation, clock, sprite, equippedSkin, skinFilter)
+                        drawCineYard(phase, state.phaseElapsed, rotation, clock, smoke, sprite, equippedSkin, skinFilter)
                     CinePhase.LANDING, CinePhase.OUTRO ->
                         drawCineArrival(phase, state.phaseElapsed, rotation, clock, sprite, equippedSkin, skinFilter)
                     else ->
@@ -230,6 +348,18 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                             skinFilter = skinFilter,
                         )
                 }
+                // La matière en suspension et l'onde de choc suivent la
+                // secousse comme le reste du plan.
+                drawParticles(particles)
+                if (shockwave >= 0f) {
+                    drawShockwave(
+                        centerX = size.width / 2f,
+                        centerY = size.height * 0.68f,
+                        progress = shockwave,
+                        maxRadius = size.width * 0.62f,
+                        color = Color(0xFFFFD9A8),
+                    )
+                }
             }
             if (amplitude > 0.15f) {
                 translate(shakeOffset.x, shakeOffset.y) {
@@ -240,6 +370,18 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
             } else {
                 body()
             }
+
+            // Étalonnage du plan : la lumière chaude du volcan, puis le
+            // vignetage qui referme le cadre.
+            when (phase) {
+                CinePhase.QUAKE -> drawLightWash(Color(0xFFFF7A2E), 0.10f)
+                CinePhase.ERUPTION -> drawLightWash(Color(0xFFFF7A2E), 0.26f)
+                CinePhase.LANDING, CinePhase.OUTRO -> drawLightWash(Color(0xFFFF7A2E), 0.14f)
+                CinePhase.ASCENT, CinePhase.STABILIZE, CinePhase.ROCKS, CinePhase.DESCENT ->
+                    drawLightWash(Color(0xFF9FD0FF), 0.08f)
+                else -> Unit
+            }
+            drawVignette(0.42f)
 
             // Éclair de l'explosion, par-dessus tout le reste.
             if (flash > 0.01f) {
@@ -398,11 +540,6 @@ private fun BoxScope.SideTapZone(label: String, alignment: Alignment) {
     }
 }
 
-// ---- Courbes d'accélération de la cinématique (cIn/cOut/cInOut côté web) ----
-private fun cIn(t: Float) = t * t * t
-private fun cOut(t: Float) = 1f - (1f - t).pow(3)
-private fun cInOut(t: Float) = if (t < 0.5f) 2f * t * t else 1f - (-2f * t + 2f).pow(2) / 2f
-private fun c01(v: Float) = v.coerceIn(0f, 1f)
 private fun seeded(seed: Double) = CourDecor.seededRand(seed).toFloat()
 
 /** `cineRockProgress()` : -1 quand aucune roche n'est en vol. */
@@ -423,6 +560,7 @@ private fun DrawScope.drawCineYard(
     phaseElapsed: Double,
     rotation: Float,
     clock: Float,
+    smoke: Float,
     sprite: ImageBitmap,
     skinId: String,
     skinFilter: ColorFilter?,
@@ -461,6 +599,19 @@ private fun DrawScope.drawCineYard(
         }
     }
 
+    // Colonne de fumée de l'éruption : hors du zoom, elle monte devant le
+    // décor mais derrière la trousse.
+    if (smoke > 0.01f) {
+        // Même repère que l'ombre portée : le sol zoomé descend de (26 + drop) × zoom.
+        drawSmokeColumn(
+            centerX = fx,
+            baseY = fy + (26f + drop) * zoom,
+            height = h * 0.8f,
+            clock = clock,
+            alpha = smoke,
+        )
+    }
+
     // La trousse : posée au sol, puis projetée vers le centre de l'écran.
     var tx = fx
     var ty = fy
@@ -471,7 +622,20 @@ private fun DrawScope.drawCineYard(
         ty += sin(clock * 16.7f) * 2f
     }
     val rot = if (phase == CinePhase.QUAKE) sin(clock * 4.5f) * 0.08f else rotation
-    drawTrousseSprite(sprite, skinId, tx, ty, 60f * zoom, rot, skinFilter)
+    val trousseSize = 60f * zoom
+    // Ombre portée : elle ancre la trousse au sol tant qu'elle y est, et
+    // s'efface à mesure qu'elle est projetée en l'air.
+    if (erupt < 0.6f) {
+        // Le sol est zoomé autour de (fx, fy) : la ligne d'horizon, à 26 px
+        // sous la trousse au repos, se retrouve donc à 26 × zoom.
+        drawGroundShadow(
+            centerX = tx,
+            groundY = fy + (26f + drop) * zoom,
+            objectSize = trousseSize,
+            height = max(0f, fy - ty),
+        )
+    }
+    drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, rot, skinFilter)
 }
 
 /** `cineDrawCracks()` : les fissures qui s'ouvrent dans le sol de la cour. */
@@ -567,8 +731,31 @@ private fun DrawScope.drawCineSky(
         ),
     )
 
+    // Étoiles : visibles seulement une fois très haut, elles disent
+    // l'altitude mieux qu'un dégradé.
+    drawStars(intensity = c01((alt - 0.55f) / 0.45f) * 0.9f, clock = clock)
+    // Le soleil, juste au-dessus de la mer de nuages.
+    drawSunGlow(
+        centerX = w * 0.78f,
+        centerY = h * 0.17f,
+        radius = 26f,
+        core = Color(0xFFFFF6D8),
+        halo = Color(0xFFFFE9A8),
+    )
+
+    // Deux couches de nuages : la lointaine défile moins vite et reste pâle,
+    // ce qui creuse la profondeur (le site n'en a qu'une).
+    drawCineCloudField(cloudScroll * 0.35f, count = 10, alphaMul = 0.45f, scaleMul = 1.9f)
     drawCineCloudField(cloudScroll, count = 16, alphaMul = 0.85f)
     if (alt > 0.45f) drawCineCloudSea((alt - 0.45f) / 0.55f, clock)
+
+    // Lignes de vitesse : la montée est violente, la descente rapide.
+    val speed = when (phase) {
+        CinePhase.ASCENT -> 1f - c01((phaseElapsed / VolcanoCinematic.ASCENT_DURATION).toFloat()) * 0.4f
+        CinePhase.DESCENT -> 0.85f
+        else -> 0f
+    }
+    drawSpeedLines(scroll = cloudScroll, intensity = speed)
 
     // Trousse
     val bob = sin(clock * 10.13f) * 8f
@@ -594,14 +781,58 @@ private fun DrawScope.drawCineSky(
     if (rockProgress >= 0f) {
         val rx = w / 2f + (laneX(rockLane.toFloat(), w) - w / 2f) * rockProgress
         val ry = h * 0.06f + (ty - h * 0.06f) * rockProgress
-        drawCineRock(rx, ry, 8f + 60f * rockProgress * rockProgress, rockSeed, clock)
+        drawCineRock(
+            x = rx,
+            y = ry,
+            r = 8f + 60f * rockProgress * rockProgress,
+            seed = rockSeed,
+            clock = clock,
+            fromX = w / 2f,
+            fromY = h * 0.06f,
+        )
     }
 }
 
 /** `cineLaneX()` : les trois voies, écartées de 20 % de la largeur. */
 private fun laneX(lane: Float, w: Float) = w / 2f + lane * w * 0.2f
 
-private fun DrawScope.drawCineRock(x: Float, y: Float, r: Float, seed: Int, clock: Float) {
+private fun DrawScope.drawCineRock(
+    x: Float,
+    y: Float,
+    r: Float,
+    seed: Int,
+    clock: Float,
+    fromX: Float,
+    fromY: Float,
+) {
+    // Traînée de feu : un fuseau qui remonte vers le point de départ de la
+    // roche. Ajout par rapport au site, où la roche arrive sans sillage.
+    val dx = x - fromX
+    val dy = y - fromY
+    val len = hypot(dx.toDouble(), dy.toDouble()).toFloat()
+    if (len > 1f) {
+        val ux = dx / len
+        val uy = dy / len
+        val tail = min(len, r * 6f)
+        val halfWidth = r * 0.62f
+        val trail = Path().apply {
+            moveTo(x - uy * halfWidth, y + ux * halfWidth)
+            lineTo(x + uy * halfWidth, y - ux * halfWidth)
+            lineTo(x - ux * tail, y - uy * tail)
+            close()
+        }
+        drawPath(
+            path = trail,
+            brush = Brush.linearGradient(
+                colorStops = arrayOf(
+                    0f to Color(0xFFFFC24D).copy(alpha = 0.55f),
+                    1f to Color(0xFFFF6E1E).copy(alpha = 0f),
+                ),
+                start = Offset(x, y),
+                end = Offset(x - ux * tail, y - uy * tail),
+            ),
+        )
+    }
     drawCircle(
         brush = Brush.radialGradient(
             colorStops = arrayOf(
@@ -638,11 +869,11 @@ private fun DrawScope.drawCineRock(x: Float, y: Float, r: Float, seed: Int, cloc
     }
 }
 
-private fun DrawScope.drawCineCloudField(scroll: Float, count: Int, alphaMul: Float) {
+private fun DrawScope.drawCineCloudField(scroll: Float, count: Int, alphaMul: Float, scaleMul: Float = 1f) {
     val w = size.width
     val h = size.height
     for (i in 0 until count) {
-        val r = 55f + seeded(i * 7.7) * 95f
+        val r = (55f + seeded(i * 7.7) * 95f) * scaleMul
         val x = seeded(i * 3.3) * (w + 320f) - 160f
         val y = mod(
             (seeded(i * 5.1) * (h + 700f) + scroll * (0.7f + seeded(i.toDouble()) * 0.6f)).toDouble(),
@@ -670,10 +901,20 @@ private fun DrawScope.drawCineCloudSea(k: Float, clock: Float) {
         val x = mod((i * 190f - drift).toDouble(), (w + 380f).toDouble()).toFloat() - 190f
         drawCinePuff(x, base - 60f - seeded(i.toDouble()) * 40f, 90f + seeded(i * 1.3) * 50f, 0.9f * alpha)
     }
+    // Le site pose un aplat blanc net ; un dégradé sur les 60 premiers pixels
+    // donne une vraie masse cotonneuse au lieu d'une bande de peinture.
     drawRect(
-        color = Color.White.copy(alpha = 0.92f * alpha),
-        topLeft = Offset(0f, base - 10f),
-        size = Size(w, h - base + 20f),
+        brush = Brush.verticalGradient(
+            colorStops = arrayOf(
+                0f to Color.White.copy(alpha = 0f),
+                0.55f to Color.White.copy(alpha = 0.86f * alpha),
+                1f to Color(0xFFDDE9F5).copy(alpha = 0.95f * alpha),
+            ),
+            startY = base - 70f,
+            endY = h,
+        ),
+        topLeft = Offset(0f, base - 70f),
+        size = Size(w, h - base + 80f),
     )
 }
 
@@ -717,5 +958,21 @@ private fun DrawScope.drawCineArrival(
     } else {
         groundY - 22f
     }
+    if (p >= impact) {
+        // Lueur de lave au fond du cratère, sous la trousse.
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = arrayOf(
+                    0f to Color(0xFFFF7A2E).copy(alpha = 0.55f),
+                    1f to Color(0xFFFF7A2E).copy(alpha = 0f),
+                ),
+                center = Offset(cx, groundY + 6f),
+                radius = 92f,
+            ),
+            radius = 92f,
+            center = Offset(cx, groundY + 6f),
+        )
+    }
+    drawGroundShadow(centerX = cx, groundY = groundY + 6f, objectSize = 70f, height = max(0f, groundY - 22f - ty))
     drawTrousseSprite(sprite, skinId, cx, ty, 70f, rotation, skinFilter)
 }
