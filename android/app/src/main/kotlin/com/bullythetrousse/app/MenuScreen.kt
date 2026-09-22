@@ -70,6 +70,7 @@ fun MenuScreen(
     onOpenChallenges: () -> Unit,
     onStartVolcanoCinematic: () -> Unit,
     onStartBeachCinematic: () -> Unit,
+    onOpenChangelog: () -> Unit,
 ) {
     var toast by remember { mutableStateOf<String?>(null) }
 
@@ -86,7 +87,7 @@ fun MenuScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            TitleCard()
+            TitleCard(onOpenChangelog = onOpenChangelog)
             MoneyPill("💰 ${save.money} $")
             TroussePreview(equippedSkin = save.equippedSkin)
 
@@ -124,7 +125,7 @@ fun MenuScreen(
 
 /** `.title-card` : numéro de version souligné, titre blanc, sous-titre bleu nuit. */
 @Composable
-private fun TitleCard() {
+private fun TitleCard(onOpenChangelog: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
             "v10.2.2",
@@ -132,7 +133,7 @@ private fun TitleCard() {
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,
             textDecoration = TextDecoration.Underline,
-            modifier = Modifier.padding(bottom = 2.dp),
+            modifier = Modifier.clickable(onClick = onOpenChangelog).padding(bottom = 2.dp),
         )
         Text(
             "🎒 Bully the Trousse",

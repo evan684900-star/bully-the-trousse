@@ -206,6 +206,36 @@ private fun SettingsRow(label: String, control: @Composable () -> Unit) {
     }
 }
 
+/**
+ * `#changelog-modal` : le journal des changements, ouvert en touchant le
+ * numéro de version du menu. Les entrées majeures sont mises en avant en
+ * doré, les mineures en gris, comme côté web.
+ */
+@Composable
+fun ChangelogScreen(onBack: () -> Unit) {
+    ModalScreen("📋 Journal des changements", onBack) {
+        for (entry in CHANGELOG) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(CardBg)
+                    .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("v${entry.version}", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                for (line in entry.major) {
+                    Text("• $line", color = TextColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                }
+                for (line in entry.minor) {
+                    Text("• $line", color = TextDim, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+}
+
 /** `#links-modal` : les deux liens du site, repris tels quels. */
 @Composable
 fun LinksScreen(onBack: () -> Unit) {

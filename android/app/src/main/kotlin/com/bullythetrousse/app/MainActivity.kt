@@ -63,6 +63,7 @@ sealed interface Screen {
     data object Challenges : Screen
     data object Settings : Screen
     data object Links : Screen
+    data object Changelog : Screen
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
 }
@@ -94,6 +95,7 @@ fun GameRoot() {
             onOpenChallenges = { screen = Screen.Challenges },
             onStartVolcanoCinematic = { screen = Screen.VolcanoCinematic },
             onStartBeachCinematic = { screen = Screen.BeachCinematic },
+            onOpenChangelog = { screen = Screen.Changelog },
         )
 
         Screen.Leaderboard -> LeaderboardScreen(onBack = { screen = Screen.Menu })
@@ -129,6 +131,8 @@ fun GameRoot() {
         )
 
         Screen.Links -> LinksScreen(onBack = { screen = Screen.Menu })
+
+        Screen.Changelog -> ChangelogScreen(onBack = { screen = Screen.Menu })
 
         Screen.VolcanoCinematic -> VolcanoCinematicScreen(onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
