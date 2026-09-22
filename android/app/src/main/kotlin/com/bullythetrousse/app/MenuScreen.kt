@@ -116,10 +116,9 @@ fun MenuScreen(
                 onToast = { toast = it },
             )
 
-            toast?.let {
-                Text(it, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
-            }
         }
+
+        Toast(message = toast, onDismiss = { toast = null })
     }
 }
 

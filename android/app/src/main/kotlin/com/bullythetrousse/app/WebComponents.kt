@@ -23,10 +23,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -39,6 +41,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.material3.Text
+import kotlinx.coroutines.delay
 
 /**
  * Les "classes CSS" du site, portées une fois et réutilisées par tous les
@@ -395,6 +398,80 @@ fun ShopCard(
         action()
     }
 }
+
+/**
+ * `.toast` : petit message temporaire en bas de l'écran ("Pas assez
+ * d'argent !", etc.). Fond volontairement toujours sombre, quel que soit le
+ * thème, et texte blanc en dur — comme le commente le CSS du site. Il
+ * remonte à 70px du bas pour ne pas passer derrière la barre flottante.
+ */
+@Composable
+fun Toast(message: String?, onDismiss: () -> Unit) {
+    if (message == null) return
+    LaunchedEffect(message) {
+        delay(2200)
+        onDismiss()
+    }
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .windowInsetsPadding(WindowInsets.safeDrawing)
+            .padding(bottom = 70.dp),
+        contentAlignment = Alignment.BottomCenter,
+    ) {
+        Box(
+            modifier = Modifier
+                .widthIn(max = 380.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xF2141824))
+                .border(2.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(10.dp))
+                .padding(horizontal = 18.dp, vertical = 10.dp),
+        ) {
+            Text(
+                message,
+                color = Color.White,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+            )
+        }
+    }
+}
+
+/**
+ * `.coin-popup` : le bonus de la Trousse Pièce prend tout l'écran d'un coup
+ * quand le multiplicateur se déclenche (voir showCoinPopup côté web), puis
+ * disparaît. Le montant est écrit en très gros doré sur un voile sombre.
+ */
+@Composable
+fun CoinPopup(multiplier: Double?, jackpot: Boolean, onDismiss: () -> Unit) {
+    if (multiplier == null) return
+    LaunchedEffect(multiplier, jackpot) {
+        delay(1600)
+        onDismiss()
+    }
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color(0x990A0802)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("🪙", fontSize = 90.sp)
+            Text(
+                "x${formatMultiplier(multiplier)}",
+                color = Accent,
+                fontSize = 54.sp,
+                fontWeight = FontWeight.Black,
+            )
+            if (jackpot) {
+                Text("JACKPOT !", color = Accent2, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+    }
+}
+
+/** "x2" plutôt que "x2.0", mais "x1.6" garde sa décimale, comme le site. */
+private fun formatMultiplier(value: Double): String =
+    if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
 
 /** Positions des 6 `.star` du web, en fraction de la zone de ciel. */
 private val STAR_POSITIONS = listOf(

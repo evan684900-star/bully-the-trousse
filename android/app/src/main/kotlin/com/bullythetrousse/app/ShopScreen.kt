@@ -36,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Economy
+import com.bullythetrousse.core.Repair
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Shop
 import com.bullythetrousse.core.SkinShop
@@ -100,17 +101,6 @@ fun ShopScreen(
                 )
             }
 
-            toast?.let {
-                Text(
-                    it,
-                    color = Accent2,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                )
-            }
-
             // .shop-body : la liste défile, en laissant la place à la barre du bas.
             Column(
                 modifier = Modifier
@@ -126,6 +116,7 @@ fun ShopScreen(
                 }
             }
         }
+        Toast(message = toast, onDismiss = { toast = null })
     }
 }
 
@@ -155,6 +146,29 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onT
             when (val result = Shop.buyVitesse(save)) {
                 is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
                 else -> onToast("💸 Pas assez d'argent !")
+            }
+        }
+    }
+
+    // "Réparer la trousse" : n'apparaît qu'une fois le monde Volcan découvert,
+    // seule source de dégâts du jeu (voir buildRepairCard() côté web).
+    if (save.volcanUnlocked) {
+        val repairCost = Repair.cost(save)
+        ShopCard(
+            title = "Réparer la trousse",
+            description = "Remet la durabilité à 100. 500 $ par tranche de 10 de durabilité manquante.",
+            levelBadge = "${save.durability} / ${SkinStats.maxDurability(save)}",
+            leading = { Text("🔧", fontSize = 30.sp) },
+        ) {
+            if (repairCost == 0) {
+                GameButton("Intacte", secondary = true, small = true) {}
+            } else {
+                GameButton("$repairCost $", small = true) {
+                    when (val result = Repair.repair(save)) {
+                        is Repair.Result.Success -> onPurchase(result.save, result.cost)
+                        else -> onToast("💸 Pas assez d'argent !")
+                    }
+                }
             }
         }
     }

@@ -94,6 +94,8 @@ fun GameScreen(
 
     val current = state
     var landedDistance by remember { mutableStateOf(0.0) }
+    var coinMultiplier by remember { mutableStateOf<Double?>(null) }
+    var coinJackpot by remember { mutableStateOf(false) }
 
     Box(
         modifier = Modifier
@@ -112,6 +114,12 @@ fun GameScreen(
             save = save,
             onSaveChange = onSaveChange,
             onDistance = { landedDistance = it },
+            onEarnings = { earnings ->
+                // Bonus de la Trousse Pièce : la popup ne s'affiche que quand
+                // le multiplicateur s'est vraiment déclenché (voir showCoinPopup).
+                coinMultiplier = earnings.coinMultiplier
+                coinJackpot = earnings.hasJackpot
+            },
         )
         ThrowCanvas(
             flightState = displayedFlight,
@@ -163,6 +171,12 @@ fun GameScreen(
                 )
             }
         }
+
+        CoinPopup(
+            multiplier = coinMultiplier,
+            jackpot = coinJackpot,
+            onDismiss = { coinMultiplier = null },
+        )
     }
 }
 
@@ -314,6 +328,7 @@ private fun ThrowFlight(
     save: GameSave,
     onSaveChange: (GameSave) -> Unit,
     onDistance: (Double) -> Unit,
+    onEarnings: (SkinEarningsResult) -> Unit,
 ): FlightState? {
     if (state !is ThrowState.Landed) {
         // Après un rebond (Trousse à Baskets), la trousse reste à sa position
@@ -372,6 +387,7 @@ private fun ThrowFlight(
         val totalVitesse = SkinStats.totalVitesse(save)
         val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalPuissance + totalVitesse)
         val earnings: SkinEarningsResult = SkinEarnings.apply(baseEarn, equippedSkin, result.distanceMeters)
+        onEarnings(earnings)
 
         // Record par monde : le monde normal et la plage ont chacun le leur.
         var updated = if (isBeach) {
