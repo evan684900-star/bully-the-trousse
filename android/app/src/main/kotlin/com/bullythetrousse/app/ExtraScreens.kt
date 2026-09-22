@@ -2,7 +2,6 @@
 
 package com.bullythetrousse.app
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,7 +28,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -319,10 +317,9 @@ fun ProfileScreen(save: GameSave, onBack: () -> Unit) {
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             ProfileCard(modifier = Modifier.weight(1f)) {
-                Image(
-                    painter = painterResource(R.drawable.trousse_skin_1),
+                TrousseSprite(
+                    skinId = save.equippedSkin,
                     contentDescription = "trousse équipée",
-                    colorFilter = rememberSkinColorFilter(save.equippedSkin),
                     modifier = Modifier.size(40.dp),
                 )
                 Text("+${save.ownedSkins.size}", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)

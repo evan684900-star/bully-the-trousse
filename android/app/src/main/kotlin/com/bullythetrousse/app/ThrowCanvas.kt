@@ -13,10 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Beach
 import com.bullythetrousse.core.BeachDecor
@@ -64,13 +64,12 @@ private fun paletteFor(world: String): WorldPalette = when (world) {
 fun ThrowCanvas(
     flightState: FlightState?,
     world: String = "cour",
+    equippedSkin: String = "classique",
     equippedTrail: String = "blanche",
     groundVerticalFraction: Float = 0.68f,
     // `#game-canvas` occupe tout l'écran côté web.
     modifier: Modifier = Modifier.fillMaxSize(),
 ) {
-    val palette = paletteFor(world)
-
     // Horloge d'ambiance (nuages, vagues) : tourne en continu tant que le
     // Canvas est affiché, indépendamment de l'état du lancer — sans elle,
     // ces détails resteraient figés tant qu'aucun lancer n'est en cours.
@@ -86,51 +85,24 @@ fun ThrowCanvas(
     // Positions récentes de la trousse, pour dessiner le sillage derrière
     // elle (trailPoints côté web). Liste simple : elle est relue à chaque
     // frame par le dessin, qui se redéclenche déjà tout seul.
+    // Sprite de la trousse + filtre du skin équipé : la trousse en vol est
+    // celle que le joueur a équipée, exactement comme paintTrousse() côté web
+    // (qui relit `save.equippedSkin` à chaque frame).
+    val sprite = rememberTrousseSprite()
+    val skinFilter = rememberSkinColorFilter(equippedSkin)
+
     val trailPoints = remember { mutableListOf<TrailPoint>() }
     val trailRgb = remember(equippedTrail) { Trails.ALL.firstOrNull { it.id == equippedTrail }?.rgb ?: "255,255,255" }
 
     Canvas(modifier = modifier) {
         val groundScreenY = size.height * groundVerticalFraction
 
-        // Ciel (dégradé) puis sol (dégradé), comme drawBackground() côté web.
-        drawRect(
-            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                colors = listOf(palette.skyTop, palette.skyBottom),
-                startY = 0f,
-                endY = groundScreenY,
-            ),
-            size = Size(size.width, groundScreenY),
-        )
-        drawRect(
-            brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                colors = listOf(palette.groundTop, palette.groundBottom),
-                startY = groundScreenY,
-                endY = size.height,
-            ),
-            topLeft = Offset(0f, groundScreenY),
-            size = Size(size.width, size.height - groundScreenY),
-        )
-
         // Caméra centrée sur worldX=0 tant qu'il n'y a pas de vol en cours,
         // sinon elle suit la trousse (voir Camera.followX, portage de la
         // logique de gameLoop côté web).
         val cameraX = if (flightState != null) Camera.followX(flightState.worldX, size.width.toDouble()) else 0.0
 
-        when (world) {
-            "volcans" -> {
-                drawClouds(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds, tint = Color(0xFFFFD9C2).copy(alpha = 0.5f))
-                drawVolcanoDecor(cameraX, size.width.toDouble(), groundScreenY, size.height)
-            }
-            "plage" -> {
-                drawClouds(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds, tint = Color.White.copy(alpha = 0.6f))
-                drawSea(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds)
-                drawBeachDecor(cameraX, size.width.toDouble(), groundScreenY)
-            }
-            else -> {
-                drawClouds(cameraX, size.width.toDouble(), groundScreenY, animationTimeSeconds, tint = Color.White.copy(alpha = 0.7f))
-                drawCourDecor(cameraX, size.width.toDouble(), groundScreenY)
-            }
-        }
+        drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds)
 
         // Le sillage ne vit que pendant le vol : au repos on repart de zéro,
         // sinon le ruban du lancer précédent resterait accroché à la trousse.
@@ -157,11 +129,68 @@ fun ThrowCanvas(
             cameraX = cameraX,
             groundScreenY = groundScreenY.toDouble(),
         )
-        rotate(
-            degrees = ((flightState?.rotation ?: 0.0) * 180.0 / Math.PI).toFloat(),
-            pivot = Offset(screen.sx.toFloat(), screen.sy.toFloat()),
-        ) {
-            drawTrousse(centerX = screen.sx.toFloat(), centerY = screen.sy.toFloat(), size = 30.dp.toPx())
+        drawTrousseSprite(
+            image = sprite,
+            skinId = equippedSkin,
+            centerX = screen.sx.toFloat(),
+            centerY = screen.sy.toFloat(),
+            size = 56.dp.toPx(),
+            rotationRadians = (flightState?.rotation ?: 0.0).toFloat(),
+            colorFilter = skinFilter,
+        )
+    }
+}
+
+/**
+ * Le décor complet d'un monde : ciel, sol, nuages et éléments de fond,
+ * portage de `drawBackground()`/`drawVolcanoBackground()`/
+ * `drawBeachBackground()` côté web. Extrait du corps de [ThrowCanvas] pour
+ * que les cinématiques puissent repeindre exactement le même décor (le web
+ * les dessine sur le même canvas, via les mêmes fonctions).
+ */
+internal fun DrawScope.drawWorldBackdrop(
+    world: String,
+    cameraX: Double,
+    groundScreenY: Float,
+    timeSeconds: Float,
+    // Les cinématiques dessinent le décor sur un cadre VIRTUEL plus grand que
+    // l'écran avant de le réduire (voir bcDrawYard() côté web) : sans ces deux
+    // paramètres, un dézoom laisserait une bande vide, car `DrawScope.size`
+    // ne suit pas les transformations appliquées au canvas.
+    width: Float = size.width,
+    height: Float = size.height,
+) {
+    val palette = paletteFor(world)
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(palette.skyTop, palette.skyBottom),
+            startY = 0f,
+            endY = groundScreenY,
+        ),
+        size = Size(width, groundScreenY),
+    )
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(palette.groundTop, palette.groundBottom),
+            startY = groundScreenY,
+            endY = height,
+        ),
+        topLeft = Offset(0f, groundScreenY),
+        size = Size(width, height - groundScreenY),
+    )
+    when (world) {
+        "volcans" -> {
+            drawClouds(cameraX, width.toDouble(), groundScreenY, timeSeconds, tint = Color(0xFFFFD9C2).copy(alpha = 0.5f))
+            drawVolcanoDecor(cameraX, width.toDouble(), groundScreenY, height)
+        }
+        "plage" -> {
+            drawClouds(cameraX, width.toDouble(), groundScreenY, timeSeconds, tint = Color.White.copy(alpha = 0.6f))
+            drawSea(cameraX, width.toDouble(), groundScreenY, timeSeconds)
+            drawBeachDecor(cameraX, width.toDouble(), groundScreenY)
+        }
+        else -> {
+            drawClouds(cameraX, width.toDouble(), groundScreenY, timeSeconds, tint = Color.White.copy(alpha = 0.7f))
+            drawCourDecor(cameraX, width.toDouble(), groundScreenY)
         }
     }
 }
@@ -319,7 +348,7 @@ private val beachDecorProps by lazy { BeachDecor.decorativeProps() }
 /** Modulo qui reste toujours positif (contrairement à `%` en Kotlin comme en
  *  JS, qui garde le signe du dividende) : utile pour les motifs qui
  *  bouclent en boucle infinie (vagues, nuages). */
-private fun mod(a: Double, n: Double): Double = ((a % n) + n) % n
+internal fun mod(a: Double, n: Double): Double = ((a % n) + n) % n
 
 /**
  * Petits nuages qui dérivent lentement dans le ciel, un détail purement
@@ -359,7 +388,7 @@ private fun DrawScope.drawSea(cameraX: Double, screenWidth: Double, groundScreen
     val seaHeight = 46f
     val seaTop = groundScreenY - seaHeight
     drawRect(
-        brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+        brush = Brush.verticalGradient(
             colors = listOf(Color(0xFF1F8FC4), Color(0xFF4FC4E0)),
             startY = seaTop,
             endY = groundScreenY,
@@ -410,7 +439,7 @@ private fun DrawScope.drawDune(sx: Float, groundScreenY: Float, dw: Float, dh: F
     drawPath(path, color = Color(0xFFE0C173))
 }
 
-private fun DrawScope.drawBeachProp(type: BeachPropType, sx: Float, baseY: Float, scale: Float) {
+internal fun DrawScope.drawBeachProp(type: BeachPropType, sx: Float, baseY: Float, scale: Float) {
     when (type) {
         BeachPropType.PARASOL -> {
             val r = 28f * scale
@@ -497,41 +526,6 @@ private fun DrawScope.drawCourTree(sx: Float, groundY: Float, seed: Int) {
         radius = 14f * scale,
         center = Offset(sx + 8f * scale, groundY - trunkH - 18f * scale),
     )
-}
-
-/**
- * Silhouette vectorielle de la trousse : pas encore le sprite réel du web
- * (une image bitmap, voir trousseImg côté JS), mais une forme reconnaissable
- * plutôt qu'un simple carré — corps arrondi, rabat et fermeture éclair,
- * dessinés en pur Canvas comme le sont déjà les skins "coin"/"iron" côté web.
- */
-private fun DrawScope.drawTrousse(centerX: Float, centerY: Float, size: Float) {
-    val topLeft = Offset(centerX - size / 2f, centerY - size / 2f)
-    val bodySize = Size(size, size * 0.62f)
-    val bodyTopLeft = Offset(topLeft.x, centerY - bodySize.height / 2f)
-
-    drawRoundRect(
-        color = Color(0xFFE67E22),
-        topLeft = bodyTopLeft,
-        size = bodySize,
-        cornerRadius = CornerRadius(size * 0.22f, size * 0.22f),
-    )
-    // rabat plus sombre sur le tiers supérieur, pour donner du volume
-    drawRoundRect(
-        color = Color(0xFFC96A1A),
-        topLeft = bodyTopLeft,
-        size = Size(bodySize.width, bodySize.height * 0.32f),
-        cornerRadius = CornerRadius(size * 0.22f, size * 0.22f),
-    )
-    // ligne de fermeture éclair
-    drawLine(
-        color = Color(0xFFFFF3E0),
-        start = Offset(bodyTopLeft.x + size * 0.08f, centerY),
-        end = Offset(bodyTopLeft.x + bodySize.width - size * 0.08f, centerY),
-        strokeWidth = size * 0.035f,
-    )
-    // tirette de la fermeture éclair
-    drawCircle(color = Color(0xFFFFF3E0), radius = size * 0.05f, center = Offset(centerX, centerY))
 }
 
 /**

@@ -140,4 +140,21 @@ class VolcanoCinematicTest {
         assertEquals(VolcanoCineOutcome.UNLOCKED, state.outcome)
         assertEquals(2, state.lives) // aucune esquive automatique n'a jamais été nécessaire
     }
+
+    @Test
+    fun `la roche vise la voie occupee au moment de l alerte et n y bouge plus`() {
+        // Jusqu'à l'alerte : rien en vol.
+        var state = VolcanoCineState(phase = CinePhase.ROCKS, lane = 1)
+        state = VolcanoCinematic.step(state, VolcanoCinematic.ROCK_WAIT)
+        assertEquals(RockState.WARN, state.rockState)
+        assertEquals(1, state.rockLane)
+
+        // Le joueur esquive : il change de voie, la roche garde la sienne.
+        state = VolcanoCinematic.move(state, -1)
+        assertEquals(0, state.lane)
+        assertEquals(1, state.rockLane)
+        assertEquals(RockState.INCOMING, state.rockState)
+        assertEquals(2, state.lives) // esquive réussie : aucune vie perdue
+    }
+
 }

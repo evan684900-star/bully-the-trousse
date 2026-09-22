@@ -1,6 +1,5 @@
 package com.bullythetrousse.app
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -29,8 +28,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -188,11 +185,9 @@ private fun SkinsTab(
         val equipped = save.equippedSkin == skin.id
         CosmeticCard(
             preview = {
-                Image(
-                    painter = painterResource(R.drawable.trousse_skin_1),
+                TrousseSprite(
+                    skinId = skin.id,
                     contentDescription = name,
-                    contentScale = ContentScale.Fit,
-                    colorFilter = rememberSkinColorFilter(skin.id),
                     modifier = Modifier.size(46.dp),
                 )
             },

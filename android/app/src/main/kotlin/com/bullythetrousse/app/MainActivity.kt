@@ -134,12 +134,12 @@ fun GameRoot() {
 
         Screen.Changelog -> ChangelogScreen(onBack = { screen = Screen.Menu })
 
-        Screen.VolcanoCinematic -> VolcanoCinematicScreen(onFinished = { outcome ->
+        Screen.VolcanoCinematic -> VolcanoCinematicScreen(equippedSkin = save.equippedSkin, onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
             screen = Screen.Menu
         })
 
-        Screen.BeachCinematic -> BeachCinematicScreen(onFinished = {
+        Screen.BeachCinematic -> BeachCinematicScreen(equippedSkin = save.equippedSkin, onFinished = {
             updateSave(BeachCinematic.applyOutcome(save))
             screen = Screen.Menu
         })

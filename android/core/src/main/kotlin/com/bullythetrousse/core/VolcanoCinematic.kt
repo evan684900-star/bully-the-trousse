@@ -29,6 +29,11 @@ data class VolcanoCineState(
     val lives: Int = 2,
     val rockIndex: Int = 0,
     val rockState: RockState = RockState.WAIT,
+    /** Voie visée par la roche en cours : fixée quand l'alerte se déclenche
+     *  (`cineRockLane = cineLane` dans cineStartRock()), et figée ensuite —
+     *  c'est précisément ce qui rend l'esquive possible, la roche ne suit
+     *  pas la trousse. */
+    val rockLane: Int = 0,
     val rockElapsed: Double = 0.0,
     val clicks: Int = 0,
     val outcome: VolcanoCineOutcome? = null, // null tant que la cinématique tourne
@@ -133,7 +138,7 @@ object VolcanoCinematic {
     }
 
     private fun startRock(state: VolcanoCineState): VolcanoCineState =
-        state.copy(rockState = RockState.WARN, rockElapsed = 0.0)
+        state.copy(rockState = RockState.WARN, rockElapsed = 0.0, rockLane = state.lane)
 
     private fun resolveRock(state: VolcanoCineState, dodged: Boolean, random: () -> Double): VolcanoCineState {
         val incoming = state.copy(rockState = RockState.INCOMING, rockElapsed = 0.0)

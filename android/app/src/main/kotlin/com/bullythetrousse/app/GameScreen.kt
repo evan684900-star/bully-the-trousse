@@ -109,7 +109,7 @@ fun GameScreen(
             ),
     ) {
         // Décor + trousse : le canvas dessine son propre ciel, comme le web.
-        val displayedFlight = ThrowFlight(
+        val flight = ThrowFlight(
             state = current,
             save = save,
             onSaveChange = onSaveChange,
@@ -122,8 +122,9 @@ fun GameScreen(
             },
         )
         ThrowCanvas(
-            flightState = displayedFlight,
+            flightState = flight.state,
             world = save.currentWorld,
+            equippedSkin = save.equippedSkin,
             equippedTrail = save.equippedTrail,
             modifier = Modifier.fillMaxSize(),
         )
@@ -161,7 +162,12 @@ fun GameScreen(
                 Meter(current)
             }
 
-            if (current is ThrowState.Landed) {
+            // Le panneau n'apparaît qu'une fois la trousse VRAIMENT immobilisée :
+            // `ThrowState.Landed` arrive dès le tap de visée (le résultat est
+            // calculé d'un coup côté `:core`), le vol n'est qu'une animation
+            // jouée ensuite. Annoncer la distance pendant que la trousse est
+            // encore en l'air spoilerait le lancer.
+            if (current is ThrowState.Landed && flight.resolved) {
                 ResultPanel(
                     save = save,
                     distanceMeters = current.result.distanceMeters,
@@ -193,6 +199,13 @@ private fun hintFor(state: ThrowState): String = when (state) {
     is ThrowState.ChargingAccuracy -> "Appuie pour lancer !"
     is ThrowState.Landed -> ""
 }
+
+/**
+ * Ce que [ThrowFlight] rend à l'écran de jeu : la position à dessiner
+ * (`null` tant que rien n'est en l'air) et si le lancer est complètement
+ * terminé — vol fini, dérapage éventuel compris.
+ */
+private data class FlightDisplay(val state: FlightState?, val resolved: Boolean)
 
 /**
  * `#meter-wrap` : barre de 26px de haut, très arrondie, fond sombre. Pendant
@@ -330,19 +343,22 @@ private fun ThrowFlight(
     onSaveChange: (GameSave) -> Unit,
     onDistance: (Double) -> Unit,
     onEarnings: (SkinEarningsResult) -> Unit,
-): FlightState? {
+): FlightDisplay {
     if (state !is ThrowState.Landed) {
         // Après un rebond (Trousse à Baskets), la trousse reste à sa position
         // cumulée plutôt que de revenir à l'origine (voir tryBasketBounce()).
         if (state is ThrowState.ChargingPower && state.bounceCount > 0) {
-            return FlightState(
-                worldX = state.cumulativeDistanceMeters * PhysicsConstants.SCALE,
-                worldY = 0.0,
-                vx = 0.0,
-                vy = 0.0,
+            return FlightDisplay(
+                state = FlightState(
+                    worldX = state.cumulativeDistanceMeters * PhysicsConstants.SCALE,
+                    worldY = 0.0,
+                    vx = 0.0,
+                    vy = 0.0,
+                ),
+                resolved = false,
             )
         }
-        return null
+        return FlightDisplay(state = null, resolved = false)
     }
 
     val result = state.result
@@ -426,5 +442,5 @@ private fun ThrowFlight(
         onSaveChange(Achievements.apply(updated))
     }
 
-    return displayed
+    return FlightDisplay(state = displayed, resolved = resolved)
 }
