@@ -1,11 +1,14 @@
 package com.bullythetrousse.app
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,8 +19,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.BeachCinePhase
 import com.bullythetrousse.core.BeachCineState
 import com.bullythetrousse.core.BeachCinematic
@@ -49,14 +57,54 @@ fun BeachCinematicScreen(onFinished: () -> Unit) {
         onFinished()
     }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF7EC8E3))
-            .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically),
-    ) {
-        Text(phaseLabel(state.phase), style = MaterialTheme.typography.headlineSmall)
+    // Fond : le ciel/sol du site, avec le voile de nuit par-dessus.
+    Box(modifier = Modifier.fillMaxSize().background(ScreenBackground)) {
+        SkyAnimation(heightFraction = 0.68f)
+
+        // #bcine-aim : consigne de visée, en rouge et très grasse.
+        if (state.phase == BeachCinePhase.AIM) {
+            Box(
+                modifier = Modifier.fillMaxSize().padding(bottom = 112.dp),
+                contentAlignment = Alignment.BottomCenter,
+            ) {
+                Text(
+                    "VISE !!!",
+                    color = Color(0xFFFF3B30),
+                    fontSize = 32.sp, // clamp(24px, 6vw, 40px)
+                    fontWeight = FontWeight.Black,
+                    letterSpacing = 2.sp,
+                )
+            }
+        }
+
+        // #bcine-dialog .box : le texte de la phase dans un panneau centré.
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .widthIn(max = 420.dp)
+                    .clip(RoundedCornerShape(18.dp))
+                    .background(PanelBg)
+                    .border(2.dp, PanelBorder, RoundedCornerShape(18.dp))
+                    .padding(horizontal = 24.dp, vertical = 22.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                Text(
+                    phaseLabel(state.phase),
+                    color = TextColor,
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                )
+                Text(
+                    "la cinématique se déroule toute seule",
+                    color = TextDim,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center,
+                )
+            }
+        }
     }
 }
 
