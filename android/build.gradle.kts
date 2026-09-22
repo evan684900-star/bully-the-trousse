@@ -26,4 +26,9 @@ plugins {
     kotlin("jvm") version "1.9.24" apply false
     kotlin("android") version "1.9.24" apply false
     kotlin("plugin.serialization") version "1.9.24" apply false
+    // Firebase : ce plugin transforme app/google-services.json en ressources
+    // Android (clé d'API, identifiant du projet...). Déclaré ici comme les
+    // autres, mais appliqué CONDITIONNELLEMENT dans app/build.gradle.kts :
+    // l'appliquer sans le fichier fait échouer tout le build.
+    id("com.google.gms.google-services") version "4.4.2" apply false
 }

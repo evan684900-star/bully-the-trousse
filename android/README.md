@@ -214,56 +214,74 @@ Android) avant d'être branché à l'affichage dans `:app`.
   Menu en pleine charge (avant le 3e tap) abandonne ce lancer plutôt que de
   le mettre en pause — un nouvel écran Jeu repart toujours de `Idle`.
 
-- **Firebase (scaffolding, pas branché)** : `CloudSaveSync` dans `:core`
-  (la seule vraie *logique* de la synchronisation cloud — résolution de
-  conflit entre sauvegarde locale et copie distante reçue, portage exact de
-  `flushPendingRemoteSave()` : une copie reçue avant le dernier `persist()`
-  local est ignorée pour ne pas régresser un lancer qui vient de se
-  terminer), testé (133 tests au total). `FirebaseSaveRepository` dans
-  `:app` (connexion anonyme, pousser/lire la sauvegarde et le classement,
-  portage best-effort de `pushCloudSave()`/`syncCloudSaveOnLogin()`/
-  `pushScoreTo()`) et les dépendances Firebase (BoM, Auth, Firestore) dans
-  `app/build.gradle.kts`.
+- **Firebase (compte, sauvegarde cloud, classement)** : l'app rejoint le
+  projet Firebase qui fait DÉJÀ tourner le site (`bully-the-trousse`) au
+  lieu d'en créer un à elle. C'est la contrainte qui gouverne tout le
+  module : le modèle de données est celui du site, au champ près, sinon un
+  même joueur aurait deux parties et deux entrées de classement selon qu'il
+  arrive du navigateur ou du téléphone.
 
-  **`GameRoot` n'appelle rien de tout ça** : c'est écrit et prêt, mais pas
-  relié, pour trois raisons qui se recoupent :
-  1. Il faut un vrai projet Firebase (console Firebase → ajouter une app
-     Android → télécharger `google-services.json` dans `app/`) — rien de
-     générique à committer ici, ce sont de vrais identifiants propres à ce
-     projet.
-  2. Le plugin `com.google.gms.google-services` (nécessaire pour lire ce
-     fichier) reste en commentaire dans `app/build.gradle.kts` : l'appliquer
-     sans le fichier ferait échouer TOUT le build, y compris pour quelqu'un
-     qui n'a pas encore configuré Firebase.
-  3. **Ce module n'a pas pu être compilé ni testé dans ce bac à sable**
-     (même blocage que l'Android Gradle Plugin : le SDK Firebase se
-     résout via `google()`, injoignable ici) — écrit avec le même soin que
-     le reste, mais à valider dans Android Studio une fois les deux points
-     précédents réglés.
+  - `RecoveryCode` (`:core`, testé) : le code à 16 chiffres et la
+    dérivation e-mail/mot de passe (`c<code>@players.bullythetrousse.app`,
+    `bt-<code>`) qui en fait une véritable identité Firebase Auth. La
+    moindre différence ici créerait un compte SÉPARÉ en silence — d'où les
+    tests sur les chaînes exactes.
+  - `SaveCodec.toFieldMap()`/`fromFieldMap()` (`:core`, testé) : la
+    sauvegarde vue comme un champ Firestore par propriété, exactement comme
+    le site l'écrit dans `users/{uid}` — et non une chaîne JSON, qui aurait
+    donné deux modèles incompatibles dans un seul projet. Les entiers
+    restent des entiers, les distances des flottants, et un document écrit
+    par le site se relit sans perte (test dédié).
+  - `CloudSaveSync` (`:core`, testé) : l'arbitrage entre la partie locale et
+    celle du cloud, portage de `flushPendingRemoteSave()`. Une copie
+    distante plus récente que la dernière écriture de cet appareil gagne ;
+    plus ancienne, elle serait une régression.
+  - `FirebaseBridge` (`:app`) : la plomberie réseau — connexion anonyme,
+    connexion par code, liaison d'un compte invité à un code (même uid
+    conservé), `users`, `scores`/`scoresPlage`, `profiles`, `follows`,
+    `recoveryCodes`.
+  - `CloudSession` (`:app`) : la session, branchée dans `GameRoot`.
+    Connexion au démarrage, lecture de la sauvegarde du cloud, puis renvoi
+    des changements une fois le calme revenu (1,5 s) — un lancer fait bouger
+    la sauvegarde plusieurs fois par seconde, écrire à chaque fois ferait
+    autant d'écritures Firestore pour un seul résultat utile.
+  - Écrans : `AccountScreen` (afficher/créer son code, rejoindre un compte),
+    classement réel, abonnés/abonnements du profil.
 
-  Divergence assumée par rapport au web : la sauvegarde cloud est stockée
-  comme une seule chaîne JSON (`SaveCodec`, déjà porté) plutôt qu'un champ
-  Firestore par propriété — plus simple et fidèle à écrire/relire, au prix
-  de ne pas pouvoir interroger un champ précis côté serveur (le classement,
-  lui, garde un champ dédié puisque c'est justement ce qu'on veut trier).
+  **Tout est facultatif.** Le plugin `com.google.gms.google-services` n'est
+  appliqué que si `app/google-services.json` existe (voir
+  `app/build.gradle.kts`) : sans ce fichier, le build passe, le jeu tourne,
+  `FirebaseBridge.isAvailable` vaut `false` et aucun appel réseau n'est
+  tenté. C'est aussi ce que fait le site quand ses scripts Firebase ne
+  chargent pas.
 
-  Hors scope de ce scaffolding (à faire plus tard si besoin) : la liaison
-  de compte par code de récupération, les cadeaux, les abonnés, le profil
-  public — tout ce qui dépend de la structure de compte multi-appareils
-  construite côté web cette session.
+### Activer le compte en ligne
+
+1. Console Firebase → projet **bully-the-trousse** (celui du site, pas un
+   nouveau) → *Ajouter une application* → **Android**.
+2. Nom du package : `com.bullythetrousse.app`. L'empreinte SHA-1 n'est pas
+   nécessaire ici (elle ne sert qu'à la connexion Google, pas à
+   l'authentification anonyme ni e-mail/mot de passe).
+3. Télécharger `google-services.json` et le déposer dans `android/app/`.
+4. Console → *Authentication* → *Sign-in method* : activer **Anonyme** ET
+   **E-mail/Mot de passe** (le second est ce qui fait marcher les codes).
+5. Relancer la synchronisation Gradle, puis l'app. Réglages → Compte doit
+   afficher « En ligne ».
+
+Les règles Firestore du site s'appliquent telles quelles : rien à changer
+côté serveur, l'app écrit les mêmes collections avec la même forme.
 
 ## Ce qu'il reste à faire
 
-1. **Créer le projet Firebase et brancher `FirebaseSaveRepository`** —
-   suivre les 3 points ci-dessus, puis appeler `ensureSignedIn()`/
-   `fetchCloudSave()`/`pushCloudSave()` depuis `GameRoot` (au lancement et
-   après chaque `onSaveChange`), avec `CloudSaveSync.shouldApplyRemoteSave()`
-   pour arbitrer. Tout le reste du jeu (physique, mondes, skins, succès,
-   défis) est fonctionnellement complet côté `:core`/`:app`.
-2. **Vrai sprite pour la trousse** — remplacer sa forme vectorielle par un
-   vrai sprite (+ ses variantes de skins, maintenant que la liste des skins
-   existe) ; bloqué faute d'assets graphiques fournis, rien à faire côté
-   code tant qu'aucune image n'est disponible.
+1. **Déposer `google-services.json`** (voir « Activer le compte en ligne »
+   ci-dessus) : c'est la seule étape qui ne peut pas être faite depuis le
+   dépôt, puisqu'elle passe par la console Firebase.
+2. **Cadeaux et abonnements** — l'app lit les compteurs d'abonnés, mais ne
+   permet pas encore de suivre quelqu'un ni d'envoyer de l'argent
+   (`gifts`/`follows` côté site).
+3. **Thème clair et bilingue FR/EN** — les deux boutons des Réglages sont
+   encore inertes : ce sont des refontes transversales qui touchent chaque
+   couleur et chaque texte.
 
 Chaque étape devrait suivre le même principe que celle-ci : porter la
 logique dans `:core` avec des tests dont les valeurs de référence viennent

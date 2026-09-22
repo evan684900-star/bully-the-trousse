@@ -66,6 +66,7 @@ sealed interface Screen {
     data object Settings : Screen
     data object Links : Screen
     data object Changelog : Screen
+    data object Account : Screen
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
 }
@@ -85,6 +86,18 @@ fun GameRoot() {
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
     WorldMusic(world = save.currentWorld, muted = save.musicMuted)
 
+    // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
+    // et sans effet tant que app/google-services.json n'est pas là : le jeu
+    // reste entièrement jouable hors ligne.
+    val cloud = rememberCloudSession(
+        save = save,
+        repository = repository,
+        // La copie venue du cloud est DÉJÀ écrite sur le disque par la session
+        // (avec l'horodatage du serveur) : la réécrire ici lui collerait
+        // l'heure locale et ferait croire que ce téléphone vient de jouer.
+        onSaveChange = { save = it },
+    )
+
     // Le niveau de détail choisi dans les Réglages descend jusqu'aux écrans
     // qui dessinent, sans que les écrans intermédiaires aient à le porter
     // (voir LocalGraphicsQuality).
@@ -94,6 +107,8 @@ fun GameRoot() {
         GameContent(
             save = save,
             screen = screen,
+            cloud = cloud,
+            repository = repository,
             updateSave = ::updateSave,
             goTo = { screen = it },
         )
@@ -109,6 +124,8 @@ fun GameRoot() {
 private fun GameContent(
     save: GameSave,
     screen: Screen,
+    cloud: CloudSession,
+    repository: SaveRepository,
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
 ) {
@@ -127,9 +144,17 @@ private fun GameContent(
             onOpenChangelog = { goTo(Screen.Changelog) },
         )
 
-        Screen.Leaderboard -> LeaderboardScreen(onBack = { goTo(Screen.Menu) })
+        Screen.Leaderboard -> LeaderboardScreen(
+            save = save,
+            session = cloud,
+            onBack = { goTo(Screen.Menu) },
+        )
 
-        Screen.Profile -> ProfileScreen(save = save, onBack = { goTo(Screen.Menu) })
+        Screen.Profile -> ProfileScreen(
+            save = save,
+            session = cloud,
+            onBack = { goTo(Screen.Menu) },
+        )
 
         Screen.AchievementsList -> AchievementsScreen(save = save, onBack = { goTo(Screen.Menu) })
 
@@ -155,8 +180,18 @@ private fun GameContent(
 
         Screen.Settings -> SettingsScreen(
             save = save,
+            session = cloud,
             onSaveChange = updateSave,
+            onOpenAccount = { goTo(Screen.Account) },
             onBack = { goTo(Screen.Menu) },
+        )
+
+        Screen.Account -> AccountScreen(
+            save = save,
+            session = cloud,
+            repository = repository,
+            onSaveChange = updateSave,
+            onBack = { goTo(Screen.Settings) },
         )
 
         Screen.Links -> LinksScreen(onBack = { goTo(Screen.Menu) })

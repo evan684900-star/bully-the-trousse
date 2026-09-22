@@ -24,6 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -45,7 +50,7 @@ import com.bullythetrousse.core.SkinStats
  * ici le fond `--app-bg` et les cartes `.achievement-row` du site.
  */
 @Composable
-private fun ModalScreen(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+internal fun ModalScreen(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -173,8 +178,23 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
  * affichent l'état courant sans le changer.
  */
 @Composable
-fun SettingsScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: () -> Unit) {
+fun SettingsScreen(
+    save: GameSave,
+    session: CloudSession,
+    onSaveChange: (GameSave) -> Unit,
+    onOpenAccount: () -> Unit,
+    onBack: () -> Unit,
+) {
     ModalScreen("⚙️ Réglages", onBack) {
+        SettingsRow("Compte") {
+            GameButton("☁️ Gérer", secondary = true, small = true, onClick = onOpenAccount)
+        }
+        Text(
+            session.statusText,
+            color = if (session.state == CloudState.LINKED) Money else TextDim,
+            fontSize = 11.5.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
         SettingsRow("Musique") {
             GameButton(
                 if (save.musicMuted) "🔇" else "🔊",
@@ -285,18 +305,89 @@ private fun LinkRow(title: String, subtitle: String) {
 }
 
 /**
- * Classement : côté web il vient de Firestore (`#screen-leaderboard`), qui
- * n'est pas encore branché dans l'app (voir FirebaseSaveRepository.kt et
- * android/README.md) — l'écran existe donc, mais sans données pour l'instant.
+ * Classement (`#screen-leaderboard`) : les mêmes documents Firestore que le
+ * site, donc les mêmes joueurs et les mêmes records — voir [FirebaseBridge].
+ * Sans compte en ligne configuré, ou hors connexion, l'écran le dit au lieu
+ * de rester vide.
  */
 @Composable
-fun LeaderboardScreen(onBack: () -> Unit) {
-    ModalScreen("🏆 Classement", onBack) {
+fun LeaderboardScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
+    // Le monde Plage a son propre classement (`scoresCollection()` côté site).
+    val collection = remember(save.inPlage) { session.bridge.scoresCollectionFor(save) }
+    var entries by remember { mutableStateOf<List<LeaderboardEntry>?>(null) }
+    var failed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(collection, session.state) {
+        if (session.state == CloudState.NOT_CONFIGURED || session.state == CloudState.OFFLINE) return@LaunchedEffect
+        try {
+            entries = session.bridge.loadLeaderboard(collection)
+        } catch (e: Exception) {
+            failed = true
+        }
+    }
+
+    ModalScreen(if (save.inPlage) "🏖️ Classement Plage" else "🏆 Classement", onBack) {
         Text(
-            "Le classement a besoin d'un compte en ligne (Firebase), pas encore branché dans l'app.",
+            "Ton pseudo : ${save.pseudo.ifBlank { "-" }}",
             color = TextDim,
             fontSize = 13.sp,
             textAlign = TextAlign.Center,
+        )
+        val rows = entries
+        when {
+            session.state == CloudState.NOT_CONFIGURED -> LeaderboardNotice(
+                "Le classement a besoin du compte en ligne, pas encore configuré dans cette version.",
+            )
+            failed || session.state == CloudState.OFFLINE -> LeaderboardNotice(
+                "Classement indisponible : pas de connexion.",
+            )
+            rows == null -> LeaderboardNotice("Chargement du classement…")
+            rows.isEmpty() -> LeaderboardNotice("Personne n'a encore de record. À toi de jouer.")
+            else -> rows.forEachIndexed { index, entry ->
+                LeaderboardRow(rank = index + 1, entry = entry, isMe = entry.uid == session.uid)
+            }
+        }
+    }
+}
+
+@Composable
+private fun LeaderboardNotice(text: String) {
+    Text(text, color = TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
+}
+
+/** `.leaderboard-row` : rang, pseudo, distance — la ligne du joueur est
+ *  soulignée en doré, comme sur le site. */
+@Composable
+private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean) {
+    val shape = RoundedCornerShape(12.dp)
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(shape)
+            .background(CardBg)
+            .border(2.dp, if (isMe) Accent else PanelBorder, shape)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            "#$rank",
+            color = if (isMe) Accent else TextDim,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.ExtraBold,
+        )
+        Text(
+            entry.pseudo,
+            color = TextColor,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.padding(horizontal = 10.dp),
+        )
+        Text(
+            "${"%.1f".format(entry.distanceMeters)} m",
+            color = Money,
+            fontSize = 14.sp,
+            fontWeight = FontWeight.ExtraBold,
         )
     }
 }
@@ -307,11 +398,25 @@ fun LeaderboardScreen(onBack: () -> Unit) {
  * `.profile-card` (trousse équipée + nombre de skins, abonnements,
  * abonnés), puis les statistiques détaillées.
  *
- * Abonnements/abonnés viennent de Firestore côté web : pas encore branché
- * ici, donc affichés à "—" comme le fait le site avant chargement.
+ * Abonnements/abonnés viennent de Firestore, comme sur le site.
  */
 @Composable
-fun ProfileScreen(save: GameSave, onBack: () -> Unit) {
+fun ProfileScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
+    // Abonnements/abonnés : deux comptages Firestore (`countFollowers()` /
+    // `countFollowing()` côté site). Tant qu'ils n'ont pas répondu — ou si le
+    // compte en ligne n'est pas disponible — on laisse le tiret du site.
+    var following by remember { mutableStateOf<Int?>(null) }
+    var followers by remember { mutableStateOf<Int?>(null) }
+    LaunchedEffect(session.uid) {
+        val id = session.uid ?: return@LaunchedEffect
+        try {
+            following = session.bridge.countFollowing(id)
+            followers = session.bridge.countFollowers(id)
+        } catch (e: Exception) {
+            // Hors ligne : on garde le tiret, ce n'est pas une erreur à montrer.
+        }
+    }
+
     ModalScreen("👤 Profil", onBack) {
         // .profile-header
         Column(
@@ -351,11 +456,21 @@ fun ProfileScreen(save: GameSave, onBack: () -> Unit) {
                 Text("+${save.ownedSkins.size}", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
             }
             ProfileCard(modifier = Modifier.weight(1f)) {
-                Text("—", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text(
+                    following?.toString() ?: "—",
+                    color = TextColor,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                )
                 Text("Abonnements", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
             }
             ProfileCard(modifier = Modifier.weight(1f)) {
-                Text("—", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                Text(
+                    followers?.toString() ?: "—",
+                    color = TextColor,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                )
                 Text("Abonnés", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
             }
         }

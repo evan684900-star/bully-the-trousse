@@ -10,12 +10,26 @@ plugins {
     // classloaders parent/enfant dans ce fichier racine.
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    // Firebase (comptes/sauvegarde cloud/classement, voir FirebaseSaveRepository.kt
-    // et android/README.md) : ce plugin lit app/google-services.json, qui n'existe
-    // pas encore (il vient de la console Firebase, propre à CE projet). L'appliquer
-    // sans ce fichier fait échouer TOUT le build, donc il reste en commentaire tant
-    // qu'un vrai projet Firebase n'a pas été créé et son fichier ajouté ici.
-    // id("com.google.gms.google-services") version "4.4.2"
+    // Le plugin Firebase n'est PAS listé ici : voir juste en dessous.
+}
+
+// Firebase (compte, sauvegarde cloud, classement — voir FirebaseBridge.kt).
+//
+// Le plugin google-services lit app/google-services.json, un fichier qui vient
+// de la console Firebase et qu'on ne peut pas versionner à la place de
+// quelqu'un. L'appliquer sans ce fichier fait échouer TOUT le build, y compris
+// pour quelqu'un qui veut juste jouer hors ligne — d'où cette application
+// conditionnelle plutôt qu'une ligne à décommenter à la main :
+//
+//   - fichier absent  -> le plugin est ignoré, l'app compile et tourne, et
+//                        FirebaseBridge.isAvailable vaut false (tout le volet
+//                        en ligne est simplement coupé) ;
+//   - fichier présent -> le plugin s'applique, Firebase s'initialise tout seul
+//                        au démarrage, et le compte/classement s'activent.
+//
+// Voir android/README.md pour la marche à suivre dans la console.
+if (project.file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
 }
 
 android {
@@ -63,13 +77,11 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.5")
 
-    // Firebase (voir FirebaseSaveRepository.kt et android/README.md). Ces
-    // dépendances se résolvent sans le plugin google-services (elles viennent
-    // juste de google(), déjà déclaré dans settings.gradle.kts) ; c'est
-    // FirebaseApp.initializeApp() qui échouera au lancement sans un vrai
-    // google-services.json — sans incidence tant que FirebaseSaveRepository
-    // n'est pas appelé depuis GameRoot (voir android/README.md, pas branché
-    // par défaut).
+    // Firebase (voir FirebaseBridge.kt et android/README.md). Ces dépendances
+    // se résolvent sans le plugin google-services (elles viennent de google(),
+    // déjà déclaré dans settings.gradle.kts). Sans google-services.json,
+    // Firebase ne s'initialise pas : FirebaseBridge.isAvailable vaut false et
+    // aucun appel réseau n'est tenté.
     implementation(platform("com.google.firebase:firebase-bom:33.5.1"))
     implementation("com.google.firebase:firebase-auth-ktx")
     implementation("com.google.firebase:firebase-firestore-ktx")

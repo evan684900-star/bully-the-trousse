@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Compte, sauvegarde cloud et classement (Firebase, voir
+         FirebaseBridge.kt). Sans cette permission, aucune requete ne part :
+         le jeu reste jouable, mais tout le volet en ligne echoue en
+         silence. ACCESS_NETWORK_STATE permet au SDK Firebase de reessayer
+         tout seul quand la connexion revient. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
