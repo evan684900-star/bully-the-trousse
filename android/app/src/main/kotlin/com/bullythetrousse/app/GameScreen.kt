@@ -3,6 +3,20 @@
 package com.bullythetrousse.app
 
 import androidx.compose.foundation.background
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -47,6 +61,7 @@ import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.PhysicsConstants
 import com.bullythetrousse.core.PowerAndAccuracy
+import com.bullythetrousse.core.SfxCatalog
 import com.bullythetrousse.core.Skid
 import com.bullythetrousse.core.SkinEarnings
 import com.bullythetrousse.core.SkinEarningsResult
@@ -78,6 +93,7 @@ fun GameScreen(
 ) {
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
+    val sfx = LocalSfx.current
 
     fun tap() {
         // Trousse Claude : fenêtre du lancer parfait élargie (isClaude côté web).
@@ -86,12 +102,24 @@ fun GameScreen(
             if (equippedSkin.isClaude) PhysicsConstants.PERFECT_WINDOW_CLAUDE else PhysicsConstants.PERFECT_WINDOW
         // Trousse à Baskets : chance de rebondir au lieu de conclure le lancer.
         val bounceChances = if (equippedSkin.isBasket) Skins.BASKET_BOUNCE_CHANCES else emptyList()
+        val before = state
         state = sequence.tap(
             SkinStats.totalPuissance(save),
             SkinStats.totalVitesse(save),
             perfectWindow,
             bounceChances,
         )
+        // Mêmes points d'appel que le site : sfxCharge() dans lockPower(),
+        // sfxLaunch() (+ sfxCoinFlip() pour la Trousse Pièce) dans
+        // lockAccuracyAndLaunch().
+        when {
+            before !is ThrowState.ChargingAccuracy && state is ThrowState.ChargingAccuracy ->
+                sfx.play(SfxCatalog.CHARGE)
+            before is ThrowState.ChargingAccuracy && state is ThrowState.Landed -> {
+                sfx.play(SfxCatalog.LAUNCH)
+                if (equippedSkin.isCoin) sfx.play(SfxCatalog.COIN_FLIP)
+            }
+        }
     }
 
     val current = state
@@ -101,6 +129,14 @@ fun GameScreen(
     // Le détour en apesanteur du lancer en cours, tant qu'il dure : c'est lui
     // qui reçoit les taps sur les anneaux du QTE.
     var spaceFlight by remember { mutableStateOf<SpaceFlight?>(null) }
+    // Le boost 🦇 du lancer en cours, quand la Trousse Vampire est équipée.
+    var vampireBoost by remember { mutableStateOf<VampireBoostController?>(null) }
+
+    // sfxSpace() : joué une fois, au basculement en apesanteur.
+    val spacePhase = spaceFlight?.state?.phase
+    LaunchedEffect(spacePhase) {
+        if (spacePhase == SpacePhase.FLOATING) sfx.play(SfxCatalog.SPACE)
+    }
 
     Box(
         modifier = Modifier
@@ -114,7 +150,13 @@ fun GameScreen(
                     // En apesanteur, le tap sert au QTE — pas à relancer.
                     val space = spaceFlight
                     if (space?.state != null) {
+                        val ringsBefore = space.state?.ringResults?.size ?: 0
                         space.tap()
+                        // advanceQteRing(hit) : sfxCharge() si touché, sinon sfxError().
+                        val after = space.state?.ringResults
+                        if (after != null && after.size > ringsBefore) {
+                            sfx.play(if (after.last()) SfxCatalog.CHARGE else SfxCatalog.ERROR)
+                        }
                     } else if (current !is ThrowState.Landed) {
                         tap()
                     }
@@ -132,8 +174,10 @@ fun GameScreen(
                 // le multiplicateur s'est vraiment déclenché (voir showCoinPopup).
                 coinMultiplier = earnings.coinMultiplier
                 coinJackpot = earnings.hasJackpot
+                if (earnings.coinMultiplier != null) sfx.play(SfxCatalog.COIN_BONUS)
             },
             onSpaceFlight = { spaceFlight = it },
+            onVampireBoost = { vampireBoost = it },
         )
         ThrowCanvas(
             flightState = flight.state,
@@ -193,7 +237,24 @@ fun GameScreen(
                     modifier = Modifier.align(Alignment.Center),
                 )
             }
+
+
+            // #btn-vampire-boost : rond violet en bas au centre, visible
+            // uniquement pendant le vol d'une Trousse Vampire dont le budget
+            // de boost n'est pas épuisé.
+            vampireBoost?.let { boost ->
+                if (boost.isVisible(flying = flight.state != null && !flight.resolved)) {
+                    VampireBoostButton(
+                        boost = boost,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
+                    )
+                }
+            }
         }
+
+        // #screen-game.vampire-boosting::after : vignette violette pulsante
+        // tant que le boost est activement maintenu.
+        VampireBoostVignette(active = vampireBoost?.state?.boosting == true)
 
         CoinPopup(
             multiplier = coinMultiplier,
@@ -368,6 +429,7 @@ private fun ThrowFlight(
     onDistance: (Double) -> Unit,
     onEarnings: (SkinEarningsResult) -> Unit,
     onSpaceFlight: (SpaceFlight?) -> Unit,
+    onVampireBoost: (VampireBoostController?) -> Unit,
 ): FlightDisplay {
     if (state !is ThrowState.Landed) {
         // Après un rebond (Trousse à Baskets), la trousse reste à sa position
@@ -386,6 +448,7 @@ private fun ThrowFlight(
         return FlightDisplay(state = null, resolved = false)
     }
 
+    val sfx = LocalSfx.current
     val result = state.result
     val isBeach = save.currentWorld == "plage"
     var flightFinished by remember(result) { mutableStateOf(false) }
@@ -399,20 +462,43 @@ private fun ThrowFlight(
         SpaceSequence.shouldTrigger(result.lockedPower, result.accuracyValue, equipped)
     }
     var spaceOutcome by remember(result) { mutableStateOf<SpaceState?>(null) }
-    val spaceFlight = rememberSpaceFlight(result, equipped) { spaceOutcome = it }
+    val spaceFlight = rememberSpaceFlight(result, equipped) { outcome ->
+        spaceOutcome = outcome
+        // sfxRecord() pour le combo parfait (tous les anneaux touchés).
+        if (SpaceSequence.isPerfect(outcome, equipped)) sfx.play(SfxCatalog.RECORD)
+    }
     // L'écran de jeu a besoin du pilote pour lui router les taps du QTE et
     // dessiner les anneaux ; il ne le reçoit que si ce lancer part vraiment.
     LaunchedEffect(result, goesToSpace) {
         onSpaceFlight(if (goesToSpace) spaceFlight else null)
     }
 
+    // Boost 🦇 : réarmé à chaque lancer (une utilisation par lancer). L'écran
+    // n'en reçoit un que tant que la trousse est en l'air — le bouton doit
+    // disparaître dès l'atterrissage, comme la condition `state === "flying"`
+    // du site.
+    val vampireBoost = rememberVampireBoost(result, equipped)
+    LaunchedEffect(result, flightFinished) {
+        onVampireBoost(if (flightFinished) null else vampireBoost)
+    }
+
     val flightState: FlightState = if (isBeach) {
-        animateBeachFlight(result) { _, outcome ->
+        animateBeachFlight(result, vampire = vampireBoost) { _, outcome ->
             beachOutcome = outcome
             flightFinished = true
+            sfx.play(SfxCatalog.LAND)
         }
     } else {
-        animateFlight(result, space = if (goesToSpace) spaceFlight else null) { flightFinished = true }
+        animateFlight(
+            result,
+            space = if (goesToSpace) spaceFlight else null,
+            vampire = vampireBoost,
+        ) {
+            flightFinished = true
+            // `inSpaceMode` côté site : un lancer revenu de l'espace s'écrase
+            // au lieu d'atterrir.
+            sfx.play(if (goesToSpace) SfxCatalog.CRASH else SfxCatalog.LAND)
+        }
     }
 
     // Monde Volcan : la poussière rouge rend le sol glissant (voir Skid).
@@ -447,6 +533,8 @@ private fun ThrowFlight(
         onEarnings(earnings)
 
         // Record par monde : le monde normal et la plage ont chacun le leur.
+        val previousRecord = if (isBeach) save.plageBestDistance else save.bestDistance
+        if (result.distanceMeters > previousRecord) sfx.play(SfxCatalog.RECORD)
         var updated = if (isBeach) {
             save.copy(
                 plageBestDistance = maxOf(save.plageBestDistance, result.distanceMeters),
@@ -492,4 +580,90 @@ private fun ThrowFlight(
     }
 
     return FlightDisplay(state = displayed, resolved = resolved)
+}
+
+/**
+ * `#btn-vampire-boost` : rond violet de 64px en bas au centre. Maintenir
+ * accélère la trousse ; relâcher met en pause sans consommer le reste du
+ * budget (voir [VampireBoost], `:core`).
+ *
+ * La détection se fait à la main plutôt qu'avec `clickable` : il faut les
+ * évènements d'appui ET de relâchement séparément, et un simple clic ne
+ * permettrait pas de maintenir. `awaitEachGesture` couvre aussi l'annulation
+ * (doigt qui sort du bouton), traitée comme un relâchement — sans quoi le
+ * boost resterait actif indéfiniment.
+ */
+@Composable
+private fun VampireBoostButton(boost: VampireBoostController, modifier: Modifier = Modifier) {
+    val pressed = boost.state.boosting
+    Box(
+        modifier = modifier
+            // :active { transform: scale(0.9) }
+            .scale(if (pressed) 0.9f else 1f)
+            .size(64.dp)
+            .clip(CircleShape)
+            // `radial-gradient(circle at 35% 30%, ...)` : le centre du dégradé
+            // est exprimé en pourcentage côté CSS mais en pixels dans un Brush,
+            // d'où le dessin à la main, qui lui connaît sa taille.
+            .drawBehind {
+                drawCircle(
+                    brush = Brush.radialGradient(
+                        colors = listOf(Color(0xFF6A1B9A), Color(0xFF2C0A3E)),
+                        center = Offset(size.width * 0.35f, size.height * 0.30f),
+                        radius = size.maxDimension * 0.8f,
+                    ),
+                )
+            }
+            .border(2.dp, Color.White.copy(alpha = 0.3f), CircleShape)
+            .pointerInput(boost) {
+                awaitEachGesture {
+                    // Consommé pour que l'appui ne remonte pas au clic
+                    // plein écran de l'écran de jeu, comme le
+                    // `e.preventDefault()` de startVampireBoost().
+                    awaitFirstDown().consume()
+                    boost.press()
+                    // Renvoie null si le geste est annulé : dans les deux cas
+                    // le boost doit s'arrêter.
+                    waitForUpOrCancellation()
+                    boost.release()
+                }
+            },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("\uD83E\uDD87", fontSize = 28.sp)
+    }
+}
+
+/**
+ * `#screen-game.vampire-boosting::after` : halo violet pulsant sur les bords
+ * de l'écran tant que le boost est maintenu, pour que l'accélération se voie
+ * ailleurs que sur le compteur de distance.
+ */
+@Composable
+private fun VampireBoostVignette(active: Boolean) {
+    if (!active) return
+    val transition = rememberInfiniteTransition(label = "vampire-boost-pulse")
+    // from { opacity: 0.6 } to { opacity: 1 }, 0.5s alternée.
+    val alpha by transition.animateFloat(
+        initialValue = 0.6f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(500), RepeatMode.Reverse),
+        label = "alpha",
+    )
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                // `box-shadow: inset` n'a pas d'équivalent : un dégradé radial
+                // transparent au centre et violet sur les bords donne le même
+                // assombrissement périphérique.
+                Brush.radialGradient(
+                    colors = listOf(
+                        Color.Transparent,
+                        Color.Transparent,
+                        Color(0xFFA028DC).copy(alpha = 0.55f * alpha),
+                    ),
+                ),
+            ),
+    )
 }

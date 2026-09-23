@@ -60,6 +60,7 @@ import com.bullythetrousse.core.CinePhase
 import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.QualityProfile
 import com.bullythetrousse.core.RockState
+import com.bullythetrousse.core.SfxCatalog
 import com.bullythetrousse.core.VolcanoCineOutcome
 import com.bullythetrousse.core.VolcanoCineState
 import com.bullythetrousse.core.VolcanoCinematic
@@ -114,6 +115,11 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
 
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
+    val sfx = LocalSfx.current
+    // Le grondement du tremblement de terre est un VRAI fichier (le seul
+    // bruitage du jeu qui en soit un), joué de la phase QUAKE jusqu'à la fin
+    // de l'éruption, dont il suit le volume décroissant.
+    val quake = rememberQuakeSound()
 
     LaunchedEffect(Unit) {
         var lastFrameMillis = System.currentTimeMillis()
@@ -132,7 +138,11 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
 
             // cineSetPhase() : l'entrée dans certaines phases déclenche un effet.
             if (next.phase != previousPhase) {
+                if (next.phase == CinePhase.QUAKE) quake.start()
+                if (next.phase == CinePhase.LANDING) sfx.play(SfxCatalog.SPACE)
                 if (next.phase == CinePhase.ERUPTION) {
+                    sfx.play(SfxCatalog.LAUNCH)
+                    sfx.play(SfxCatalog.CRASH)
                     flash = 1f
                     shake = 26f
                     if (viewWidth > 0f) {
@@ -160,7 +170,23 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                 wobble = 1f
                 shake = 14f
             }
-            if (next.phase == CinePhase.DEATH && state.phase != CinePhase.DEATH) shake = 30f
+            if (next.phase == CinePhase.DEATH && state.phase != CinePhase.DEATH) {
+                shake = 30f
+                sfx.play(SfxCatalog.CRASH)
+            }
+
+            // Le grondement décroît avec l'éruption puis s'arrête ; en cas de
+            // mort il s'éteint en une seconde (`quakeAudio.volume - dt`).
+            when (next.phase) {
+                CinePhase.ERUPTION -> {
+                    val p = (next.phaseElapsed / VolcanoCinematic.ERUPTION_DURATION).coerceIn(0.0, 1.0)
+                    quake.setVolume((QuakeSound.MAX_VOLUME * (1.0 - p)).toFloat())
+                }
+                CinePhase.DEATH -> quake.fadeOut(dt)
+                CinePhase.ASCENT, CinePhase.STABILIZE, CinePhase.ROCKS,
+                CinePhase.DESCENT, CinePhase.LANDING, CinePhase.OUTRO -> quake.stop()
+                else -> Unit
+            }
 
             // cineUpdate() : la part visuelle, phase par phase.
             when (next.phase) {

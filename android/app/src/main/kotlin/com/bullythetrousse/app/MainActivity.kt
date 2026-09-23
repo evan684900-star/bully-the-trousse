@@ -140,8 +140,12 @@ fun GameRoot() {
     // Le niveau de détail choisi dans les Réglages descend jusqu'aux écrans
     // qui dessinent, sans que les écrans intermédiaires aient à le porter
     // (voir LocalGraphicsQuality).
+    // Les bruitages sont synthétisés (voir SfxPlayer) : un seul lecteur pour
+    // toute l'app, pour que le cache PCM serve à tous les écrans.
+    val sfx = rememberSfxPlayer()
     CompositionLocalProvider(
         LocalGraphicsQuality provides GraphicsQuality.fromId(save.graphicsQuality),
+        LocalSfx provides sfx,
     ) {
         GameContent(
             save = save,

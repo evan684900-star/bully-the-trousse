@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.Repair
+import com.bullythetrousse.core.SfxCatalog
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Shop
 import com.bullythetrousse.core.SkinShop
@@ -56,10 +57,24 @@ fun ShopScreen(
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
+    val sfx = LocalSfx.current
 
     fun purchase(updated: GameSave, cost: Int) {
         applyPurchase(updated, cost, onSaveChange)
+        sfx.play(SfxCatalog.BUY)
         toast = null
+    }
+
+    /** Achat refusé faute d'argent : sfxError() + le toast du site. */
+    fun notEnoughMoney() {
+        sfx.play(SfxCatalog.ERROR)
+        toast = "💸 Pas assez d'argent !"
+    }
+
+    /** Équiper joue aussi sfxBuy() côté site. */
+    fun equip(updated: GameSave) {
+        onSaveChange(updated)
+        sfx.play(SfxCatalog.BUY)
     }
 
     Box(modifier = Modifier.fillMaxSize().background(ShopBg)) {
@@ -106,9 +121,9 @@ fun ShopScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (tab) {
-                    0 -> UpgradesTab(save, ::purchase) { toast = it }
-                    1 -> SkinsTab(save, onSaveChange, ::purchase) { toast = it }
-                    else -> TrailsTab(save, onSaveChange, ::purchase) { toast = it }
+                    0 -> UpgradesTab(save, ::purchase, ::notEnoughMoney)
+                    1 -> SkinsTab(save, ::equip, ::purchase, ::notEnoughMoney)
+                    else -> TrailsTab(save, ::equip, ::purchase, ::notEnoughMoney)
                 }
             }
         }
@@ -118,7 +133,7 @@ fun ShopScreen(
 
 /** Onglet "Améliorations" : Puissance et Vitesse (voir renderShopTab côté web). */
 @Composable
-private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onToast: (String) -> Unit) {
+private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onNotEnoughMoney: () -> Unit) {
     ShopCard(
         title = "Puissance",
         description = "Augmente la force maximale de ton lancer, et l'argent gagné à chaque lancer (+3%/niveau).",
@@ -128,7 +143,7 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onT
         GameButton("${Economy.upgradeCost(save.puissanceLevel)} $", small = true) {
             when (val result = Shop.buyPuissance(save)) {
                 is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
-                else -> onToast("💸 Pas assez d'argent !")
+                else -> onNotEnoughMoney()
             }
         }
     }
@@ -141,7 +156,7 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onT
         GameButton("${Economy.upgradeCost(save.vitesseLevel)} $", small = true) {
             when (val result = Shop.buyVitesse(save)) {
                 is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
-                else -> onToast("💸 Pas assez d'argent !")
+                else -> onNotEnoughMoney()
             }
         }
     }
@@ -162,7 +177,7 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onT
                 GameButton("$repairCost $", small = true) {
                     when (val result = Repair.repair(save)) {
                         is Repair.Result.Success -> onPurchase(result.save, result.cost)
-                        else -> onToast("💸 Pas assez d'argent !")
+                        else -> onNotEnoughMoney()
                     }
                 }
             }
@@ -174,9 +189,9 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onT
 @Composable
 private fun SkinsTab(
     save: GameSave,
-    onSaveChange: (GameSave) -> Unit,
+    onEquip: (GameSave) -> Unit,
     onPurchase: (GameSave, Int) -> Unit,
-    onToast: (String) -> Unit,
+    onNotEnoughMoney: () -> Unit,
 ) {
     for (skin in Skins.ALL) {
         val (name, desc) = SKIN_LABELS[skin.id] ?: (skin.id to "")
@@ -198,10 +213,10 @@ private fun SkinsTab(
             onBuy = {
                 when (val result = SkinShop.buy(save, skin.id)) {
                     is SkinShop.PurchaseResult.Success -> onPurchase(result.save, skin.cost)
-                    else -> onToast("💸 Pas assez d'argent !")
+                    else -> onNotEnoughMoney()
                 }
             },
-            onEquip = { onSaveChange(SkinShop.equip(save, skin.id)) },
+            onEquip = { onEquip(SkinShop.equip(save, skin.id)) },
         )
     }
 }
@@ -210,9 +225,9 @@ private fun SkinsTab(
 @Composable
 private fun TrailsTab(
     save: GameSave,
-    onSaveChange: (GameSave) -> Unit,
+    onEquip: (GameSave) -> Unit,
     onPurchase: (GameSave, Int) -> Unit,
-    onToast: (String) -> Unit,
+    onNotEnoughMoney: () -> Unit,
 ) {
     for (trail in Trails.ALL) {
         val (name, desc) = TRAIL_LABELS[trail.id] ?: (trail.id to "")
@@ -228,10 +243,10 @@ private fun TrailsTab(
             onBuy = {
                 when (val result = TrailShop.buy(save, trail.id)) {
                     is TrailShop.PurchaseResult.Success -> onPurchase(result.save, trail.cost)
-                    else -> onToast("💸 Pas assez d'argent !")
+                    else -> onNotEnoughMoney()
                 }
             },
-            onEquip = { onSaveChange(TrailShop.equip(save, trail.id)) },
+            onEquip = { onEquip(TrailShop.equip(save, trail.id)) },
         )
     }
 }

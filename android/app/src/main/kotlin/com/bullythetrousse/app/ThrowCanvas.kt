@@ -699,6 +699,7 @@ private fun DrawScope.drawCourTree(sx: Float, groundY: Float, seed: Int) {
 fun animateFlight(
     result: ThrowResult,
     space: SpaceFlight? = null,
+    vampire: VampireBoostController? = null,
     onLanded: () -> Unit,
 ): FlightState {
     var state by remember(result) { mutableStateOf(result.toInitialFlightState()) }
@@ -725,6 +726,9 @@ fun animateFlight(
                 continue
             }
 
+            // Le boost 🦇 accélère vx AVANT le pas de simulation, comme la
+            // section "flying" de gameLoop() côté site.
+            if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
         }
         onLanded()
@@ -745,7 +749,11 @@ data class BeachFlightOutcome(val parasolBounced: Boolean, val towelFound: Boole
  * `onLanded` reçoit l'état final ET ce qui s'est déclenché pendant le vol.
  */
 @Composable
-fun animateBeachFlight(result: ThrowResult, onLanded: (FlightState, BeachFlightOutcome) -> Unit): FlightState {
+fun animateBeachFlight(
+    result: ThrowResult,
+    vampire: VampireBoostController? = null,
+    onLanded: (FlightState, BeachFlightOutcome) -> Unit,
+): FlightState {
     var state by remember(result) { mutableStateOf(result.toInitialFlightState()) }
     val rotSpeed = remember(result) { rotationSpeed(result.initialSpeed) }
 
@@ -764,6 +772,7 @@ fun animateBeachFlight(result: ThrowResult, onLanded: (FlightState, BeachFlightO
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+            if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
             if (state.hasLanded) {
                 when (Beach.landingOutcome(events, used, inSpaceMode = false)) {
