@@ -56,6 +56,9 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BumpMode
 import com.bullythetrousse.core.DailyChallenges
+import com.bullythetrousse.core.Milestones
+import com.bullythetrousse.core.LunarBonus
+import com.bullythetrousse.core.DailyStats
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
@@ -74,6 +77,7 @@ import com.bullythetrousse.core.SpaceState
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 import java.time.LocalDate
+import kotlin.math.roundToInt
 
 /**
  * Écran de jeu, porté de `#screen-game` (index.html) : le canvas en plein
@@ -131,6 +135,8 @@ fun GameScreen(
     var landedDistance by remember { mutableStateOf(0.0) }
     var coinMultiplier by remember { mutableStateOf<Double?>(null) }
     var coinJackpot by remember { mutableStateOf(false) }
+    // Toast de l'écran de jeu (palier atteint...), comme `showToast()` côté site.
+    var toast by remember { mutableStateOf<String?>(null) }
     // Le détour en apesanteur du lancer en cours, tant qu'il dure : c'est lui
     // qui reçoit les taps sur les anneaux du QTE.
     var spaceFlight by remember { mutableStateOf<SpaceFlight?>(null) }
@@ -191,6 +197,7 @@ fun GameScreen(
             },
             onSpaceFlight = { spaceFlight = it },
             onVampireBoost = { vampireBoost = it },
+            onToast = { toast = it },
         )
         ThrowCanvas(
             flightState = flight.state,
@@ -240,9 +247,10 @@ fun GameScreen(
             // calculé d'un coup côté `:core`), le vol n'est qu'une animation
             // jouée ensuite. Annoncer la distance pendant que la trousse est
             // encore en l'air spoilerait le lancer.
-            if (current is ThrowState.Landed && flight.resolved) {
+            val throwSummary = flight.summary
+            if (current is ThrowState.Landed && flight.resolved && throwSummary != null) {
                 ResultPanel(
-                    save = save,
+                    summary = throwSummary,
                     distanceMeters = current.result.distanceMeters,
                     isPerfect = current.result.isPerfect,
                     onThrowAgain = { tap() },
@@ -274,6 +282,7 @@ fun GameScreen(
             jackpot = coinJackpot,
             onDismiss = { coinMultiplier = null },
         )
+        Toast(message = toast, onDismiss = { toast = null })
     }
 }
 
@@ -303,7 +312,26 @@ private fun hintForSpace(space: SpaceState): String = when (space.phase) {
  * (`null` tant que rien n'est en l'air) et si le lancer est complètement
  * terminé — vol fini, dérapage éventuel compris.
  */
-private data class FlightDisplay(val state: FlightState?, val resolved: Boolean)
+private data class FlightDisplay(
+    val state: FlightState?,
+    val resolved: Boolean,
+    val summary: ThrowSummary? = null,
+)
+
+/**
+ * Ce que le panneau de résultat affiche en plus de la distance, calculé une
+ * fois le lancer résolu — les lignes `#result-*` de `onLanded()` côté site.
+ */
+private data class ThrowSummary(
+    val isRecord: Boolean,
+    val earn: Int,
+    val coinMultiplier: Double?,
+    val coinExtra: Int,
+    val vampireStolen: Int,
+    val vampireStealPct: Double,
+    val skidded: Boolean,
+    val beach: BeachFlightOutcome?,
+)
 
 /**
  * `#meter-wrap` : barre de 26px de haut, très arrondie, fond sombre. Pendant
@@ -383,7 +411,7 @@ private fun Meter(state: ThrowState) {
  */
 @Composable
 private fun ResultPanel(
-    save: GameSave,
+    summary: ThrowSummary,
     distanceMeters: Double,
     isPerfect: Boolean,
     onThrowAgain: () -> Unit,
@@ -391,7 +419,6 @@ private fun ResultPanel(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(18.dp)
-    val record = if (save.currentWorld == "plage") save.plageBestDistance else save.bestDistance
     Column(
         modifier = modifier
             .widthIn(min = 260.dp, max = 340.dp)
@@ -401,14 +428,14 @@ private fun ResultPanel(
             .padding(horizontal = 28.dp, vertical = 22.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (distanceMeters >= record) {
-            Text("🏆 NOUVEAU RECORD !", color = Accent2, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+        if (summary.isRecord) {
+            Text(tr("resultRecord"), color = Accent2, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
         }
         if (isPerfect) {
-            Text("✨ LANCER PARFAIT !", color = Money, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+            Text(tr("resultPerfect"), color = Money, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
         }
         Text(
-            "Distance parcourue",
+            tr("resultDistanceTitle"),
             color = Accent,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
@@ -421,11 +448,51 @@ private fun ResultPanel(
             fontSize = 34.sp,
             fontWeight = FontWeight.Black,
         )
+        // .earn
+        Text("+${summary.earn} $", color = Money, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        // #result-coin / #result-vampire : textes en dur côté site (pas dans STRINGS).
+        summary.coinMultiplier?.let { m ->
+            ResultNote(
+                "🪙 Multiplicateur x${formatMultiplier(m)} ! (+${summary.coinExtra}$ grâce au bonus)",
+                Accent,
+            )
+        }
+        if (summary.vampireStolen > 0 || summary.vampireStealPct > 0) {
+            ResultNote(
+                "🦇 -${summary.vampireStolen}$ volés par la malédiction (${summary.vampireStealPct.roundToInt()}%)",
+                Color(0xFFB388FF),
+            )
+        }
+        // #result-skid
+        if (summary.skidded) ResultNote(tr("skidWarning"), Color(0xFFFF6B6B))
+        // #result-beach : une ligne par évènement de la plage, comme beachResultText().
+        summary.beach?.let { beach ->
+            val lines = buildList {
+                if (beach.parasolBounced) add(tr("beachResultParasol"))
+                if (beach.towelFound) add(tr("beachResultTowel"))
+                if (beach.castleCrushed) add(tr("beachResultCastle"))
+            }
+            if (lines.isNotEmpty()) ResultNote(lines.joinToString("\n"), Color(0xFF6BFFB0))
+        }
         FlowRowCentered(gap = 10.dp, modifier = Modifier.padding(top = 12.dp)) {
-            GameButton("🔁 Relancer", small = true, onClick = onThrowAgain)
-            GameButton("🛒 Boutique", secondary = true, small = true, onClick = onOpenShop)
+            GameButton(tr("btnThrowAgain"), small = true, onClick = onThrowAgain)
+            GameButton(tr("btnShop"), secondary = true, small = true, onClick = onOpenShop)
         }
     }
+}
+
+/** Les petites lignes colorées sous le gain (`#result-coin`, `#result-skid`...). */
+@Composable
+private fun ResultNote(text: String, color: Color) {
+    Text(
+        text,
+        color = color,
+        fontSize = 12.5.sp,
+        fontWeight = FontWeight.ExtraBold,
+        textAlign = TextAlign.Center,
+        lineHeight = 18.sp,
+        modifier = Modifier.widthIn(max = 280.dp).padding(top = 6.dp),
+    )
 }
 
 /**
@@ -443,6 +510,7 @@ private fun ThrowFlight(
     onEarnings: (SkinEarningsResult) -> Unit,
     onSpaceFlight: (SpaceFlight?) -> Unit,
     onVampireBoost: (VampireBoostController?) -> Unit,
+    onToast: (String) -> Unit,
 ): FlightDisplay {
     if (state !is ThrowState.Landed) {
         // Après un rebond (Trousse à Baskets), la trousse reste à sa position
@@ -547,66 +615,108 @@ private fun ThrowFlight(
     }
 
     val resolved = flightFinished && skidDecided && (!isSkidding || skidFinished)
+    var summary by remember(result) { mutableStateOf<ThrowSummary?>(null) }
     LaunchedEffect(resolved, result) {
         if (!resolved) return@LaunchedEffect
+        val today = LocalDate.now()
         val equippedSkin = Skins.find(save.equippedSkin)
         val totalPuissance = SkinStats.totalPuissance(save)
         val totalVitesse = SkinStats.totalVitesse(save)
-        val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalPuissance + totalVitesse)
-        val earnings: SkinEarningsResult = SkinEarnings.apply(baseEarn, equippedSkin, result.distanceMeters)
-        onEarnings(earnings)
+        var updated = save
+
+        // Dérapage (monde Volcan) : -10 de durabilité et message rouge.
+        if (isSkidding) updated = Skid.applyDurabilityCost(updated)
 
         // Record par monde : le monde normal et la plage ont chacun le leur.
         val previousRecord = if (isBeach) save.plageBestDistance else save.bestDistance
-        if (result.distanceMeters > previousRecord) {
+        val isRecord = result.distanceMeters > previousRecord
+        if (isRecord) {
             sfx.play(SfxCatalog.RECORD)
             haptics.play(HapticEvent.RECORD)
+            updated = if (isBeach) {
+                updated.copy(plageBestDistance = result.distanceMeters)
+            } else {
+                updated.copy(bestDistance = result.distanceMeters)
+            }
         }
-        var updated = if (isBeach) {
-            save.copy(
-                plageBestDistance = maxOf(save.plageBestDistance, result.distanceMeters),
-                plageThrows = save.plageThrows + 1,
-                plageMoneyEarned = save.plageMoneyEarned + earnings.finalEarn,
-            )
-        } else {
-            save.copy(bestDistance = maxOf(save.bestDistance, result.distanceMeters))
-        }
+
+        // Gain : base + parfait + améliorations, puis le bonus lunaire (après
+        // l'espace seulement), puis la pièce, puis le tribut vampire — dans
+        // cet ordre précis, comme côté site.
+        val base = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalPuissance + totalVitesse)
+        val withLunar = LunarBonus.apply(base, equippedSkin, cameFromSpace = goesToSpace)
+        val earnings: SkinEarningsResult = SkinEarnings.apply(withLunar, equippedSkin, result.distanceMeters)
+        onEarnings(earnings)
+        val earn = earnings.finalEarn
+        // Le « +X $ grâce au bonus » de la pièce, calculé avant le tribut
+        // vampire (les deux ne peuvent de toute façon pas se cumuler).
+        val coinExtra = earnings.coinMultiplier?.let { (withLunar * it).roundToInt() - withLunar } ?: 0
+
         updated = updated.copy(
-            money = updated.money + earnings.finalEarn,
-            totalMoneyEarned = updated.totalMoneyEarned + earnings.finalEarn,
-            totalThrows = updated.totalThrows + 1,
+            money = updated.money + earn,
             hasJackpot = updated.hasJackpot || earnings.hasJackpot,
         )
-        if (isSkidding) updated = Skid.applyDurabilityCost(updated)
+        updated = DailyStats.recordEarning(updated, earn, today)
+        updated = DailyStats.recordDistance(updated, result.distanceMeters, today)
+        var totalGained = earn
+
+        // Palier de 100 m : une seule fois par palier, même franchis en rafale.
+        Milestones.reward(updated, result.distanceMeters)?.let { reward ->
+            updated = updated.copy(
+                milestoneReached = reward.milestone,
+                money = updated.money + reward.bonus,
+            )
+            updated = DailyStats.recordEarning(updated, reward.bonus, today)
+            totalGained += reward.bonus
+            onToast("🎉 Palier des ${reward.meters}m atteint ! +${reward.bonus}$")
+        }
+
+        updated = updated.copy(totalThrows = updated.totalThrows + 1)
+        if (isBeach) updated = updated.copy(plageThrows = updated.plageThrows + 1)
         beachOutcome?.let { outcome ->
             if (outcome.parasolBounced) updated = updated.copy(plageParasolBounces = updated.plageParasolBounces + 1)
             if (outcome.towelFound) updated = updated.copy(plageTowelsFound = updated.plageTowelsFound + 1)
             if (outcome.castleCrushed) updated = updated.copy(plageCastlesCrushed = updated.plageCastlesCrushed + 1)
         }
 
-        // Défis quotidiens (voir bumpDailyChallenge() côté web).
-        updated = DailyChallenges.ensure(updated, LocalDate.now().toString(), totalPuissance, totalVitesse)
+        // Défis quotidiens (voir bumpDailyChallenge() côté web) : "volcan" et
+        // "skid" seulement au monde Volcan hors apesanteur.
+        updated = DailyChallenges.ensure(updated, today.toString(), totalPuissance, totalVitesse)
         updated = DailyChallenges.bump(updated, "throws", 1.0, BumpMode.ADD)
         updated = DailyChallenges.bump(updated, "distance", result.distanceMeters, BumpMode.MAX)
         updated = DailyChallenges.bump(updated, "distanceCumul", result.distanceMeters, BumpMode.ADD)
-        updated = DailyChallenges.bump(updated, "earn", earnings.finalEarn.toDouble(), BumpMode.ADD)
+        updated = DailyChallenges.bump(updated, "earn", totalGained.toDouble(), BumpMode.ADD)
         if (result.isPerfect) updated = DailyChallenges.bump(updated, "perfect", 1.0, BumpMode.ADD)
         if (isSkidding) updated = DailyChallenges.bump(updated, "skid", 1.0, BumpMode.ADD)
+        if (save.currentWorld == "volcans" && !goesToSpace) {
+            updated = DailyChallenges.bump(updated, "volcan", 1.0, BumpMode.ADD)
+        }
         if (result.isPerfect) updated = updated.copy(hasPerfectThrow = true)
 
         // Passage par l'apesanteur : le succès de l'easter egg, et celui des
-        // réflexes parfaits si tous les anneaux ont été réussis d'affilée.
+        // réflexes parfaits (+ le défi "qte") si tous les anneaux sont réussis.
         spaceOutcome?.let { outcome ->
             updated = updated.copy(hasTriggeredSpaceEgg = true)
             if (SpaceSequence.isPerfect(outcome, equipped)) {
                 updated = updated.copy(hasPerfectQte = true)
+                updated = DailyChallenges.bump(updated, "qte", 1.0, BumpMode.ADD)
             }
         }
 
+        summary = ThrowSummary(
+            isRecord = isRecord,
+            earn = earn,
+            coinMultiplier = earnings.coinMultiplier,
+            coinExtra = coinExtra,
+            vampireStolen = earnings.vampireStolen,
+            vampireStealPct = earnings.vampireStealPct,
+            skidded = isSkidding,
+            beach = beachOutcome,
+        )
         onSaveChange(Achievements.apply(updated))
     }
 
-    return FlightDisplay(state = displayed, resolved = resolved)
+    return FlightDisplay(state = displayed, resolved = resolved && summary != null, summary = summary)
 }
 
 /**

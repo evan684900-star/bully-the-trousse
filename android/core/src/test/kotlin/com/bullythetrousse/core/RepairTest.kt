@@ -32,9 +32,20 @@ class RepairTest {
     }
 
     @Test
-    fun `refuse si l argent manque`() {
-        val save = GameSave(durability = 0, money = 100)
+    fun `refuse si l argent ne paie meme pas un point`() {
+        val save = GameSave(durability = 0, money = 49)
         assertIs<Repair.Result.NotEnoughMoney>(Repair.repair(save))
+    }
+
+    @Test
+    fun `repare partiellement avec tout l argent disponible`() {
+        // 100 $ ne paient pas la réparation complète (5000 $) : 2 points à 50 $.
+        val result = Repair.repair(GameSave(durability = 0, money = 120))
+        assertIs<Repair.Result.Partial>(result)
+        assertEquals(2, result.points)
+        assertEquals(100, result.cost)
+        assertEquals(2, result.save.durability)
+        assertEquals(20, result.save.money)
     }
 
     @Test

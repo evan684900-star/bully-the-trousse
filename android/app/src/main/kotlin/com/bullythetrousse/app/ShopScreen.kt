@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.bullythetrousse.core.Beach
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.Repair
 import com.bullythetrousse.core.SfxCatalog
@@ -61,26 +62,31 @@ fun ShopScreen(
     val sfx = LocalSfx.current
     val haptics = LocalHaptics.current
 
-    fun purchase(updated: GameSave, cost: Int) {
+    /** Achat réussi : sfxBuy() + le toast de confirmation du site. */
+    fun purchase(updated: GameSave, cost: Int, message: String) {
         applyPurchase(updated, cost, onSaveChange)
         sfx.play(SfxCatalog.BUY)
         haptics.play(HapticEvent.BUY)
-        toast = null
+        toast = message
     }
 
     /** Achat refusé faute d'argent : sfxError() + le toast du site. */
-    fun notEnoughMoney() {
+    fun notEnoughMoney(message: String) {
         sfx.play(SfxCatalog.ERROR)
         haptics.play(HapticEvent.ERROR)
-        toast = "💸 Pas assez d'argent !"
+        toast = message
     }
 
-    /** Équiper joue aussi sfxBuy() côté site. */
-    fun equip(updated: GameSave) {
+    /** Équiper joue aussi sfxBuy() côté site, avec son propre toast. */
+    fun equip(updated: GameSave, message: String) {
         onSaveChange(updated)
         sfx.play(SfxCatalog.BUY)
         haptics.play(HapticEvent.BUY)
+        toast = message
     }
+
+    val noMoney = tr("notEnoughMoney")
+    val actions = ShopActions(::purchase, { notEnoughMoney(noMoney) }, ::equip)
 
     Box(modifier = Modifier.fillMaxSize().background(ShopBg)) {
         Column(
@@ -94,8 +100,8 @@ fun ShopScreen(
                 modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                GameButton("← Menu", secondary = true, small = true, onClick = onBackToMenu)
-                GameButton("🎮 Retour au jeu", small = true, onClick = onBackToGame)
+                GameButton(tr("btnBackMenu"), secondary = true, small = true, onClick = onBackToMenu)
+                GameButton(tr("btnBackGame"), small = true, onClick = onBackToGame)
             }
 
             // .shop-header : centré, argent + bonus de gains cumulé.
@@ -111,7 +117,7 @@ fun ShopScreen(
 
             Box(modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)) {
                 ShopTabs(
-                    tabs = listOf("⚙️ Améliorations", "🎨 Skins", "🌈 Traînées"),
+                    tabs = listOf(tr("shopTabUpgrades"), tr("shopTabSkins"), tr("shopTabTrails")),
                     selectedIndex = tab,
                     onSelect = { tab = it },
                 )
@@ -126,9 +132,9 @@ fun ShopScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 when (tab) {
-                    0 -> UpgradesTab(save, ::purchase, ::notEnoughMoney)
-                    1 -> SkinsTab(save, ::equip, ::purchase, ::notEnoughMoney)
-                    else -> TrailsTab(save, ::equip, ::purchase, ::notEnoughMoney)
+                    0 -> UpgradesTab(save, actions)
+                    1 -> SkinsTab(save, actions)
+                    else -> TrailsTab(save, actions)
                 }
             }
         }
@@ -136,54 +142,110 @@ fun ShopScreen(
     }
 }
 
-/** Onglet "Améliorations" : Puissance et Vitesse (voir renderShopTab côté web). */
+/** Les trois issues d'un clic en boutique, communes à tous les onglets. */
+private class ShopActions(
+    val purchase: (updated: GameSave, cost: Int, message: String) -> Unit,
+    val notEnoughMoney: () -> Unit,
+    val equip: (updated: GameSave, message: String) -> Unit,
+)
+
+/**
+ * Onglet "Améliorations" (voir renderShopTab côté web) : Puissance, Vitesse,
+ * puis la réparation (monde Volcan découvert, jamais sur la plage où rien
+ * n'abîme la trousse), puis le billet de bus sur la plage ou, ailleurs, la
+ * Trousse à Claquettes tant qu'elle n'est pas achetée.
+ */
 @Composable
-private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onNotEnoughMoney: () -> Unit) {
+private fun UpgradesTab(save: GameSave, actions: ShopActions) {
+    val level = tr("levelShort")
+    val puissanceName = tr("upgradePuissanceName")
     ShopCard(
-        title = "Puissance",
-        description = "Augmente la force maximale de ton lancer, et l'argent gagné à chaque lancer (+3%/niveau).",
-        levelBadge = "Niv. ${save.puissanceLevel}",
+        title = puissanceName,
+        description = tr("upgradePuissanceDesc"),
+        levelBadge = "$level${save.puissanceLevel}",
         leading = { Text("💪", fontSize = 30.sp) },
     ) {
         GameButton("${Economy.upgradeCost(save.puissanceLevel)} $", small = true) {
             when (val result = Shop.buyPuissance(save)) {
-                is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
-                else -> onNotEnoughMoney()
+                is Shop.PurchaseResult.Success ->
+                    actions.purchase(result.save, result.cost, "✅ $puissanceName ($level${result.save.puissanceLevel})")
+                else -> actions.notEnoughMoney()
             }
         }
     }
+    val vitesseName = tr("upgradeVitesseName")
     ShopCard(
-        title = "Vitesse",
-        description = "Réduit la résistance (vole plus loin), et augmente l'argent gagné à chaque lancer (+3%/niveau).",
-        levelBadge = "Niv. ${save.vitesseLevel}",
+        title = vitesseName,
+        description = tr("upgradeVitesseDesc"),
+        levelBadge = "$level${save.vitesseLevel}",
         leading = { Text("⚡", fontSize = 30.sp) },
     ) {
         GameButton("${Economy.upgradeCost(save.vitesseLevel)} $", small = true) {
             when (val result = Shop.buyVitesse(save)) {
-                is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
-                else -> onNotEnoughMoney()
+                is Shop.PurchaseResult.Success ->
+                    actions.purchase(result.save, result.cost, "✅ $vitesseName ($level${result.save.vitesseLevel})")
+                else -> actions.notEnoughMoney()
             }
         }
     }
 
-    // "Réparer la trousse" : n'apparaît qu'une fois le monde Volcan découvert,
-    // seule source de dégâts du jeu (voir buildRepairCard() côté web).
-    if (save.volcanUnlocked) {
+    if (save.volcanUnlocked && !save.inPlage) {
         val repairCost = Repair.cost(save)
+        val done = tr("repairDone")
+        val partial = tr("repairPartialDone")
         ShopCard(
-            title = "Réparer la trousse",
-            description = "Remet la durabilité à 100. 500 $ par tranche de 10 de durabilité manquante.",
+            title = tr("repairName"),
+            description = tr("repairDesc"),
             levelBadge = "${save.durability} / ${SkinStats.maxDurability(save)}",
             leading = { Text("🔧", fontSize = 30.sp) },
         ) {
             if (repairCost == 0) {
-                GameButton("Intacte", secondary = true, small = true) {}
+                GameButton(tr("repairFull"), secondary = true, small = true) {}
             } else {
                 GameButton("$repairCost $", small = true) {
                     when (val result = Repair.repair(save)) {
-                        is Repair.Result.Success -> onPurchase(result.save, result.cost)
-                        else -> onNotEnoughMoney()
+                        is Repair.Result.Success -> actions.purchase(result.save, result.cost, done)
+                        is Repair.Result.Partial -> actions.purchase(result.save, result.cost, partial)
+                        Repair.Result.AlreadyFull -> Unit
+                        Repair.Result.NotEnoughMoney -> actions.notEnoughMoney()
                     }
+                }
+            }
+        }
+    }
+
+    if (save.inPlage) {
+        // Billet de bus : la seule sortie de la plage.
+        val free = save.hasTakenBusBack
+        val bought = tr("busTicketBought")
+        ShopCard(
+            title = tr("busTicketName"),
+            description = tr(if (free) "busTicketFreeDesc" else "busTicketDesc"),
+            leading = { Text("🚌", fontSize = 30.sp) },
+        ) {
+            GameButton(
+                if (free) tr("busTicketFreeBtn") else "${Beach.BUS_TICKET_COST} $",
+                secondary = free,
+                small = true,
+            ) {
+                when (val result = Beach.buyBusTicket(save)) {
+                    is Beach.PurchaseResult.Success -> actions.purchase(result.save, Beach.busTicketCost(save), bought)
+                    Beach.PurchaseResult.NotEnoughMoney -> actions.notEnoughMoney()
+                }
+            }
+        }
+    } else if (!save.hasClaquettes) {
+        // Trousse à Claquettes : pas de bonus, c'est le ticket d'entrée de la Plage.
+        val bought = tr("claquettesBought")
+        ShopCard(
+            title = tr("claquettesName"),
+            description = tr("claquettesDesc"),
+            leading = { Text("🩴", fontSize = 30.sp) },
+        ) {
+            GameButton("${Beach.CLAQUETTES_COST} $", small = true) {
+                when (val result = Beach.buyClaquettes(save)) {
+                    is Beach.PurchaseResult.Success -> actions.purchase(result.save, Beach.CLAQUETTES_COST, bought)
+                    Beach.PurchaseResult.NotEnoughMoney -> actions.notEnoughMoney()
                 }
             }
         }
@@ -192,12 +254,7 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onN
 
 /** Onglet "Skins" : le sprite de la trousse, le nom et la description du site. */
 @Composable
-private fun SkinsTab(
-    save: GameSave,
-    onEquip: (GameSave) -> Unit,
-    onPurchase: (GameSave, Int) -> Unit,
-    onNotEnoughMoney: () -> Unit,
-) {
+private fun SkinsTab(save: GameSave, actions: ShopActions) {
     for (skin in Skins.ALL) {
         val (name, desc) = SKIN_LABELS[skin.id] ?: (skin.id to "")
         val owned = save.ownedSkins.contains(skin.id)
@@ -217,23 +274,19 @@ private fun SkinsTab(
             cost = skin.cost,
             onBuy = {
                 when (val result = SkinShop.buy(save, skin.id)) {
-                    is SkinShop.PurchaseResult.Success -> onPurchase(result.save, skin.cost)
-                    else -> onNotEnoughMoney()
+                    // Textes en dur côté site (pas dans STRINGS), comme le nom des skins.
+                    is SkinShop.PurchaseResult.Success -> actions.purchase(result.save, skin.cost, "✅ $name achetée !")
+                    else -> actions.notEnoughMoney()
                 }
             },
-            onEquip = { onEquip(SkinShop.equip(save, skin.id)) },
+            onEquip = { actions.equip(SkinShop.equip(save, skin.id), "✅ $name équipée !") },
         )
     }
 }
 
 /** Onglet "Traînées" : la pastille `.trail-swatch` tient lieu d'aperçu. */
 @Composable
-private fun TrailsTab(
-    save: GameSave,
-    onEquip: (GameSave) -> Unit,
-    onPurchase: (GameSave, Int) -> Unit,
-    onNotEnoughMoney: () -> Unit,
-) {
+private fun TrailsTab(save: GameSave, actions: ShopActions) {
     for (trail in Trails.ALL) {
         val (name, desc) = TRAIL_LABELS[trail.id] ?: (trail.id to "")
         val owned = save.ownedTrails.contains(trail.id)
@@ -247,11 +300,11 @@ private fun TrailsTab(
             cost = trail.cost,
             onBuy = {
                 when (val result = TrailShop.buy(save, trail.id)) {
-                    is TrailShop.PurchaseResult.Success -> onPurchase(result.save, trail.cost)
-                    else -> onNotEnoughMoney()
+                    is TrailShop.PurchaseResult.Success -> actions.purchase(result.save, trail.cost, "✅ $name achetée !")
+                    else -> actions.notEnoughMoney()
                 }
             },
-            onEquip = { onEquip(TrailShop.equip(save, trail.id)) },
+            onEquip = { actions.equip(TrailShop.equip(save, trail.id), "✅ $name équipée !") },
         )
     }
 }
@@ -274,8 +327,8 @@ private fun CosmeticCard(
 ) {
     ShopCard(title = title, description = description, leading = preview) {
         when {
-            equipped -> Text("✅ Équipée", color = Money, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-            owned -> GameButton("Équiper", secondary = true, small = true, onClick = onEquip)
+            equipped -> Text("✅ ${tr("equipped")}", color = Money, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            owned -> GameButton(tr("equip"), secondary = true, small = true, onClick = onEquip)
             else -> GameButton("$cost $", small = true, onClick = onBuy)
         }
     }

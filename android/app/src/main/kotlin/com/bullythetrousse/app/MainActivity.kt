@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,7 +24,9 @@ import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.HapticEvent
+import com.bullythetrousse.core.Lang
 import com.bullythetrousse.core.VolcanoCinematic
+import java.util.Locale
 
 /**
  * Treizième tranche du portage natif : écrans séparés (Menu / Jeu /
@@ -129,6 +132,14 @@ fun GameRoot() {
         if (newlyUnlocked.isNotEmpty()) haptics.play(HapticEvent.ACHIEVEMENT)
     }
 
+    // Langue jamais choisie : on devine d'après celle du téléphone, une seule
+    // fois, comme l'initialisation du site (`navigator.language`).
+    LaunchedEffect(Unit) {
+        if (save.lang.isEmpty()) {
+            updateSave(save.copy(lang = Lang.forDeviceLanguage(Locale.getDefault().language).id))
+        }
+    }
+
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
     WorldMusic(world = save.currentWorld, muted = save.musicMuted)
 
@@ -154,6 +165,7 @@ fun GameRoot() {
         LocalGraphicsQuality provides GraphicsQuality.fromId(save.graphicsQuality),
         LocalSfx provides sfx,
         LocalHaptics provides haptics,
+        LocalLang provides Lang.fromId(save.lang),
     ) {
         GameContent(
             save = save,

@@ -99,14 +99,16 @@ object DailyChallenges {
 
     /** Réclame la récompense du défi d'index [index] : refuse s'il n'existe
      *  pas, est déjà réclamé, ou n'a pas encore atteint sa cible. */
-    fun claim(save: GameSave, index: Int): ClaimResult {
+    fun claim(save: GameSave, index: Int, today: java.time.LocalDate = java.time.LocalDate.now()): ClaimResult {
         val challenge = save.dailyChallenges.getOrNull(index) ?: return ClaimResult.NotReady
         if (challenge.claimed || challenge.progress < challenge.target) return ClaimResult.NotReady
         val updatedChallenges = save.dailyChallenges.mapIndexed { i, c -> if (i == index) c.copy(claimed = true) else c }
-        val updated = save.copy(
-            dailyChallenges = updatedChallenges,
-            money = save.money + challenge.reward,
-            totalMoneyEarned = save.totalMoneyEarned + challenge.reward,
+        // `recordDailyEarning(c.reward)` côté site : la récompense compte dans
+        // le total cumulé ET dans les gains du jour (graphique hebdo du profil).
+        val updated = DailyStats.recordEarning(
+            save.copy(dailyChallenges = updatedChallenges, money = save.money + challenge.reward),
+            challenge.reward,
+            today,
         )
         return ClaimResult.Success(updated, challenge.reward)
     }

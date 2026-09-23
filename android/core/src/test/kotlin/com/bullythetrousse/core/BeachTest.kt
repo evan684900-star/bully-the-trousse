@@ -115,6 +115,17 @@ class BeachTest {
         assertEquals("cour", result.save.currentWorld)
     }
 
+    @Test
+    fun `le bus du retour est gratuit une fois paye`() {
+        val save = GameSave(money = 5, inPlage = true, currentWorld = "plage", hasTakenBusBack = true)
+        val result = Beach.buyBusTicket(save)
+        assertIs<Beach.PurchaseResult.Success>(result)
+        assertEquals(5, result.save.money)
+        assertFalse(result.save.inPlage)
+        assertEquals(0, Beach.busTicketCost(save))
+        assertEquals(Beach.BUS_TICKET_COST, Beach.busTicketCost(GameSave()))
+    }
+
     private fun assertClose(expected: Double, actual: Double, tolerance: Double = 1e-9) {
         assertTrue(abs(expected - actual) <= tolerance, "expected=$expected actual=$actual")
     }

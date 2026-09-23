@@ -42,6 +42,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
+import com.bullythetrousse.core.description
+import com.bullythetrousse.core.name
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Pseudo
@@ -150,11 +152,11 @@ fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
 
     detail?.let { achievement ->
         val unlocked = achievement.id in save.unlockedAchievements
-        val (name, description) = ACHIEVEMENT_LABELS[achievement.id] ?: (achievement.id to "")
+        val lang = LocalLang.current
         AchievementDetailDialog(
             emoji = if (unlocked) achievement.emoji else "🔒",
-            name = name,
-            description = description,
+            name = achievement.name(lang),
+            description = achievement.description(lang),
             unlocked = unlocked,
             onDismiss = { detail = null },
         )
@@ -322,7 +324,13 @@ fun SettingsScreen(
                 onSaveChange(save.copy(theme = if (night) "light" else "dark"))
             }
         }
-        SettingsRow("Langue") { GameButton("FR", secondary = true, small = true) {} }
+        // Bouton de langue : bascule FR <-> EN, toute l'interface suit
+        // immédiatement (voir LocalLang).
+        SettingsRow(tr("settingsLangLabel")) {
+            GameButton(if (save.lang == "en") "EN" else "FR", secondary = true, small = true) {
+                onSaveChange(save.copy(lang = if (save.lang == "en") "fr" else "en"))
+            }
+        }
     }
 }
 
