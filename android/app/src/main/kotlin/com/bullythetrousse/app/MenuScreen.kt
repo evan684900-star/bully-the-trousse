@@ -72,7 +72,8 @@ fun MenuScreen(
     var toast by remember { mutableStateOf<String?>(null) }
 
     Box(modifier = Modifier.fillMaxSize().background(ScreenBackground)) {
-        SkyAnimation(heightFraction = 0.6f) // #screen-menu .sky-anim { bottom: 40% }
+        // #screen-menu .sky-anim { bottom: 40% } — jour/nuit selon save.theme
+        SkyAnimation(heightFraction = 0.6f, night = save.theme != "light", world = save.currentWorld)
 
         // .menu-wrap : colonne centrée, défilable, padding 24/16/16, gap 10px.
         Column(

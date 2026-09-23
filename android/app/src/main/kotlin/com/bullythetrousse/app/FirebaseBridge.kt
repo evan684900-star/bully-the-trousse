@@ -273,6 +273,61 @@ class FirebaseBridge(context: Context) {
         firestore.collection(PROFILES).document(uid).set(payload, SetOptions.merge()).await()
     }
 
+    /**
+     * `renderProfile(uid)` côté site : le profil PUBLIC d'un autre joueur,
+     * lu dans `profiles/{uid}` — jamais dans `users/{uid}`, qui reste privé.
+     * Renvoie `null` si ce joueur n'a pas encore de profil publié.
+     */
+    suspend fun fetchPublicProfile(uid: String): PublicProfile? {
+        if (!isAvailable) return null
+        val doc = firestore.collection(PROFILES).document(uid).get().await()
+        if (!doc.exists()) return null
+        return PublicProfile(
+            uid = uid,
+            pseudo = doc.getString("pseudo").orEmpty().ifBlank { "?" },
+            avatarEmoji = doc.getString("avatarEmoji").orEmpty(),
+            isPrivate = doc.getBoolean("isPrivate") ?: false,
+            equippedSkin = doc.getString("equippedSkin").orEmpty().ifBlank { "classique" },
+            ownedSkinsCount = (doc.get("ownedSkins") as? List<*>)?.size ?: 0,
+            bestDistance = doc.getDouble("bestDistance") ?: 0.0,
+            totalMoneyEarned = (doc.getLong("totalMoneyEarned") ?: 0L),
+            puissance = (doc.getLong("puissance") ?: 0L).toInt(),
+            vitesse = (doc.getLong("vitesse") ?: 0L).toInt(),
+            achievementsCount = (doc.getLong("achievementsCount") ?: 0L).toInt(),
+            // `pingPresence()` côté site tient ce champ à jour : il sert à
+            // afficher "En ligne" ou "Vu il y a...".
+            updatedAtMillis = doc.getTimestamp(UPDATED_AT)?.toDate()?.time,
+        )
+    }
+
+    /** `isFollowing()` côté site : un `get()` direct sur l'identifiant de la
+     *  relation, sans requête — c'est pour ça que l'id est composé. */
+    suspend fun isFollowing(followerUid: String, targetUid: String): Boolean {
+        if (!isAvailable) return false
+        return firestore.collection(FOLLOWS).document(followDocId(followerUid, targetUid)).get().await().exists()
+    }
+
+    /** `followUser()` côté site. Sans effet si on essaie de se suivre soi-même. */
+    suspend fun follow(followerUid: String, targetUid: String) {
+        if (!isAvailable || followerUid == targetUid) return
+        val payload = mapOf(
+            "follower" to followerUid,
+            "following" to targetUid,
+            "createdAt" to FieldValue.serverTimestamp(),
+        )
+        firestore.collection(FOLLOWS).document(followDocId(followerUid, targetUid)).set(payload).await()
+    }
+
+    /** `unfollowUser()` côté site. */
+    suspend fun unfollow(followerUid: String, targetUid: String) {
+        if (!isAvailable) return
+        firestore.collection(FOLLOWS).document(followDocId(followerUid, targetUid)).delete().await()
+    }
+
+    /** `followDocId()` côté site : "<abonné>_<suivi>", ce qui interdit les
+     *  doublons par construction. */
+    private fun followDocId(followerUid: String, targetUid: String) = "${followerUid}_$targetUid"
+
     /** `countFollowers()` / `countFollowing()` : une collection plate, un
      *  document par relation. */
     suspend fun countFollowers(uid: String): Int = countFollows("following", uid)
@@ -302,6 +357,26 @@ data class CloudSave(val save: GameSave, val updatedAtMillis: Long)
 
 /** Une ligne du classement (`.leaderboard-row` côté site). */
 data class LeaderboardEntry(val uid: String, val pseudo: String, val distanceMeters: Double)
+
+/**
+ * Le profil public d'un joueur, tel que `profiles/{uid}` le porte : le
+ * sous-ensemble de la sauvegarde que le site accepte de rendre visible.
+ * Volontairement sans les champs privés de `users/{uid}`.
+ */
+data class PublicProfile(
+    val uid: String,
+    val pseudo: String,
+    val avatarEmoji: String,
+    val isPrivate: Boolean,
+    val equippedSkin: String,
+    val ownedSkinsCount: Int,
+    val bestDistance: Double,
+    val totalMoneyEarned: Long,
+    val puissance: Int,
+    val vitesse: Int,
+    val achievementsCount: Int,
+    val updatedAtMillis: Long?,
+)
 
 /**
  * Attend un `Task` Firebase (API à callbacks) comme une coroutine standard,

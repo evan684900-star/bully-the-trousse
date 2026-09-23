@@ -2,6 +2,9 @@
 
 package com.bullythetrousse.app
 
+import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -28,9 +31,11 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -155,29 +160,85 @@ fun HintText(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * `.sky-anim` : le ciel animé, qui occupe le haut de l'écran (jusqu'à 60 %
- * sur le menu, 68 % sur l'écran de jeu). En thème sombre — celui par défaut
- * du site — un voile nocturne, 6 étoiles et la lune.
+ * `.sky-anim` : le ciel animé posé derrière le menu et l'écran de jeu.
+ *
+ * C'est ici que se joue la bascule jour/nuit du site. Côté web, elle ne
+ * demande aucune boucle : le soleil et la lune sont deux éléments dont la
+ * position et l'opacité changent avec `[data-theme]`, et la transition CSS
+ * anime toute seule la levée de l'un et la chute de l'autre. Même principe
+ * ici avec [animateFloatAsState] — mêmes durées et mêmes courbes que le
+ * site (2,4 s pour la course de l'astre, 2 s pour le voile de nuit, 1,6 s
+ * avec 0,3 s de retard pour les étoiles).
+ *
+ * Tailles et position reprises du bloc `@media (max-width: 480px)` : sur un
+ * téléphone l'astre est deux fois plus petit et collé au bord droit, pour ne
+ * pas chevaucher le titre du menu ni la pastille de distance en jeu.
  */
 @Composable
-fun SkyAnimation(heightFraction: Float) {
+fun SkyAnimation(heightFraction: Float, night: Boolean = true, world: String = "cour") {
+    // `top: 120%` (sous l'horizon) -> `top: 10%`/`12%` (haut du ciel).
+    val celestialTop by animateFloatAsState(
+        targetValue = if (night) 0.10f else 0.12f,
+        animationSpec = tween(durationMillis = 2400, easing = CubicBezierEasing(0.65f, 0f, 0.35f, 1f)),
+        label = "celestialTop",
+    )
+    val tintAlpha by animateFloatAsState(
+        targetValue = if (night) 1f else 0f,
+        animationSpec = tween(durationMillis = 2000),
+        label = "tintAlpha",
+    )
+    val starAlpha by animateFloatAsState(
+        targetValue = if (night) 0.9f else 0f,
+        animationSpec = tween(durationMillis = 1600, delayMillis = 300),
+        label = "starAlpha",
+    )
+    val moonAlpha by animateFloatAsState(
+        targetValue = if (night) 1f else 0f,
+        animationSpec = tween(durationMillis = 1800),
+        label = "moonAlpha",
+    )
+    // Monde Volcans de jour : le soleil est à peine visible, noyé dans la
+    // poussière en suspension (`opacity: 0.4` côté site).
+    val sunTarget = if (world == "volcans") 0.4f else 1f
+    val sunAlpha by animateFloatAsState(
+        targetValue = if (night) 0f else sunTarget,
+        animationSpec = tween(durationMillis = 1800),
+        label = "sunAlpha",
+    )
+
     Box(modifier = Modifier.fillMaxWidth().fillMaxHeight(heightFraction)) {
-        // .sky-anim .tint
-        Box(
-            modifier = Modifier.fillMaxSize().background(
-                Brush.verticalGradient(listOf(Color(0xBF060A22), Color(0x4D121A40))),
-            ),
-        )
-        for ((xFraction, yFraction) in STAR_POSITIONS) {
-            PositionedAt(xFraction, yFraction) { Star() }
+        // .sky-anim .tint : le voile de nuit.
+        if (tintAlpha > 0.001f) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .alpha(tintAlpha)
+                    .background(Brush.verticalGradient(listOf(Color(0xBF060A22), Color(0x4D121A40)))),
+            )
         }
-        PositionedAt(xFraction = 0.68f, yFraction = 0.10f) { Moon() }
+        if (starAlpha > 0.001f) {
+            for ((xFraction, yFraction) in STAR_POSITIONS) {
+                PositionedAt(xFraction, yFraction) { Star(alpha = starAlpha) }
+            }
+        }
+        // Les deux astres partagent la même course : l'un monte pendant que
+        // l'autre est encore invisible, donc un seul se voit à la fois.
+        if (moonAlpha > 0.001f) {
+            PositionedAt(xFraction = 0.94f, yFraction = celestialTop) {
+                Moon(alpha = moonAlpha, world = world)
+            }
+        }
+        if (sunAlpha > 0.001f) {
+            PositionedAt(xFraction = 0.94f, yFraction = celestialTop) {
+                Sun(alpha = sunAlpha, world = world)
+            }
+        }
     }
 }
 
 /** `.sky-anim .star` : 3px, blanche, halo `0 0 4px 1px rgba(255,255,255,0.8)`. */
 @Composable
-private fun Star() {
+private fun Star(alpha: Float) {
     Canvas(modifier = Modifier.size(10.dp)) {
         val center = Offset(size.width / 2f, size.height / 2f)
         drawCircle(
@@ -188,36 +249,93 @@ private fun Star() {
             ),
             radius = size.minDimension / 2f,
             center = center,
+            alpha = alpha,
         )
-        drawCircle(color = Color.White.copy(alpha = 0.9f), radius = 1.5.dp.toPx(), center = center)
+        drawCircle(color = Color.White, radius = 1.5.dp.toPx(), center = center, alpha = alpha)
     }
 }
 
-/** `.sky-anim .moon` : 48px, dégradé radial décalé à 35 %/35 %, et son halo. */
+/**
+ * `.sky-anim .moon` : 24 px sur mobile, dégradé radial décalé à 35 %/35 %,
+ * plus le halo et les trois ombres internes qui lui creusent des cratères.
+ * Le monde Volcans a droit à sa lune de sang.
+ */
 @Composable
-private fun Moon() {
-    Canvas(modifier = Modifier.size(96.dp)) {
+private fun Moon(alpha: Float, world: String) {
+    val bodyStops = if (world == "volcans") {
+        arrayOf(0f to Color(0xFFFFB199), 0.55f to Color(0xFFC23B2B), 1f to Color(0xFF6E1810))
+    } else if (world == "plage") {
+        arrayOf(0f to Color.White, 0.6f to Color(0xFFEAF6FF), 1f to Color(0xFFB6D4E8))
+    } else {
+        arrayOf(0f to Color.White, 0.6f to Color(0xFFE6EBF7), 1f to Color(0xFFB9C2DA))
+    }
+    val glow = if (world == "volcans") Color(0x80C8321E) else Color(0x73DCE1FF)
+
+    Canvas(modifier = Modifier.size(56.dp)) {
         val center = Offset(size.width / 2f, size.height / 2f)
-        val moonRadius = 24.dp.toPx()
-        // box-shadow 0 0 32px 8px rgba(220,225,255,0.45)
+        val radius = 12.dp.toPx() // 24px de diamètre (variante mobile)
         drawCircle(
             brush = Brush.radialGradient(
-                colors = listOf(Color(0x73DCE1FF), Color.Transparent),
+                colors = listOf(glow, Color.Transparent),
                 center = center,
-                radius = moonRadius * 2f,
+                radius = radius * 2.4f,
             ),
-            radius = moonRadius * 2f,
+            radius = radius * 2.4f,
             center = center,
+            alpha = alpha,
         )
-        // radial-gradient(circle at 35% 35%, #ffffff, #e6ebf7 60%, #b9c2da 100%)
         drawCircle(
             brush = Brush.radialGradient(
-                colorStops = arrayOf(0f to Color.White, 0.6f to Color(0xFFE6EBF7), 1f to Color(0xFFB9C2DA)),
-                center = Offset(center.x - moonRadius * 0.3f, center.y - moonRadius * 0.3f),
-                radius = moonRadius,
+                colorStops = bodyStops,
+                center = Offset(center.x - radius * 0.3f, center.y - radius * 0.3f),
+                radius = radius,
             ),
-            radius = moonRadius,
+            radius = radius,
             center = center,
+            alpha = alpha,
+        )
+    }
+}
+
+/**
+ * `.sky-anim .sun` : le pendant du jour. Blanc d'été sur la Plage, rougi par
+ * la poussière au Volcan, doré partout ailleurs.
+ */
+@Composable
+private fun Sun(alpha: Float, world: String) {
+    val bodyStops = when (world) {
+        "volcans" -> arrayOf(0f to Color(0xFFFF8F6B), 0.6f to Color(0xFFC1401F), 1f to Color(0xFF7A2210))
+        "plage" -> arrayOf(0f to Color.White, 0.55f to Color(0xFFFFF1A8), 1f to Color(0xFFFFC94D))
+        else -> arrayOf(0f to Color(0xFFFFF6C8), 0.55f to Color(0xFFFFD23F), 1f to Color(0xFFFFA620))
+    }
+    val glow = when (world) {
+        "volcans" -> Color(0x59C83C14)
+        "plage" -> Color(0x99FFE178)
+        else -> Color(0x73FFBE3C)
+    }
+
+    Canvas(modifier = Modifier.size(56.dp)) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val radius = 12.dp.toPx()
+        drawCircle(
+            brush = Brush.radialGradient(
+                colors = listOf(glow, Color.Transparent),
+                center = center,
+                radius = radius * 2.6f,
+            ),
+            radius = radius * 2.6f,
+            center = center,
+            alpha = alpha,
+        )
+        drawCircle(
+            brush = Brush.radialGradient(
+                colorStops = bodyStops,
+                center = Offset(center.x - radius * 0.3f, center.y - radius * 0.3f),
+                radius = radius,
+            ),
+            radius = radius,
+            center = center,
+            alpha = alpha,
         )
     }
 }

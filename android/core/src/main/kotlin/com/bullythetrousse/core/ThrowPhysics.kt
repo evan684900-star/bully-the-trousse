@@ -38,6 +38,12 @@ data class ThrowResult(
     val initialSpeed: Double,
     val angleDegrees: Double,
     val effectiveGravity: Double,
+    /** La puissance et la visée figées qui ont produit ce lancer. Le site
+     *  les garde après coup pour décider de l'easter egg spatial
+     *  (`spaceEggTriggered`, voir [SpaceSequence.shouldTrigger]) : sans
+     *  elles, impossible de savoir si CE lancer part en apesanteur. */
+    val lockedPower: Double = 0.0,
+    val accuracyValue: Double = 0.0,
 )
 
 /**
@@ -66,6 +72,8 @@ object ThrowPhysics {
         val isPerfect = kotlin.math.abs(input.accuracyValue) < input.perfectWindow
 
         return ThrowResult(
+            lockedPower = input.lockedPower,
+            accuracyValue = input.accuracyValue,
             distanceMeters = distanceMeters,
             isPerfect = isPerfect,
             initialSpeed = v0,

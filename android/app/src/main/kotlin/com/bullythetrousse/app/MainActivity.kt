@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -14,6 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
@@ -70,7 +73,30 @@ sealed interface Screen {
     data object Account : Screen
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
+
+    /** Le profil public d'un autre joueur, ouvert depuis le classement. */
+    data class PlayerProfile(val uid: String) : Screen
 }
+
+/**
+ * Les destinations qui sont des MODALES côté site (`.modal-overlay`) : elles
+ * se posent par-dessus l'écran courant, assombri à 50 %, au lieu de le
+ * remplacer. C'est ce qui fait qu'on voit encore le menu derrière les
+ * Réglages, comme sur le site.
+ */
+private val MODAL_SCREENS: Set<Screen> = setOf(
+    Screen.Settings,
+    Screen.Account,
+    Screen.Links,
+    Screen.Changelog,
+    Screen.AchievementsList,
+    Screen.Challenges,
+)
+
+// Le classement et les profils sont de vrais ÉCRANS côté site
+// (`screens.leaderboard`/`screens.profile`), pas des `.modal-overlay` :
+// ils remplacent le menu au lieu de le recouvrir.
+private fun Screen.isModal(): Boolean = this in MODAL_SCREENS
 
 @Composable
 fun GameRoot() {
@@ -78,6 +104,10 @@ fun GameRoot() {
     val repository = remember { SaveRepository(context) }
     var save by remember { mutableStateOf(repository.load()) }
     var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
+    // Le dernier écran de fond : une modale se pose PAR-DESSUS lui sans le
+    // remplacer (voir isModal), donc il faut le retenir pour continuer à le
+    // dessiner derrière le voile.
+    var baseScreen by remember { mutableStateOf<Screen>(Screen.Menu) }
 
     // Point de passage UNIQUE pour toute modification de la sauvegarde locale
     // (portage de persist() côté web, qui appelle checkAchievements() à
@@ -118,8 +148,12 @@ fun GameRoot() {
             screen = screen,
             cloud = cloud,
             repository = repository,
+            baseScreen = baseScreen,
             updateSave = ::updateSave,
-            goTo = { screen = it },
+            goTo = { destination ->
+                if (!destination.isModal()) baseScreen = destination
+                screen = destination
+            },
         )
     }
 }
@@ -131,6 +165,73 @@ fun GameRoot() {
  */
 @Composable
 private fun GameContent(
+    save: GameSave,
+    screen: Screen,
+    cloud: CloudSession,
+    repository: SaveRepository,
+    baseScreen: Screen,
+    updateSave: (GameSave) -> Unit,
+    goTo: (Screen) -> Unit,
+) {
+    // Une modale se pose par-dessus l'écran de fond, assombri à 50 % —
+    // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. Sans ça
+    // les Réglages remplaçaient le menu au lieu de le recouvrir.
+    if (screen.isModal() && baseScreen != screen) {
+        ScreenContent(
+            save = save,
+            screen = baseScreen,
+            cloud = cloud,
+            repository = repository,
+            updateSave = updateSave,
+            goTo = goTo,
+        )
+        // Le voile avale les taps : sans ça, toucher une zone vide des
+        // Réglages actionnerait le bouton du menu resté visible dessous.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.5f))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = {},
+                ),
+        )
+    }
+
+    ScreenContent(
+        save = save,
+        screen = screen,
+        cloud = cloud,
+        repository = repository,
+        updateSave = updateSave,
+        goTo = goTo,
+    )
+
+    // Tutoriel du tout premier lancement (showTutorialIfNeeded() côté web) :
+    // il recouvre tout tant qu'il n'est pas terminé ou passé.
+    if (!save.tutorialSeen) {
+        TutorialOverlay(onDone = { updateSave(save.copy(tutorialSeen = true)) })
+        return
+    }
+
+    // .links-btn + .corner-icons-right : en position:fixed côté web, donc
+    // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
+    // qui occupent l'écran entier.
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    if (!inCinematic) {
+        BottomBar(
+            musicMuted = save.musicMuted,
+            onOpenLinks = { goTo(Screen.Links) },
+            onToggleMute = { updateSave(save.copy(musicMuted = !save.musicMuted)) },
+            onOpenSettings = { goTo(Screen.Settings) },
+        )
+    }
+}
+
+/** Un écran, sans le décor commun (voile des modales, tutoriel, barre du bas). */
+@Composable
+private fun ScreenContent(
     save: GameSave,
     screen: Screen,
     cloud: CloudSession,
@@ -156,7 +257,15 @@ private fun GameContent(
         Screen.Leaderboard -> LeaderboardScreen(
             save = save,
             session = cloud,
+            onSaveChange = updateSave,
+            onOpenPlayer = { uid -> goTo(Screen.PlayerProfile(uid)) },
             onBack = { goTo(Screen.Menu) },
+        )
+
+        is Screen.PlayerProfile -> PlayerProfileScreen(
+            uid = screen.uid,
+            session = cloud,
+            onBack = { goTo(Screen.Leaderboard) },
         )
 
         Screen.Profile -> ProfileScreen(
@@ -216,25 +325,5 @@ private fun GameContent(
             updateSave(BeachCinematic.applyOutcome(save))
             goTo(Screen.Menu)
         })
-    }
-
-    // Tutoriel du tout premier lancement (showTutorialIfNeeded() côté web) :
-    // il recouvre tout tant qu'il n'est pas terminé ou passé.
-    if (!save.tutorialSeen) {
-        TutorialOverlay(onDone = { updateSave(save.copy(tutorialSeen = true)) })
-        return
-    }
-
-    // .links-btn + .corner-icons-right : en position:fixed côté web, donc
-    // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
-    // qui occupent l'écran entier.
-    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
-    if (!inCinematic) {
-        BottomBar(
-            musicMuted = save.musicMuted,
-            onOpenLinks = { goTo(Screen.Links) },
-            onToggleMute = { updateSave(save.copy(musicMuted = !save.musicMuted)) },
-            onOpenSettings = { goTo(Screen.Settings) },
-        )
     }
 }

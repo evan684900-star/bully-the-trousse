@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.RecoveryCode
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -261,6 +262,12 @@ fun rememberCloudSession(
                     repository.saveFromCloud(cloud.save, cloud.updatedAtMillis)
                     onSaveChange(cloud.save)
                 }
+                // Jamais de pseudo vide au classement : le site en attribue un
+                // à la première connexion (`if (!save.pseudo) save.pseudo =
+                // "Trousse-" + ...`), sans quoi l'entrée s'affiche "Anonyme"
+                // pour tout le monde.
+                if (save.pseudo.isBlank()) onSaveChange(save.copy(pseudo = Pseudo.generateDefault()))
+
                 session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
                 return@LaunchedEffect
             } catch (e: Exception) {

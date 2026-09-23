@@ -5,6 +5,7 @@ package com.bullythetrousse.app
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,11 +18,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -33,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,6 +44,7 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.SkinStats
 
@@ -50,11 +55,22 @@ import com.bullythetrousse.core.SkinStats
  * ici le fond `--app-bg` et les cartes `.achievement-row` du site.
  */
 @Composable
-internal fun ModalScreen(title: String, onBack: () -> Unit, content: @Composable () -> Unit) {
+internal fun ModalScreen(
+    title: String,
+    onBack: () -> Unit,
+    /**
+     * Un vrai ÉCRAN (classement, profil) peint son fond et remplace ce qu'il
+     * y avait avant ; une MODALE (`.modal-overlay` côté site : réglages,
+     * succès, liens...) le laisse transparent pour se poser sur l'écran
+     * courant, assombri à 50 % par `GameContent`.
+     */
+    opaque: Boolean = false,
+    content: @Composable () -> Unit,
+) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(AppBg)
+            .then(if (opaque) Modifier.background(AppBg) else Modifier)
             .windowInsetsPadding(WindowInsets.safeDrawing)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
@@ -91,11 +107,24 @@ private fun BackButton(onBack: () -> Unit) {
  */
 @Composable
 fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
+    // Le succès dont on regarde la fiche (nom + description), ou null : la
+    // grille d'émojis seule ne dit pas ce que chacun récompense, alors que la
+    // liste du site affiche nom et description en clair (voir
+    // renderAchievements()). On garde la grille et on met le texte derrière
+    // un appui.
+    var detail by remember { mutableStateOf<com.bullythetrousse.core.Achievement?>(null) }
+
     ModalScreen("🏆 Succès", onBack) {
         Text(
             "${save.unlockedAchievements.size} / ${Achievements.ALL.size} débloqués",
             color = TextDim,
             fontSize = 13.sp,
+        )
+        Text(
+            "Appuie sur un succès pour savoir ce qu'il récompense.",
+            color = TextDim,
+            fontSize = 11.5.sp,
+            textAlign = TextAlign.Center,
         )
         FlowRow(
             modifier = Modifier.fillMaxWidth(),
@@ -110,11 +139,78 @@ fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
                         .clip(RoundedCornerShape(12.dp))
                         .background(CardBg)
                         .border(2.dp, if (unlocked) Accent else PanelBorder, RoundedCornerShape(12.dp))
+                        .clickable { detail = achievement }
                         .padding(horizontal = 12.dp, vertical = 10.dp),
                 ) {
                     Text(achievement.emoji, fontSize = 26.sp)
                 }
             }
+        }
+    }
+
+    detail?.let { achievement ->
+        val unlocked = achievement.id in save.unlockedAchievements
+        val (name, description) = ACHIEVEMENT_LABELS[achievement.id] ?: (achievement.id to "")
+        AchievementDetailDialog(
+            emoji = if (unlocked) achievement.emoji else "🔒",
+            name = name,
+            description = description,
+            unlocked = unlocked,
+            onDismiss = { detail = null },
+        )
+    }
+}
+
+/**
+ * La fiche d'un succès : ce que la liste du site (`renderAchievements()`)
+ * montre en permanence à côté de chaque icône, ici derrière un appui pour
+ * garder la grille compacte.
+ */
+@Composable
+private fun AchievementDetailDialog(
+    emoji: String,
+    name: String,
+    description: String,
+    unlocked: Boolean,
+    onDismiss: () -> Unit,
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = 0.6f))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onDismiss,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(28.dp)
+                .widthIn(max = 380.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(ShopBg)
+                .border(2.dp, if (unlocked) Accent else PanelBorder, RoundedCornerShape(16.dp))
+                .padding(22.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(emoji, fontSize = 44.sp)
+            Text(
+                name,
+                color = if (unlocked) Accent else TextColor,
+                fontSize = 17.sp,
+                fontWeight = FontWeight.ExtraBold,
+                textAlign = TextAlign.Center,
+            )
+            Text(description, color = TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
+            Text(
+                if (unlocked) "✅ Débloqué" else "🔒 Pas encore débloqué",
+                color = if (unlocked) Money else TextDim,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
         }
     }
 }
@@ -217,7 +313,15 @@ fun SettingsScreen(
             fontSize = 11.5.sp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         )
-        SettingsRow("Thème") { GameButton("🌙", secondary = true, small = true) {} }
+        // Thème : la bascule jour/nuit du ciel (`applyTheme()` côté site).
+        // Le reste de l'interface reste sombre pour l'instant — seul le ciel
+        // suit, avec la même animation de lever/coucher que le site.
+        val night = save.theme != "light"
+        SettingsRow("Thème") {
+            GameButton(if (night) "🌙" else "☀️", secondary = true, small = true) {
+                onSaveChange(save.copy(theme = if (night) "light" else "dark"))
+            }
+        }
         SettingsRow("Langue") { GameButton("FR", secondary = true, small = true) {} }
     }
 }
@@ -311,7 +415,13 @@ private fun LinkRow(title: String, subtitle: String) {
  * de rester vide.
  */
 @Composable
-fun LeaderboardScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
+fun LeaderboardScreen(
+    save: GameSave,
+    session: CloudSession,
+    onSaveChange: (GameSave) -> Unit,
+    onOpenPlayer: (String) -> Unit,
+    onBack: () -> Unit,
+) {
     // Le monde Plage a son propre classement (`scoresCollection()` côté site).
     val collection = remember(save.inPlage) { session.bridge.scoresCollectionFor(save) }
     var entries by remember { mutableStateOf<List<LeaderboardEntry>?>(null) }
@@ -326,11 +436,27 @@ fun LeaderboardScreen(save: GameSave, session: CloudSession, onBack: () -> Unit)
         }
     }
 
-    ModalScreen(if (save.inPlage) "🏖️ Classement Plage" else "🏆 Classement", onBack) {
+    var editingPseudo by remember { mutableStateOf(false) }
+
+    ModalScreen(if (save.inPlage) "🏖️ Classement Plage" else "🏆 Classement", onBack, opaque = true) {
+        // `#leaderboard-pseudo` + `btn-edit-pseudo` côté site : c'est d'ici
+        // qu'on change le nom affiché aux autres joueurs.
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Ton pseudo : ${save.pseudo.ifBlank { "-" }}",
+                color = TextDim,
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+            )
+            GameButton("✏️", secondary = true, small = true) { editingPseudo = true }
+        }
         Text(
-            "Ton pseudo : ${save.pseudo.ifBlank { "-" }}",
+            "Touche une ligne pour voir le profil de ce joueur.",
             color = TextDim,
-            fontSize = 13.sp,
+            fontSize = 11.5.sp,
             textAlign = TextAlign.Center,
         )
         val rows = entries
@@ -344,7 +470,72 @@ fun LeaderboardScreen(save: GameSave, session: CloudSession, onBack: () -> Unit)
             rows == null -> LeaderboardNotice("Chargement du classement…")
             rows.isEmpty() -> LeaderboardNotice("Personne n'a encore de record. À toi de jouer.")
             else -> rows.forEachIndexed { index, entry ->
-                LeaderboardRow(rank = index + 1, entry = entry, isMe = entry.uid == session.uid)
+                LeaderboardRow(
+                    rank = index + 1,
+                    entry = entry,
+                    isMe = entry.uid == session.uid,
+                    onClick = { onOpenPlayer(entry.uid) },
+                )
+            }
+        }
+    }
+
+    if (editingPseudo) {
+        PseudoDialog(
+            current = save.pseudo,
+            onDismiss = { editingPseudo = false },
+            onConfirm = { typed ->
+                editingPseudo = false
+                Pseudo.sanitize(typed)?.let { onSaveChange(save.copy(pseudo = it)) }
+            },
+        )
+    }
+}
+
+/**
+ * Changement de pseudo (`btn-edit-pseudo` côté site, qui utilise un `prompt()`
+ * natif). Le nouveau nom repart aussitôt vers le classement : `scores/{uid}`
+ * n'est normalement réécrit que sur un nouveau record, donc sans ça le
+ * changement n'apparaîtrait aux autres qu'au prochain record battu — c'est
+ * [CloudSession] qui s'en charge, puisque toute modification de la sauvegarde
+ * déclenche un renvoi vers le cloud.
+ */
+@Composable
+private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+    var typed by remember { mutableStateOf(current) }
+    Box(
+        modifier = Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(28.dp)
+                .widthIn(max = 380.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(ShopBg)
+                .border(2.dp, PanelBorder, RoundedCornerShape(16.dp))
+                .padding(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Text("✏️ Ton pseudo", color = Accent, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+            Text(
+                "C'est le nom que les autres voient au classement et sur ton profil.",
+                color = TextDim,
+                fontSize = 12.sp,
+                textAlign = TextAlign.Center,
+            )
+            OutlinedTextField(
+                value = typed,
+                onValueChange = { typed = it.take(Pseudo.MAX_LENGTH) },
+                singleLine = true,
+                placeholder = { Text("Ton nom", color = TextDim, fontSize = 13.sp) },
+                modifier = Modifier.fillMaxWidth(),
+            )
+            Text("${typed.length} / ${Pseudo.MAX_LENGTH}", color = TextDim, fontSize = 11.sp)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                GameButton("Enregistrer", small = true) { onConfirm(typed) }
+                GameButton("Annuler", secondary = true, small = true, onClick = onDismiss)
             }
         }
     }
@@ -358,7 +549,7 @@ private fun LeaderboardNotice(text: String) {
 /** `.leaderboard-row` : rang, pseudo, distance — la ligne du joueur est
  *  soulignée en doré, comme sur le site. */
 @Composable
-private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean) {
+private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean, onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Row(
         modifier = Modifier
@@ -366,6 +557,7 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean) {
             .clip(shape)
             .background(CardBg)
             .border(2.dp, if (isMe) Accent else PanelBorder, shape)
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
@@ -417,7 +609,7 @@ fun ProfileScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
         }
     }
 
-    ModalScreen("👤 Profil", onBack) {
+    ModalScreen("👤 Profil", onBack, opaque = true) {
         // .profile-header
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -501,7 +693,7 @@ fun ProfileScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
 
 /** `.profile-card` : carte carrée, contenu centré. */
 @Composable
-private fun ProfileCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+internal fun ProfileCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(12.dp))
@@ -516,7 +708,7 @@ private fun ProfileCard(modifier: Modifier = Modifier, content: @Composable () -
 }
 
 @Composable
-private fun ProfileRow(label: String, value: String) {
+internal fun ProfileRow(label: String, value: String) {
     Row(
         modifier = Modifier
             .fillMaxWidth()

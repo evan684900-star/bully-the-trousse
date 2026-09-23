@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Beach
 import com.bullythetrousse.core.BeachDecor
@@ -28,6 +29,9 @@ import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.FlightSimulator
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.Skid
+import com.bullythetrousse.core.SpacePhase
+import com.bullythetrousse.core.SpaceSequence
+import com.bullythetrousse.core.SpaceState
 import com.bullythetrousse.core.Trails
 import com.bullythetrousse.core.ThrowResult
 import com.bullythetrousse.core.VolcanoDecor
@@ -66,6 +70,9 @@ fun ThrowCanvas(
     world: String = "cour",
     equippedSkin: String = "classique",
     equippedTrail: String = "blanche",
+    /** Non nul pendant le détour en apesanteur : le décor devient spatial et
+     *  le QTE se dessine par-dessus (voir [SpaceFlight]). */
+    spaceState: SpaceState? = null,
     groundVerticalFraction: Float = 0.68f,
     // `#game-canvas` occupe tout l'écran côté web.
     modifier: Modifier = Modifier.fillMaxSize(),
@@ -106,7 +113,13 @@ fun ThrowCanvas(
         // logique de gameLoop côté web).
         val cameraX = if (flightState != null) Camera.followX(flightState.worldX, size.width.toDouble()) else 0.0
 
-        drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds)
+        // Pendant l'apesanteur, c'est le décor spatial qui remplace le monde —
+        // et les nuages de la transition cachent la bascule, comme côté site.
+        if (spaceState != null) {
+            drawSpaceBackdrop(cameraX, groundScreenY, animationTimeSeconds)
+        } else {
+            drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds)
+        }
 
         // Le sillage ne vit que pendant le vol : au repos on repart de zéro,
         // sinon le ruban du lancer précédent resterait accroché à la trousse.
@@ -144,6 +157,19 @@ fun ThrowCanvas(
             colorFilter = skinFilter,
             filterQuality = spriteFilter,
         )
+
+        if (spaceState != null) {
+            when (spaceState.phase) {
+                SpacePhase.TRANSITION -> drawCloudSweep(
+                    (spaceState.phaseElapsed / SpaceSequence.TRANSITION_DURATION).toFloat(),
+                )
+                SpacePhase.QTE -> drawQteRings(
+                    currentRadius = SpaceSequence.currentRingRadius(spaceState.phaseElapsed).toFloat(),
+                    targetRadius = spaceState.ringTargetRadius.toFloat(),
+                )
+                else -> Unit
+            }
+        }
     }
 }
 
@@ -199,6 +225,127 @@ internal fun DrawScope.drawWorldBackdrop(
             drawCourDecor(cameraX, width.toDouble(), groundScreenY)
         }
     }
+}
+
+/**
+ * `drawSpaceBackground()` : ciel noir étoilé, planète lointaine et sol
+ * lunaire. Les étoiles ont une légère parallaxe, comme le décor des autres
+ * mondes.
+ */
+private fun DrawScope.drawSpaceBackdrop(cameraX: Double, groundScreenY: Float, timeSeconds: Float) {
+    val w = size.width
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF05040F), Color(0xFF1B1240)),
+            startY = 0f,
+            endY = groundScreenY,
+        ),
+        size = Size(w, groundScreenY),
+    )
+
+    val starParallax = -cameraX * 0.05
+    for (i in 0 until 90) {
+        val sx = mod(i * 137.0 + starParallax, (w + 100f).toDouble()).toFloat() - 50f
+        val sy = CourDecor.seededRand(i * 3.1).toFloat() * groundScreenY * 0.9f
+        val twinkle = 0.4f + 0.6f * kotlin.math.abs(kotlin.math.sin(timeSeconds * 2f + i))
+        drawCircle(
+            color = Color.White.copy(alpha = (0.3f + 0.5f * twinkle).coerceIn(0f, 1f)),
+            radius = 1f + CourDecor.seededRand(i.toDouble()).toFloat() * 1.5f,
+            center = Offset(sx, sy),
+        )
+    }
+
+    // Planète lointaine, avec son cratère d'ombre.
+    val planetX = (w * 0.75f - cameraX * 0.1).toFloat()
+    val planetY = groundScreenY * 0.25f
+    drawCircle(color = Color(0xFFC97B5F), radius = 46f, center = Offset(planetX, planetY))
+    drawCircle(
+        color = Color.Black.copy(alpha = 0.15f),
+        radius = 12f,
+        center = Offset(planetX - 14f, planetY - 10f),
+    )
+
+    // Sol lunaire : le même gris que la cour, pour rester cohérent.
+    drawRect(
+        brush = Brush.verticalGradient(
+            colors = listOf(Color(0xFF9AA0AB), Color(0xFF6F7480)),
+            startY = groundScreenY,
+            endY = size.height,
+        ),
+        topLeft = Offset(0f, groundScreenY),
+        size = Size(w, size.height - groundScreenY),
+    )
+
+    // Cratères décoratifs, à la place de la craie et des arbres de la cour.
+    val spacing = 180.0
+    val startIndex = kotlin.math.floor(cameraX / spacing).toInt() - 1
+    for (i in startIndex..(startIndex + kotlin.math.ceil(w / spacing).toInt() + 2)) {
+        val worldPos = i * spacing + (CourDecor.seededRand(i + 0.4) - 0.5) * 60.0
+        val sx = (worldPos - cameraX).toFloat()
+        if (sx < -30f || sx > w + 30f) continue
+        drawMoonCrater(
+            centerX = sx,
+            centerY = groundScreenY + 10f + CourDecor.seededRand(i.toDouble()).toFloat() * 14f,
+            radius = 10f + CourDecor.seededRand(i + 1.0).toFloat() * 8f,
+        )
+    }
+}
+
+/** Un cratère : une ellipse creusée, plus claire en bas qu'en haut. */
+private fun DrawScope.drawMoonCrater(centerX: Float, centerY: Float, radius: Float) {
+    drawOval(
+        color = Color(0xFF5F646E),
+        topLeft = Offset(centerX - radius, centerY - radius * 0.45f),
+        size = Size(radius * 2f, radius * 0.9f),
+    )
+    drawOval(
+        color = Color(0xFF878D98),
+        topLeft = Offset(centerX - radius * 0.8f, centerY - radius * 0.3f),
+        size = Size(radius * 1.6f, radius * 0.6f),
+    )
+}
+
+/**
+ * `drawCloudSweep()` : les nuages qui balaient l'écran de bas en haut
+ * pendant la transition, doublés d'un voile plein écran en cloche
+ * (0 → 1 → 0). C'est ce voile qui garantit qu'on ne voit JAMAIS le décor
+ * basculer, quelle que soit la position des nuages.
+ */
+private fun DrawScope.drawCloudSweep(progress: Float) {
+    val p = progress.coerceIn(0f, 1f)
+    val w = size.width
+    val h = size.height
+    val drift = h * 1.15f - p * h * 1.3f
+    for (i in 0 until 5) {
+        val cy = drift - i * 150f
+        val cx = w * (0.15f + (i % 3) * 0.25f)
+        val cloud = Color(0xFFEEF3F8)
+        drawCircle(color = cloud, radius = 95f, center = Offset(cx, cy))
+        drawCircle(color = cloud, radius = 75f, center = Offset(cx + 75f, cy + 12f))
+        drawCircle(color = cloud, radius = 68f, center = Offset(cx - 65f, cy + 18f))
+    }
+    val coverage = kotlin.math.sin(p * Math.PI).toFloat()
+    drawRect(color = Color(0xFFF4F8FF).copy(alpha = coverage.coerceIn(0f, 1f)))
+}
+
+/**
+ * `drawQteRing()` : l'anneau-cible fixe (vert) et l'anneau blanc qui
+ * rétrécit. Il faut taper quand les deux tailles coïncident.
+ */
+private fun DrawScope.drawQteRings(currentRadius: Float, targetRadius: Float) {
+    val center = Offset(size.width / 2f, size.height * 0.4f)
+    drawCircle(
+        color = Color(0xFF6BFFB0).copy(alpha = 0.9f),
+        radius = targetRadius,
+        center = center,
+        style = Stroke(width = 4f),
+    )
+    drawCircle(
+        color = Color.White.copy(alpha = 0.95f),
+        radius = max(currentRadius, 2f),
+        center = center,
+        style = Stroke(width = 5f),
+    )
 }
 
 /**
@@ -541,19 +688,43 @@ private fun DrawScope.drawCourTree(sx: Float, groundY: Float, seed: Int) {
  * Anime un [FlightState] à partir d'un [ThrowResult] fraîchement lancé,
  * pas à pas via [FlightSimulator], jusqu'à l'atterrissage. `onLanded` est
  * appelé une seule fois, quand `hasLanded` devient vrai.
+ *
+ * Le détour par l'apesanteur ([SpaceFlight]) s'intercale au sommet de la
+ * courbe quand le lancer a déclenché l'easter egg : la trousse se fige, le
+ * QTE se joue, puis le vol reprend avec la vitesse du boost — exactement
+ * comme le `state = "space_transition"` du site, qui suspend la boucle de
+ * vol sans l'abandonner.
  */
 @Composable
-fun animateFlight(result: ThrowResult, onLanded: () -> Unit): FlightState {
+fun animateFlight(
+    result: ThrowResult,
+    space: SpaceFlight? = null,
+    onLanded: () -> Unit,
+): FlightState {
     var state by remember(result) { mutableStateOf(result.toInitialFlightState()) }
     val rotSpeed = remember(result) { rotationSpeed(result.initialSpeed) }
 
     LaunchedEffect(result) {
         var lastFrameMillis = System.currentTimeMillis()
+        var spaceDone = space == null
         while (!state.hasLanded) {
             withFrameNanos { }
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+
+            // Apogée atteinte (`vy <= 0` côté site) : on bascule en apesanteur
+            // au lieu de laisser la trousse redescendre.
+            if (!spaceDone && space != null && state.vy <= 0.0) {
+                spaceDone = true
+                val boost = space.run()
+                state = state.copy(vx = boost.first, vy = boost.second)
+                // Le temps a passé pendant la séquence : repartir de l'horloge
+                // courante, sinon le premier pas d'après avalerait toute sa durée.
+                lastFrameMillis = System.currentTimeMillis()
+                continue
+            }
+
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
         }
         onLanded()

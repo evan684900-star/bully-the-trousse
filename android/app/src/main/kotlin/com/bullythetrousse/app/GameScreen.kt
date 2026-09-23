@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.width
@@ -53,6 +52,9 @@ import com.bullythetrousse.core.SkinEarnings
 import com.bullythetrousse.core.SkinEarningsResult
 import com.bullythetrousse.core.SkinStats
 import com.bullythetrousse.core.Skins
+import com.bullythetrousse.core.SpacePhase
+import com.bullythetrousse.core.SpaceSequence
+import com.bullythetrousse.core.SpaceState
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 import java.time.LocalDate
@@ -96,6 +98,9 @@ fun GameScreen(
     var landedDistance by remember { mutableStateOf(0.0) }
     var coinMultiplier by remember { mutableStateOf<Double?>(null) }
     var coinJackpot by remember { mutableStateOf(false) }
+    // Le détour en apesanteur du lancer en cours, tant qu'il dure : c'est lui
+    // qui reçoit les taps sur les anneaux du QTE.
+    var spaceFlight by remember { mutableStateOf<SpaceFlight?>(null) }
 
     Box(
         modifier = Modifier
@@ -105,7 +110,15 @@ fun GameScreen(
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
-                onClick = { if (current !is ThrowState.Landed) tap() },
+                onClick = {
+                    // En apesanteur, le tap sert au QTE — pas à relancer.
+                    val space = spaceFlight
+                    if (space?.state != null) {
+                        space.tap()
+                    } else if (current !is ThrowState.Landed) {
+                        tap()
+                    }
+                },
             ),
     ) {
         // Décor + trousse : le canvas dessine son propre ciel, comme le web.
@@ -120,15 +133,18 @@ fun GameScreen(
                 coinMultiplier = earnings.coinMultiplier
                 coinJackpot = earnings.hasJackpot
             },
+            onSpaceFlight = { spaceFlight = it },
         )
         ThrowCanvas(
             flightState = flight.state,
             world = save.currentWorld,
             equippedSkin = save.equippedSkin,
             equippedTrail = save.equippedTrail,
+            spaceState = spaceFlight?.state,
             modifier = Modifier.fillMaxSize(),
         )
-        SkyAnimation(heightFraction = 0.68f) // #screen-game .sky-anim { bottom: 32% }
+        // #screen-game .sky-anim { bottom: 32% } — jour/nuit selon save.theme
+        SkyAnimation(heightFraction = 0.68f, night = save.theme != "light", world = save.currentWorld)
 
         Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             // .back-btn : coin haut-gauche, 10px de marge.
@@ -158,7 +174,7 @@ fun GameScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                HintText(hintFor(current))
+                HintText(spaceFlight?.state?.let { hintForSpace(it) } ?: hintFor(current))
                 Meter(current)
             }
 
@@ -198,6 +214,14 @@ private fun hintFor(state: ThrowState): String = when (state) {
         }
     is ThrowState.ChargingAccuracy -> "Appuie pour lancer !"
     is ThrowState.Landed -> ""
+}
+
+/** `hintZeroG` côté site, plus le numéro de l'anneau en cours : pendant le
+ *  QTE, le joueur doit savoir où il en est dans la série. */
+private fun hintForSpace(space: SpaceState): String = when (space.phase) {
+    SpacePhase.TRANSITION, SpacePhase.DONE -> ""
+    SpacePhase.FLOATING -> "🛸 En apesanteur..."
+    SpacePhase.QTE -> "🎯 Tape quand les anneaux se superposent ! (${space.ringResults.size + 1})"
 }
 
 /**
@@ -343,6 +367,7 @@ private fun ThrowFlight(
     onSaveChange: (GameSave) -> Unit,
     onDistance: (Double) -> Unit,
     onEarnings: (SkinEarningsResult) -> Unit,
+    onSpaceFlight: (SpaceFlight?) -> Unit,
 ): FlightDisplay {
     if (state !is ThrowState.Landed) {
         // Après un rebond (Trousse à Baskets), la trousse reste à sa position
@@ -366,13 +391,28 @@ private fun ThrowFlight(
     var flightFinished by remember(result) { mutableStateOf(false) }
     var beachOutcome by remember(result) { mutableStateOf<BeachFlightOutcome?>(null) }
 
+    // Easter egg « vers l'espace » : puissance au maximum ET visée tout au
+    // début de la barre (voir SpaceSequence.shouldTrigger, `:core`). Le
+    // Boeing 747 en est exclu, c'est le prix de sa vitesse au sol.
+    val equipped = Skins.find(save.equippedSkin)
+    val goesToSpace = remember(result) {
+        SpaceSequence.shouldTrigger(result.lockedPower, result.accuracyValue, equipped)
+    }
+    var spaceOutcome by remember(result) { mutableStateOf<SpaceState?>(null) }
+    val spaceFlight = rememberSpaceFlight(result, equipped) { spaceOutcome = it }
+    // L'écran de jeu a besoin du pilote pour lui router les taps du QTE et
+    // dessiner les anneaux ; il ne le reçoit que si ce lancer part vraiment.
+    LaunchedEffect(result, goesToSpace) {
+        onSpaceFlight(if (goesToSpace) spaceFlight else null)
+    }
+
     val flightState: FlightState = if (isBeach) {
         animateBeachFlight(result) { _, outcome ->
             beachOutcome = outcome
             flightFinished = true
         }
     } else {
-        animateFlight(result) { flightFinished = true }
+        animateFlight(result, space = if (goesToSpace) spaceFlight else null) { flightFinished = true }
     }
 
     // Monde Volcan : la poussière rouge rend le sol glissant (voir Skid).
@@ -438,6 +478,15 @@ private fun ThrowFlight(
         if (result.isPerfect) updated = DailyChallenges.bump(updated, "perfect", 1.0, BumpMode.ADD)
         if (isSkidding) updated = DailyChallenges.bump(updated, "skid", 1.0, BumpMode.ADD)
         if (result.isPerfect) updated = updated.copy(hasPerfectThrow = true)
+
+        // Passage par l'apesanteur : le succès de l'easter egg, et celui des
+        // réflexes parfaits si tous les anneaux ont été réussis d'affilée.
+        spaceOutcome?.let { outcome ->
+            updated = updated.copy(hasTriggeredSpaceEgg = true)
+            if (SpaceSequence.isPerfect(outcome, equipped)) {
+                updated = updated.copy(hasPerfectQte = true)
+            }
+        }
 
         onSaveChange(Achievements.apply(updated))
     }
