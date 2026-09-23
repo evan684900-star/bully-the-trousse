@@ -59,6 +59,7 @@ import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.HapticEvent
 import com.bullythetrousse.core.PhysicsConstants
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.SfxCatalog
@@ -94,6 +95,7 @@ fun GameScreen(
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
     val sfx = LocalSfx.current
+    val haptics = LocalHaptics.current
 
     fun tap() {
         // Trousse Claude : fenêtre du lancer parfait élargie (isClaude côté web).
@@ -113,11 +115,14 @@ fun GameScreen(
         // sfxLaunch() (+ sfxCoinFlip() pour la Trousse Pièce) dans
         // lockAccuracyAndLaunch().
         when {
-            before !is ThrowState.ChargingAccuracy && state is ThrowState.ChargingAccuracy ->
+            before !is ThrowState.ChargingAccuracy && state is ThrowState.ChargingAccuracy -> {
                 sfx.play(SfxCatalog.CHARGE)
+                haptics.play(HapticEvent.CHARGE)
+            }
             before is ThrowState.ChargingAccuracy && state is ThrowState.Landed -> {
                 sfx.play(SfxCatalog.LAUNCH)
                 if (equippedSkin.isCoin) sfx.play(SfxCatalog.COIN_FLIP)
+                haptics.play(HapticEvent.LAUNCH)
             }
         }
     }
@@ -135,7 +140,10 @@ fun GameScreen(
     // sfxSpace() : joué une fois, au basculement en apesanteur.
     val spacePhase = spaceFlight?.state?.phase
     LaunchedEffect(spacePhase) {
-        if (spacePhase == SpacePhase.FLOATING) sfx.play(SfxCatalog.SPACE)
+        if (spacePhase == SpacePhase.FLOATING) {
+            sfx.play(SfxCatalog.SPACE)
+            haptics.play(HapticEvent.RECORD)
+        }
     }
 
     Box(
@@ -155,7 +163,9 @@ fun GameScreen(
                         // advanceQteRing(hit) : sfxCharge() si touché, sinon sfxError().
                         val after = space.state?.ringResults
                         if (after != null && after.size > ringsBefore) {
-                            sfx.play(if (after.last()) SfxCatalog.CHARGE else SfxCatalog.ERROR)
+                            val hit = after.last()
+                            sfx.play(if (hit) SfxCatalog.CHARGE else SfxCatalog.ERROR)
+                            haptics.play(if (hit) HapticEvent.QTE_HIT else HapticEvent.ERROR)
                         }
                     } else if (current !is ThrowState.Landed) {
                         tap()
@@ -174,7 +184,10 @@ fun GameScreen(
                 // le multiplicateur s'est vraiment déclenché (voir showCoinPopup).
                 coinMultiplier = earnings.coinMultiplier
                 coinJackpot = earnings.hasJackpot
-                if (earnings.coinMultiplier != null) sfx.play(SfxCatalog.COIN_BONUS)
+                if (earnings.coinMultiplier != null) {
+                    sfx.play(SfxCatalog.COIN_BONUS)
+                    haptics.play(HapticEvent.RECORD)
+                }
             },
             onSpaceFlight = { spaceFlight = it },
             onVampireBoost = { vampireBoost = it },
@@ -449,6 +462,7 @@ private fun ThrowFlight(
     }
 
     val sfx = LocalSfx.current
+    val haptics = LocalHaptics.current
     val result = state.result
     val isBeach = save.currentWorld == "plage"
     var flightFinished by remember(result) { mutableStateOf(false) }
@@ -465,7 +479,10 @@ private fun ThrowFlight(
     val spaceFlight = rememberSpaceFlight(result, equipped) { outcome ->
         spaceOutcome = outcome
         // sfxRecord() pour le combo parfait (tous les anneaux touchés).
-        if (SpaceSequence.isPerfect(outcome, equipped)) sfx.play(SfxCatalog.RECORD)
+        if (SpaceSequence.isPerfect(outcome, equipped)) {
+            sfx.play(SfxCatalog.RECORD)
+            haptics.play(HapticEvent.RECORD)
+        }
     }
     // L'écran de jeu a besoin du pilote pour lui router les taps du QTE et
     // dessiner les anneaux ; il ne le reçoit que si ce lancer part vraiment.
@@ -487,6 +504,7 @@ private fun ThrowFlight(
             beachOutcome = outcome
             flightFinished = true
             sfx.play(SfxCatalog.LAND)
+            haptics.play(HapticEvent.LAND)
         }
     } else {
         animateFlight(
@@ -497,7 +515,13 @@ private fun ThrowFlight(
             flightFinished = true
             // `inSpaceMode` côté site : un lancer revenu de l'espace s'écrase
             // au lieu d'atterrir.
-            sfx.play(if (goesToSpace) SfxCatalog.CRASH else SfxCatalog.LAND)
+            if (goesToSpace) {
+                sfx.play(SfxCatalog.CRASH)
+                haptics.play(HapticEvent.CRASH)
+            } else {
+                sfx.play(SfxCatalog.LAND)
+                haptics.play(HapticEvent.LAND)
+            }
         }
     }
 
@@ -534,7 +558,10 @@ private fun ThrowFlight(
 
         // Record par monde : le monde normal et la plage ont chacun le leur.
         val previousRecord = if (isBeach) save.plageBestDistance else save.bestDistance
-        if (result.distanceMeters > previousRecord) sfx.play(SfxCatalog.RECORD)
+        if (result.distanceMeters > previousRecord) {
+            sfx.play(SfxCatalog.RECORD)
+            haptics.play(HapticEvent.RECORD)
+        }
         var updated = if (isBeach) {
             save.copy(
                 plageBestDistance = maxOf(save.plageBestDistance, result.distanceMeters),
@@ -596,6 +623,7 @@ private fun ThrowFlight(
 @Composable
 private fun VampireBoostButton(boost: VampireBoostController, modifier: Modifier = Modifier) {
     val pressed = boost.state.boosting
+    val haptics = LocalHaptics.current
     Box(
         modifier = modifier
             // :active { transform: scale(0.9) }
@@ -622,6 +650,7 @@ private fun VampireBoostButton(boost: VampireBoostController, modifier: Modifier
                     // `e.preventDefault()` de startVampireBoost().
                     awaitFirstDown().consume()
                     boost.press()
+                    haptics.play(HapticEvent.VAMPIRE_BOOST)
                     // Renvoie null si le geste est annulé : dans les deux cas
                     // le boost doit s'arrêter.
                     waitForUpOrCancellation()

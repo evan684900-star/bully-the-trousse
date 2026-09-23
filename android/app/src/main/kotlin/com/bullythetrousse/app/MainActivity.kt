@@ -22,6 +22,7 @@ import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.GraphicsQuality
+import com.bullythetrousse.core.HapticEvent
 import com.bullythetrousse.core.VolcanoCinematic
 
 /**
@@ -109,6 +110,10 @@ fun GameRoot() {
     // dessiner derrière le voile.
     var baseScreen by remember { mutableStateOf<Screen>(Screen.Menu) }
 
+    // Vibrations (voir HapticsPlayer) : créé ici, avant updateSave() plus
+    // bas, qui en a besoin pour le tic du succès débloqué.
+    val haptics = rememberHapticsPlayer()
+
     // Point de passage UNIQUE pour toute modification de la sauvegarde locale
     // (portage de persist() côté web, qui appelle checkAchievements() à
     // chaque appel — pas seulement après un lancer ou un achat). Sans ça,
@@ -117,9 +122,11 @@ fun GameRoot() {
     // seraient constatés qu'au prochain lancer ou achat, au lieu de l'instant
     // où ils sont vraiment obtenus.
     fun updateSave(updated: GameSave) {
+        val newlyUnlocked = Achievements.newlyUnlocked(updated)
         val withAchievements = Achievements.apply(updated)
         save = withAchievements
         repository.save(withAchievements)
+        if (newlyUnlocked.isNotEmpty()) haptics.play(HapticEvent.ACHIEVEMENT)
     }
 
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
@@ -146,6 +153,7 @@ fun GameRoot() {
     CompositionLocalProvider(
         LocalGraphicsQuality provides GraphicsQuality.fromId(save.graphicsQuality),
         LocalSfx provides sfx,
+        LocalHaptics provides haptics,
     ) {
         GameContent(
             save = save,

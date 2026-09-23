@@ -35,6 +35,7 @@ import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.Repair
 import com.bullythetrousse.core.SfxCatalog
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.HapticEvent
 import com.bullythetrousse.core.Shop
 import com.bullythetrousse.core.SkinShop
 import com.bullythetrousse.core.SkinStats
@@ -58,16 +59,19 @@ fun ShopScreen(
     var tab by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
     val sfx = LocalSfx.current
+    val haptics = LocalHaptics.current
 
     fun purchase(updated: GameSave, cost: Int) {
         applyPurchase(updated, cost, onSaveChange)
         sfx.play(SfxCatalog.BUY)
+        haptics.play(HapticEvent.BUY)
         toast = null
     }
 
     /** Achat refusé faute d'argent : sfxError() + le toast du site. */
     fun notEnoughMoney() {
         sfx.play(SfxCatalog.ERROR)
+        haptics.play(HapticEvent.ERROR)
         toast = "💸 Pas assez d'argent !"
     }
 
@@ -75,6 +79,7 @@ fun ShopScreen(
     fun equip(updated: GameSave) {
         onSaveChange(updated)
         sfx.play(SfxCatalog.BUY)
+        haptics.play(HapticEvent.BUY)
     }
 
     Box(modifier = Modifier.fillMaxSize().background(ShopBg)) {

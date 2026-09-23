@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.CinePhase
 import com.bullythetrousse.core.CourDecor
+import com.bullythetrousse.core.HapticCatalog
+import com.bullythetrousse.core.HapticEvent
 import com.bullythetrousse.core.QualityProfile
 import com.bullythetrousse.core.RockState
 import com.bullythetrousse.core.SfxCatalog
@@ -116,6 +118,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
     val sfx = LocalSfx.current
+    val haptics = LocalHaptics.current
     // Le grondement du tremblement de terre est un VRAI fichier (le seul
     // bruitage du jeu qui en soit un), joué de la phase QUAKE jusqu'à la fin
     // de l'éruption, dont il suit le volume décroissant.
@@ -138,11 +141,20 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
 
             // cineSetPhase() : l'entrée dans certaines phases déclenche un effet.
             if (next.phase != previousPhase) {
-                if (next.phase == CinePhase.QUAKE) quake.start()
-                if (next.phase == CinePhase.LANDING) sfx.play(SfxCatalog.SPACE)
+                if (next.phase == CinePhase.QUAKE) {
+                    quake.start()
+                    // Grondement continu : boucle sur le motif tant que la
+                    // secousse dure, jusqu'à l'arrêt explicite ci-dessous.
+                    haptics?.play(HapticCatalog.QUAKE, repeatFromIndex = 0)
+                }
+                if (next.phase == CinePhase.LANDING) {
+                    sfx.play(SfxCatalog.SPACE)
+                    haptics.play(HapticEvent.RECORD)
+                }
                 if (next.phase == CinePhase.ERUPTION) {
                     sfx.play(SfxCatalog.LAUNCH)
                     sfx.play(SfxCatalog.CRASH)
+                    haptics.play(HapticEvent.CRASH)
                     flash = 1f
                     shake = 26f
                     if (viewWidth > 0f) {
@@ -169,10 +181,12 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
             if (next.lives < state.lives) {
                 wobble = 1f
                 shake = 14f
+                haptics.play(HapticEvent.ERROR)
             }
             if (next.phase == CinePhase.DEATH && state.phase != CinePhase.DEATH) {
                 shake = 30f
                 sfx.play(SfxCatalog.CRASH)
+                haptics.play(HapticEvent.CRASH)
             }
 
             // Le grondement décroît avec l'éruption puis s'arrête ; en cas de
@@ -186,6 +200,19 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                 CinePhase.ASCENT, CinePhase.STABILIZE, CinePhase.ROCKS,
                 CinePhase.DESCENT, CinePhase.LANDING, CinePhase.OUTRO -> quake.stop()
                 else -> Unit
+            }
+            // La vibration continue s'arrête dès que la secousse s'apaise
+            // vraiment (même frontière que l'arrêt du grondement audio, sauf
+            // qu'elle ne suit pas de fondu : un tremblement ne s'atténue pas
+            // en douceur au toucher).
+            // `previousPhase` est déjà réécrit à `next.phase` par le bloc
+            // ci-dessus quand la phase a changé : c'est `state.phase` (pas
+            // encore réassigné à ce stade de l'itération) qui porte la
+            // valeur réellement précédente.
+            if (next.phase != CinePhase.QUAKE && next.phase != CinePhase.ERUPTION &&
+                (state.phase == CinePhase.QUAKE || state.phase == CinePhase.ERUPTION)
+            ) {
+                haptics?.cancel()
             }
 
             // cineUpdate() : la part visuelle, phase par phase.
