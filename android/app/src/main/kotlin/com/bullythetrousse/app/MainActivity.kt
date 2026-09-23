@@ -24,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.HapticEvent
 import com.bullythetrousse.core.Lang
@@ -85,8 +86,9 @@ sealed interface Screen {
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
 
-    /** Le profil public d'un autre joueur, ouvert depuis le classement. */
-    data class PlayerProfile(val uid: String) : Screen
+    /** Le profil d'un autre joueur ; [from] est l'écran où revenir (le
+     *  classement, ou mon profil quand on l'ouvre depuis une liste d'abonnés). */
+    data class PlayerProfile(val uid: String, val from: Screen = Screen.Leaderboard) : Screen
 }
 
 /**
@@ -130,17 +132,14 @@ fun GameRoot() {
     // LocalToaster pour les écrans qui en émettent).
     val toasts = remember { mutableStateListOf<String>() }
 
-    // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
-    // et sans effet tant que app/google-services.json n'est pas là : le jeu
-    // reste entièrement jouable hors ligne.
-    val cloud = rememberCloudSession(
-        save = save,
-        repository = repository,
-        // La copie venue du cloud est DÉJÀ écrite sur le disque par la session
-        // (avec l'horodatage du serveur) : la réécrire ici lui collerait
-        // l'heure locale et ferait croire que ce téléphone vient de jouer.
-        onSaveChange = { save = it },
-    )
+    // La session en ligne, créée plus bas (elle a besoin d'updateSave pour
+    // créditer les cadeaux) mais utilisée par updateSave pour publier les
+    // succès : d'où cette référence renseignée juste après sa création.
+    var cloudRef: CloudSession? = null
+
+    // Cadeaux ramassés à la connexion, affichés dans une modale (voir
+    // checkIncomingGifts() côté site) : lignes fusionnées par expéditeur + total.
+    var receivedGifts by remember { mutableStateOf<Pair<List<Pair<String, Int>>, Int>?>(null) }
 
     // Temps de jeu et série d'écoute musicale, accumulés en mémoire et
     // reportés dans la sauvegarde toutes les 30 s (voir PlayTimeTracker).
@@ -168,9 +167,36 @@ fun GameRoot() {
             newlyUnlocked.forEach { toasts += I18n.tr("achvUnlockedPrefix", lang) + it.name(lang) }
             sfx.play(SfxCatalog.BUY)
             haptics.play(HapticEvent.ACHIEVEMENT)
-            cloud.publishUnlocks(newlyUnlocked.map { it.id }, withAchievements.totalThrows)
+            cloudRef?.publishUnlocks(newlyUnlocked.map { it.id }, withAchievements.totalThrows)
         }
     }
+
+    // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
+    // et sans effet tant que app/google-services.json n'est pas là : le jeu
+    // reste entièrement jouable hors ligne.
+    val cloud = rememberCloudSession(
+        save = save,
+        repository = repository,
+        // La copie venue du cloud est DÉJÀ écrite sur le disque par la session
+        // (avec l'horodatage du serveur) : la réécrire ici lui collerait
+        // l'heure locale et ferait croire que ce téléphone vient de jouer.
+        onSaveChange = { save = it },
+        onGifts = { gifts, atLogin ->
+            val total = Gifts.total(gifts)
+            if (total > 0) {
+                updateSave(save.copy(money = save.money + total))
+                if (atLogin) {
+                    receivedGifts = Gifts.mergeBySender(gifts) to total
+                } else {
+                    val lang = Lang.fromId(save.lang)
+                    gifts.forEach { gift ->
+                        toasts += I18n.tr("giftReceivedToast", lang, "pseudo" to gift.senderPseudo, "amount" to gift.amount)
+                    }
+                }
+            }
+        },
+    )
+    cloudRef = cloud
 
     // Langue jamais choisie : on devine d'après celle du téléphone, une seule
     // fois, comme l'initialisation du site (`navigator.language`).
@@ -215,6 +241,9 @@ fun GameRoot() {
                 screen = destination
             },
         )
+        receivedGifts?.let { (rows, total) ->
+            GiftsReceivedDialog(rows = rows, total = total, onDismiss = { receivedGifts = null })
+        }
         Toast(message = toasts.firstOrNull(), onDismiss = { if (toasts.isNotEmpty()) toasts.removeAt(0) })
     }
 }
@@ -241,6 +270,7 @@ private fun GameContent(
         ScreenContent(
             save = save,
             screen = baseScreen,
+            baseScreen = baseScreen,
             cloud = cloud,
             repository = repository,
             updateSave = updateSave,
@@ -263,6 +293,7 @@ private fun GameContent(
     ScreenContent(
         save = save,
         screen = screen,
+        baseScreen = baseScreen,
         cloud = cloud,
         repository = repository,
         updateSave = updateSave,
@@ -295,11 +326,16 @@ private fun GameContent(
 private fun ScreenContent(
     save: GameSave,
     screen: Screen,
+    baseScreen: Screen,
     cloud: CloudSession,
     repository: SaveRepository,
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
 ) {
+    // Fermer une modale rend la main à l'écran qu'elle recouvrait (le jeu,
+    // le profil...), pas systématiquement au menu — comme côté site, où la
+    // modale disparaît simplement de par-dessus l'écran actif.
+    val closeModal = { goTo(baseScreen) }
     when (screen) {
         Screen.Menu -> MenuScreen(
             save = save,
@@ -325,22 +361,32 @@ private fun ScreenContent(
 
         is Screen.PlayerProfile -> PlayerProfileScreen(
             uid = screen.uid,
+            save = save,
             session = cloud,
-            onBack = { goTo(Screen.Leaderboard) },
+            // Depuis une liste d'abonnés, on garde le même point de retour.
+            onOpenPlayer = { other ->
+                goTo(if (other == cloud.uid) Screen.Profile else Screen.PlayerProfile(other, screen.from))
+            },
+            onBack = { goTo(screen.from) },
         )
 
         Screen.Profile -> ProfileScreen(
             save = save,
             session = cloud,
+            onSaveChange = updateSave,
+            onOpenAchievements = { goTo(Screen.AchievementsList) },
+            onOpenPlayer = { other ->
+                goTo(if (other == cloud.uid) Screen.Profile else Screen.PlayerProfile(other, Screen.Profile))
+            },
             onBack = { goTo(Screen.Menu) },
         )
 
-        Screen.AchievementsList -> AchievementsScreen(save = save, session = cloud, onBack = { goTo(Screen.Menu) })
+        Screen.AchievementsList -> AchievementsScreen(save = save, session = cloud, onBack = closeModal)
 
         Screen.Challenges -> ChallengesScreen(
             save = save,
             onSaveChange = updateSave,
-            onBack = { goTo(Screen.Menu) },
+            onBack = closeModal,
         )
 
         Screen.Game -> GameScreen(
@@ -362,7 +408,7 @@ private fun ScreenContent(
             session = cloud,
             onSaveChange = updateSave,
             onOpenAccount = { goTo(Screen.Account) },
-            onBack = { goTo(Screen.Menu) },
+            onBack = closeModal,
         )
 
         Screen.Account -> AccountScreen(
@@ -373,9 +419,9 @@ private fun ScreenContent(
             onBack = { goTo(Screen.Settings) },
         )
 
-        Screen.Links -> LinksScreen(onBack = { goTo(Screen.Menu) })
+        Screen.Links -> LinksScreen(onBack = closeModal)
 
-        Screen.Changelog -> ChangelogScreen(onBack = { goTo(Screen.Menu) })
+        Screen.Changelog -> ChangelogScreen(onBack = closeModal)
 
         Screen.VolcanoCinematic -> VolcanoCinematicScreen(equippedSkin = save.equippedSkin, onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))

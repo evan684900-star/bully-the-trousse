@@ -1,18 +1,22 @@
 package com.bullythetrousse.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.IncomingGift
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.RecoveryCode
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -63,6 +67,46 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
         internal set
 
     internal var retryTrigger by mutableIntStateOf(0)
+
+    /**
+     * Lance [block] pour la durée de vie de l'app, pas celle d'un écran.
+     *
+     * Pour les écritures qui ne doivent pas être abandonnées à mi-chemin : un
+     * cadeau, par exemple, part vers Firestore même si le joueur ferme la
+     * fenêtre, et l'annuler de notre côté ferait rembourser un cadeau bel et
+     * bien envoyé.
+     */
+    fun launchDetached(block: suspend () -> Unit) {
+        scope.launch { block() }
+    }
+
+    /** Heure du dernier cadeau envoyé (`lastGiftSentAt` côté site) : le délai
+     *  de [Gifts.COOLDOWN_MS] vaut pour toute la session, pas par écran. */
+    var lastGiftSentAtMillis: Long = 0L
+
+    /** Reçoit les cadeaux crédités : tous ceux en attente à la connexion
+     *  (`atLogin` = vrai, affichés dans une modale), puis un par un en temps
+     *  réel (toast). Branché par [rememberCloudSession]. */
+    internal var giftSink: ((gifts: List<IncomingGift>, atLogin: Boolean) -> Unit)? = null
+
+    private var giftsListener: ListenerRegistration? = null
+
+    /**
+     * `checkIncomingGifts()` puis `startGiftsListener()`, dans cet ordre : le
+     * ramassage marque d'abord « vus » les cadeaux en attente, pour que
+     * l'écoute ne les crédite pas une deuxième fois.
+     */
+    internal suspend fun startGifts(uid: String) {
+        stopGifts()
+        val pending = runCatching { bridge.collectIncomingGifts(uid) }.getOrDefault(emptyList())
+        if (pending.isNotEmpty()) giftSink?.invoke(pending, true)
+        giftsListener = bridge.listenIncomingGifts(uid) { gift -> giftSink?.invoke(listOf(gift), false) }
+    }
+
+    internal fun stopGifts() {
+        giftsListener?.remove()
+        giftsListener = null
+    }
 
     /**
      * `pushAchvUnlock()` pour chaque succès qui vient de tomber : alimente les
@@ -146,8 +190,10 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
             null
         } ?: return "Aucun compte ne correspond à ce code."
 
+        stopGifts()
         uid = joined
         state = CloudState.LINKED
+        scope.launch { startGifts(joined) }
         return try {
             val cloud = bridge.fetchCloudSave(joined)
             if (cloud != null) {
@@ -217,6 +263,8 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
                 runCatching { bridge.cleanupAbandonedAnonymousAccount(id, currentSave.unlockedAchievements) }
             }
         }
+        // Les cadeaux de l'ancien compte ne doivent plus être crédités ici.
+        stopGifts()
         bridge.signOut()
         uid = null
         state = if (bridge.isAvailable) CloudState.CONNECTING else CloudState.NOT_CONFIGURED
@@ -260,10 +308,19 @@ fun rememberCloudSession(
     save: GameSave,
     repository: SaveRepository,
     onSaveChange: (GameSave) -> Unit,
+    onGifts: (gifts: List<IncomingGift>, atLogin: Boolean) -> Unit,
 ): CloudSession {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember { CloudSession(FirebaseBridge(context), scope) }
+    val currentOnGifts by rememberUpdatedState(onGifts)
+    DisposableEffect(session) {
+        session.giftSink = { gifts, atLogin -> currentOnGifts(gifts, atLogin) }
+        onDispose {
+            session.giftSink = null
+            session.stopGifts()
+        }
+    }
 
     LaunchedEffect(session.retryTrigger) {
         if (!session.bridge.isAvailable) return@LaunchedEffect
@@ -300,6 +357,8 @@ fun rememberCloudSession(
                 session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
                 // Rattrape les succès obtenus hors ligne ou avant ce système.
                 session.syncAchievementStats(save)
+                // Cadeaux reçus pendant l'absence, puis écoute temps réel.
+                session.startGifts(signedIn)
                 return@LaunchedEffect
             } catch (e: Exception) {
                 // Réseau coupé, règles Firestore, authentification désactivée

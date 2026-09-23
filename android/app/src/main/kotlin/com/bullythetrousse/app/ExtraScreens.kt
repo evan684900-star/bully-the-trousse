@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
@@ -50,7 +49,6 @@ import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.I18n
-import com.bullythetrousse.core.SkinStats
 import kotlin.math.roundToInt
 
 /**
@@ -634,142 +632,3 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean, on
     }
 }
 
-/**
- * Profil, porté de `#screen-profile` / `paintProfile()` : l'en-tête
- * (avatar rond bordé de doré, pseudo, statut), la rangée de trois cartes
- * `.profile-card` (trousse équipée + nombre de skins, abonnements,
- * abonnés), puis les statistiques détaillées.
- *
- * Abonnements/abonnés viennent de Firestore, comme sur le site.
- */
-@Composable
-fun ProfileScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
-    // Abonnements/abonnés : deux comptages Firestore (`countFollowers()` /
-    // `countFollowing()` côté site). Tant qu'ils n'ont pas répondu — ou si le
-    // compte en ligne n'est pas disponible — on laisse le tiret du site.
-    var following by remember { mutableStateOf<Int?>(null) }
-    var followers by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(session.uid) {
-        val id = session.uid ?: return@LaunchedEffect
-        try {
-            following = session.bridge.countFollowing(id)
-            followers = session.bridge.countFollowers(id)
-        } catch (e: Exception) {
-            // Hors ligne : on garde le tiret, ce n'est pas une erreur à montrer.
-        }
-    }
-
-    ModalScreen("👤 Profil", onBack, opaque = true) {
-        // .profile-header
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(84.dp)
-                    .clip(CircleShape)
-                    .background(CardBg)
-                    .border(3.dp, Accent, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(save.avatarEmoji.ifBlank { "🎒" }, fontSize = 40.sp)
-            }
-            Text(
-                save.pseudo.ifBlank { "?" },
-                color = TextColor,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            // .profile-status : toujours "En ligne" pour SON PROPRE profil côté
-            // site (profileOnline, sans vérifier de seuil — ce seuil ne sert
-            // qu'à afficher le profil d'un AUTRE joueur, pas encore porté ici).
-            val isOnline = session.state == CloudState.GUEST || session.state == CloudState.LINKED
-            Text(
-                if (isOnline) "🟢 En ligne" else "Hors ligne",
-                color = if (isOnline) Money else TextDim,
-                fontSize = 12.5.sp,
-                fontWeight = if (isOnline) FontWeight.Bold else FontWeight.Normal,
-            )
-        }
-
-        // .profile-top-row : trois cartes côte à côte.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ProfileCard(modifier = Modifier.weight(1f)) {
-                TrousseSprite(
-                    skinId = save.equippedSkin,
-                    contentDescription = "trousse équipée",
-                    modifier = Modifier.size(40.dp),
-                )
-                Text("+${save.ownedSkins.size}", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            ProfileCard(modifier = Modifier.weight(1f)) {
-                Text(
-                    following?.toString() ?: "—",
-                    color = TextColor,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text("Abonnements", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
-            }
-            ProfileCard(modifier = Modifier.weight(1f)) {
-                Text(
-                    followers?.toString() ?: "—",
-                    color = TextColor,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text("Abonnés", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
-            }
-        }
-
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProfileRow("Lancers", save.totalThrows.toString())
-            ProfileRow("Record", "${"%.1f".format(save.bestDistance)} m")
-            ProfileRow("Record plage", "${"%.1f".format(save.plageBestDistance)} m")
-            ProfileRow("Argent gagné", "${save.totalMoneyEarned} $")
-            ProfileRow("Succès", "${save.unlockedAchievements.size} / ${Achievements.ALL.size}")
-            ProfileRow("Puissance", SkinStats.totalPuissance(save).toString())
-            ProfileRow("Vitesse", SkinStats.totalVitesse(save).toString())
-        }
-    }
-}
-
-/** `.profile-card` : carte carrée, contenu centré. */
-@Composable
-internal fun ProfileCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBg)
-            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
-            .padding(vertical = 12.dp, horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        content()
-    }
-}
-
-@Composable
-internal fun ProfileRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBg)
-            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text(value, color = Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-    }
-}

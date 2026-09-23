@@ -59,6 +59,9 @@ fun skinColorFilter(skinId: String, hueDegrees: Float = 0f): ColorFilter? {
     return ColorFilter.colorMatrix(ColorMatrix(cssFilterToMatrix(effective)))
 }
 
+/** `grayscale(1)` : une trousse pas encore possédée, dans la liste du profil. */
+val LockedSkinFilter: ColorFilter by lazy { ColorFilter.colorMatrix(ColorMatrix(cssFilterToMatrix("grayscale(1)"))) }
+
 /**
  * Le filtre d'un skin, prêt à poser sur l'image — en animant la teinte
  * quand c'est la Trousse Arc-en-ciel (le seul skin dont le filtre bouge).

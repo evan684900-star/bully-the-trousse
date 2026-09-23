@@ -2,6 +2,8 @@ package com.bullythetrousse.app
 
 import android.content.Context
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Gifts
+import com.bullythetrousse.core.IncomingGift
 import com.bullythetrousse.core.RecoveryCode
 import com.bullythetrousse.core.SaveCodec
 import com.bullythetrousse.core.SkinStats
@@ -10,8 +12,10 @@ import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.AggregateSource
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -289,7 +293,11 @@ class FirebaseBridge(context: Context) {
             avatarEmoji = doc.getString("avatarEmoji").orEmpty(),
             isPrivate = doc.getBoolean("isPrivate") ?: false,
             equippedSkin = doc.getString("equippedSkin").orEmpty().ifBlank { "classique" },
-            ownedSkinsCount = (doc.get("ownedSkins") as? List<*>)?.size ?: 0,
+            // `safeOwnedSkins()` côté site : seuls des identifiants texte, le
+            // document n'étant pas validé côté serveur.
+            ownedSkins = (doc.get("ownedSkins") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+            dailyEarnings = numberMap(doc.get("dailyEarnings")).mapValues { it.value.toLong() },
+            dailyBestDistance = numberMap(doc.get("dailyBestDistance")),
             bestDistance = doc.getDouble("bestDistance") ?: 0.0,
             totalMoneyEarned = (doc.getLong("totalMoneyEarned") ?: 0L),
             puissance = (doc.getLong("puissance") ?: 0L).toInt(),
@@ -299,6 +307,32 @@ class FirebaseBridge(context: Context) {
             // afficher "En ligne" ou "Vu il y a...".
             updatedAtMillis = doc.getTimestamp(UPDATED_AT)?.toDate()?.time,
         )
+    }
+
+    /** Une map `{ "AAAA-MM-JJ": nombre }` lue dans un document, sans faire
+     *  confiance à son contenu (`num()` côté site : tout ce qui n'est pas un
+     *  nombre fini est ignoré). */
+    private fun numberMap(raw: Any?): Map<String, Double> =
+        (raw as? Map<*, *>).orEmpty().mapNotNull { (k, v) ->
+            val key = k as? String ?: return@mapNotNull null
+            val value = (v as? Number)?.toDouble()?.takeIf { it.isFinite() } ?: return@mapNotNull null
+            key to value
+        }.toMap()
+
+    /**
+     * `openFollowListModal()` : les comptes que [uid] suit (FOLLOWING) ou qui
+     * le suivent (FOLLOWERS), 50 au plus, avec leur profil public pour le
+     * pseudo et l'avatar (null si ce joueur n'a jamais publié de profil).
+     */
+    suspend fun listFollows(uid: String, direction: FollowDirection): List<Pair<String, PublicProfile?>> {
+        if (!isAvailable) return emptyList()
+        val (matchField, otherField) = when (direction) {
+            FollowDirection.FOLLOWING -> "follower" to "following"
+            FollowDirection.FOLLOWERS -> "following" to "follower"
+        }
+        val others = firestore.collection(FOLLOWS).whereEqualTo(matchField, uid).limit(50).get().await()
+            .documents.mapNotNull { it.getString(otherField) }
+        return others.map { other -> other to runCatching { fetchPublicProfile(other) }.getOrNull() }
     }
 
     /** `isFollowing()` côté site : un `get()` direct sur l'identifiant de la
@@ -346,6 +380,91 @@ class FirebaseBridge(context: Context) {
     private suspend fun countDocs(query: Query): Int =
         query.count().get(AggregateSource.SERVER).await().count.toInt()
 
+    // ---- Cadeaux d'argent entre joueurs (collection "gifts") ----
+
+    /**
+     * `openGiftModal()` : à qui je peux offrir de l'argent. « Abonnés » couvre
+     * ici les deux sens du suivi — ceux qui me suivent ET ceux que je suis —
+     * car les règles Firestore autorisent le cadeau dans les deux cas.
+     */
+    suspend fun listGiftTargets(uid: String): List<Pair<String, PublicProfile?>> {
+        if (!isAvailable) return emptyList()
+        val followers = firestore.collection(FOLLOWS).whereEqualTo("following", uid).limit(50).get().await()
+            .documents.mapNotNull { it.getString("follower") }
+        val following = firestore.collection(FOLLOWS).whereEqualTo("follower", uid).limit(50).get().await()
+            .documents.mapNotNull { it.getString("following") }
+        return (followers + following).distinct().map { other ->
+            other to runCatching { fetchPublicProfile(other) }.getOrNull()
+        }
+    }
+
+    /** `sendGift()` : écrit le cadeau que le destinataire ramassera. */
+    suspend fun sendGift(fromUid: String, toUid: String, fromPseudo: String, amount: Int) {
+        check(isAvailable) { "Firebase indisponible" }
+        firestore.collection(GIFTS).add(
+            mapOf(
+                "from" to fromUid,
+                "to" to toUid,
+                "fromPseudo" to fromPseudo.ifBlank { "Anonyme" },
+                "amount" to amount.toLong(),
+                "seen" to false,
+                "createdAt" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
+    /**
+     * `checkIncomingGifts()` : ramasse les cadeaux reçus depuis la dernière
+     * connexion et les marque « vus » d'un seul lot, pour ne jamais les
+     * créditer deux fois. Le marquage est best-effort, comme côté site.
+     */
+    suspend fun collectIncomingGifts(uid: String): List<IncomingGift> {
+        if (!isAvailable) return emptyList()
+        val snap = firestore.collection(GIFTS)
+            .whereEqualTo("to", uid).whereEqualTo("seen", false)
+            .limit(Gifts.PENDING_LIMIT).get().await()
+        if (snap.isEmpty) return emptyList()
+        val batch = firestore.batch()
+        val gifts = snap.documents.map { doc ->
+            batch.update(doc.reference, "seen", true)
+            giftFrom(doc.id, doc.data.orEmpty())
+        }
+        runCatching { batch.commit().await() }
+        return gifts
+    }
+
+    /**
+     * `startGiftsListener()` : pendant la session, crédite chaque nouveau
+     * cadeau dès son écriture par l'expéditeur. À démarrer seulement après
+     * [collectIncomingGifts], pour ne jamais créditer le même document deux
+     * fois. Renvoie de quoi arrêter l'écoute.
+     */
+    fun listenIncomingGifts(uid: String, onGift: (IncomingGift) -> Unit): ListenerRegistration? {
+        if (!isAvailable) return null
+        return firestore.collection(GIFTS)
+            .whereEqualTo("to", uid).whereEqualTo("seen", false)
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) return@addSnapshotListener
+                for (change in snap.documentChanges) {
+                    if (change.type != DocumentChange.Type.ADDED) continue
+                    val gift = giftFrom(change.document.id, change.document.data)
+                    if (gift.amount <= 0) continue
+                    change.document.reference.update("seen", true)
+                    onGift(gift)
+                }
+            }
+    }
+
+    /** Un document de `gifts`, sans faire confiance à son contenu. */
+    private fun giftFrom(docId: String, data: Map<String, Any?>): IncomingGift {
+        val amount = (data["amount"] as? Number)?.toDouble()?.takeIf { it.isFinite() } ?: 0.0
+        return IncomingGift(
+            senderUid = data["from"] as? String ?: docId,
+            senderPseudo = (data["fromPseudo"] as? String).orEmpty().ifBlank { "Anonyme" },
+            amount = kotlin.math.floor(amount).toInt().coerceAtLeast(0),
+        )
+    }
+
     // ---- Statistiques publiques des succès (% de joueurs) ----
 
     /** `markPlayerActive()` : un compte est « actif » dès son premier lancer.
@@ -390,6 +509,7 @@ class FirebaseBridge(context: Context) {
         private const val RECOVERY_CODES = "recoveryCodes"
         private const val RECOVERY_TOKENS = "recoveryTokens"
         private const val UPDATED_AT = "updatedAt"
+        private const val GIFTS = "gifts"
         private const val ACTIVE_PLAYERS = "activePlayers"
         private const val ACHV_UNLOCKS = "achvUnlocks"
     }
@@ -398,6 +518,9 @@ class FirebaseBridge(context: Context) {
 /** Sauvegarde reçue du cloud, avec l'horodatage serveur de sa dernière
  *  écriture (voir `CloudSaveSync` dans `:core`, qui décide si on l'applique). */
 data class CloudSave(val save: GameSave, val updatedAtMillis: Long)
+
+/** Sens d'une liste d'abonnements : ceux que je suis, ou ceux qui me suivent. */
+enum class FollowDirection { FOLLOWING, FOLLOWERS }
 
 /** Une ligne du classement (`.leaderboard-row` côté site). */
 data class LeaderboardEntry(val uid: String, val pseudo: String, val distanceMeters: Double)
@@ -413,7 +536,9 @@ data class PublicProfile(
     val avatarEmoji: String,
     val isPrivate: Boolean,
     val equippedSkin: String,
-    val ownedSkinsCount: Int,
+    val ownedSkins: List<String>,
+    val dailyEarnings: Map<String, Long>,
+    val dailyBestDistance: Map<String, Double>,
     val bestDistance: Double,
     val totalMoneyEarned: Long,
     val puissance: Int,
