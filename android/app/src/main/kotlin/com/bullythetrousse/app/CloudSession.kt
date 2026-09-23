@@ -6,13 +6,16 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.RecoveryCode
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /** Ce que l'app sait de sa connexion au compte en ligne, pour l'afficher
@@ -50,7 +53,7 @@ enum class CloudState {
  * démarrage (voir [AUTO_RETRY_DELAYS_MS]) et à la demande depuis l'écran
  * Compte.
  */
-class CloudSession(val bridge: FirebaseBridge) {
+class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope) {
     var state by mutableStateOf(
         if (bridge.isAvailable) CloudState.CONNECTING else CloudState.NOT_CONFIGURED,
     )
@@ -60,6 +63,31 @@ class CloudSession(val bridge: FirebaseBridge) {
         internal set
 
     internal var retryTrigger by mutableIntStateOf(0)
+
+    /**
+     * `pushAchvUnlock()` pour chaque succès qui vient de tomber : alimente les
+     * pourcentages de la liste des succès. Best-effort, en arrière-plan — un
+     * échec réseau ne doit ni bloquer ni retarder la partie.
+     */
+    fun publishUnlocks(achievementIds: List<String>, totalThrows: Int) {
+        val id = uid ?: return
+        if (achievementIds.isEmpty()) return
+        scope.launch {
+            for (achievementId in achievementIds) {
+                runCatching { bridge.pushAchvUnlock(id, achievementId, totalThrows) }
+            }
+        }
+    }
+
+    /** `syncAchievementStats()` : à chaque connexion, renvoie tous les succès
+     *  déjà obtenus, au cas où ce compte date d'avant ce système. */
+    internal suspend fun syncAchievementStats(save: GameSave) {
+        val id = uid ?: return
+        runCatching { bridge.markPlayerActive(id, save.totalThrows) }
+        for (achievementId in save.unlockedAchievements) {
+            runCatching { bridge.pushAchvUnlock(id, achievementId, save.totalThrows) }
+        }
+    }
 
     /** Redemande une connexion (nouvelle tentative automatique épuisée, ou
      *  bouton "Réessayer" de l'écran Compte). Sans effet si déjà connecté. */
@@ -234,7 +262,8 @@ fun rememberCloudSession(
     onSaveChange: (GameSave) -> Unit,
 ): CloudSession {
     val context = LocalContext.current
-    val session = remember { CloudSession(FirebaseBridge(context)) }
+    val scope = rememberCoroutineScope()
+    val session = remember { CloudSession(FirebaseBridge(context), scope) }
 
     LaunchedEffect(session.retryTrigger) {
         if (!session.bridge.isAvailable) return@LaunchedEffect
@@ -269,6 +298,8 @@ fun rememberCloudSession(
                 if (save.pseudo.isBlank()) onSaveChange(save.copy(pseudo = Pseudo.generateDefault()))
 
                 session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
+                // Rattrape les succès obtenus hors ligne ou avant ce système.
+                session.syncAchievementStats(save)
                 return@LaunchedEffect
             } catch (e: Exception) {
                 // Réseau coupé, règles Firestore, authentification désactivée

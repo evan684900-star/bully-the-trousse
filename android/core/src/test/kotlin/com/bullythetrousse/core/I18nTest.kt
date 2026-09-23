@@ -60,4 +60,14 @@ class I18nTest {
     fun `la table contient toutes les cles du site`() {
         assertTrue(I18nStrings.TABLE.size >= 335)
     }
+
+    @Test
+    fun `les textes propres a l app sont traduits et ne masquent aucune cle du site`() {
+        assertEquals("Graphics quality", I18n.tr("app.settingsQuality", Lang.EN))
+        for ((key, value) in I18nAppStrings.TABLE) {
+            assertTrue(key.startsWith("app."), key)
+            assertTrue(!I18nStrings.TABLE.containsKey(key), key)
+            assertTrue(value.first.isNotBlank() && value.second.isNotBlank(), key)
+        }
+    }
 }

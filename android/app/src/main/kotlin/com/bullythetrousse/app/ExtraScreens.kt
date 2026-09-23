@@ -30,6 +30,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -48,7 +49,9 @@ import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.GraphicsQuality
+import com.bullythetrousse.core.I18n
 import com.bullythetrousse.core.SkinStats
+import kotlin.math.roundToInt
 
 /**
  * Écrans ouverts depuis le menu (Succès, Défis, Classement, Profil). Côté
@@ -102,28 +105,60 @@ private fun BackButton(onBack: () -> Unit) {
 }
 
 /**
- * Les 47 succès du jeu. `:core` ne porte que leur id et leur émoji (pas
- * encore les libellés traduits du web, voir les clés `achv*Name` dans
- * index.html), donc on affiche pour l'instant la grille des émojis :
- * débloqués en clair, verrouillés estompés comme `.achievement-row.locked`.
+ * Les 47 succès du jeu, en grille d'émojis : débloqués en clair, verrouillés
+ * estompés comme `.achievement-row.locked`. Un appui ouvre la fiche du
+ * succès (nom, description, part des joueurs qui l'ont), ce que la liste du
+ * site affiche en permanence à côté de chaque icône.
+ *
+ * Les pourcentages suivent `loadAchievementStats()` : rien en dessous de
+ * [ACHV_MIN_ACTIVE_PLAYERS] joueurs actifs, le panel serait trop petit pour
+ * un chiffre fiable.
  */
 @Composable
-fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
-    // Le succès dont on regarde la fiche (nom + description), ou null : la
-    // grille d'émojis seule ne dit pas ce que chacun récompense, alors que la
-    // liste du site affiche nom et description en clair (voir
-    // renderAchievements()). On garde la grille et on met le texte derrière
-    // un appui.
+fun AchievementsScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
     var detail by remember { mutableStateOf<com.bullythetrousse.core.Achievement?>(null) }
+    val lang = LocalLang.current
 
-    ModalScreen("🏆 Succès", onBack) {
+    // État du panel de joueurs (`#achv-pool-status`) et % par succès.
+    var poolStatus by remember { mutableStateOf<String?>(null) }
+    val percents = remember { mutableStateMapOf<String, Int>() }
+    LaunchedEffect(session.state) {
+        val online = session.state == CloudState.GUEST || session.state == CloudState.LINKED
+        if (!online) {
+            poolStatus = I18n.tr("achvPctOffline", lang)
+            return@LaunchedEffect
+        }
+        poolStatus = I18n.tr("achvPctLoading", lang)
+        val totalActive = try {
+            session.bridge.countActivePlayers()
+        } catch (e: Exception) {
+            poolStatus = I18n.tr("achvPctOffline", lang)
+            return@LaunchedEffect
+        }
+        if (totalActive < ACHV_MIN_ACTIVE_PLAYERS) {
+            poolStatus = I18n.tr("achvPctNotEnough", lang) + ACHV_MIN_ACTIVE_PLAYERS +
+                I18n.tr("achvPctNotEnoughMin", lang) + totalActive + I18n.tr("achvPctNotEnoughSuffix", lang)
+            return@LaunchedEffect
+        }
+        poolStatus = totalActive.toString() + I18n.tr("achvPctActivePlayers", lang)
+        for (achievement in Achievements.ALL) {
+            runCatching { session.bridge.countAchievementUnlocks(achievement.id) }.onSuccess { count ->
+                percents[achievement.id] = (count * 100.0 / totalActive).roundToInt()
+            }
+        }
+    }
+
+    ModalScreen(tr("achvModalTitle"), onBack) {
         Text(
-            "${save.unlockedAchievements.size} / ${Achievements.ALL.size} débloqués",
+            tr("app.achvCount", "n" to save.unlockedAchievements.size, "total" to Achievements.ALL.size),
             color = TextDim,
             fontSize = 13.sp,
         )
+        poolStatus?.let {
+            Text(it, color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+        }
         Text(
-            "Appuie sur un succès pour savoir ce qu'il récompense.",
+            tr("app.achvTapHint"),
             color = TextDim,
             fontSize = 11.5.sp,
             textAlign = TextAlign.Center,
@@ -152,16 +187,19 @@ fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
 
     detail?.let { achievement ->
         val unlocked = achievement.id in save.unlockedAchievements
-        val lang = LocalLang.current
         AchievementDetailDialog(
             emoji = if (unlocked) achievement.emoji else "🔒",
             name = achievement.name(lang),
             description = achievement.description(lang),
             unlocked = unlocked,
+            percent = percents[achievement.id],
             onDismiss = { detail = null },
         )
     }
 }
+
+/** `ACHV_MIN_ACTIVE_PLAYERS` : en dessous, le panel est jugé trop petit pour un % fiable. */
+private const val ACHV_MIN_ACTIVE_PLAYERS = 5
 
 /**
  * La fiche d'un succès : ce que la liste du site (`renderAchievements()`)
@@ -174,6 +212,7 @@ private fun AchievementDetailDialog(
     name: String,
     description: String,
     unlocked: Boolean,
+    percent: Int?,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -208,11 +247,14 @@ private fun AchievementDetailDialog(
             )
             Text(description, color = TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
             Text(
-                if (unlocked) "✅ Débloqué" else "🔒 Pas encore débloqué",
+                tr(if (unlocked) "app.achvUnlocked" else "app.achvLocked"),
                 color = if (unlocked) Money else TextDim,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
             )
+            percent?.let {
+                Text(tr("app.achvPlayersPct", "pct" to it), color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }

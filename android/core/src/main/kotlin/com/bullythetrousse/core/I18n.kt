@@ -28,11 +28,11 @@ enum class Lang(val id: String) {
  * qu'un oubli se voie à l'écran au lieu de faire disparaître un libellé.
  */
 object I18n {
-    fun has(key: String): Boolean = I18nStrings.TABLE.containsKey(key)
+    fun has(key: String): Boolean = I18nStrings.TABLE.containsKey(key) || I18nAppStrings.TABLE.containsKey(key)
 
     /** Le texte brut, placeholders `{nom}` compris. */
     fun raw(key: String, lang: Lang): String {
-        val entry = I18nStrings.TABLE[key] ?: return key
+        val entry = I18nStrings.TABLE[key] ?: I18nAppStrings.TABLE[key] ?: return key
         return when (lang) {
             Lang.FR -> entry.first
             Lang.EN -> entry.second.ifEmpty { entry.first }

@@ -9,6 +9,7 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -140,7 +141,7 @@ class FirebaseBridge(context: Context) {
      */
     suspend fun cleanupAbandonedAnonymousAccount(uid: String, unlockedAchievements: List<String>) {
         if (!isAvailable) return
-        val docWipes = listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, "activePlayers", RECOVERY_TOKENS)
+        val docWipes = listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, ACTIVE_PLAYERS, RECOVERY_TOKENS)
         for (collection in docWipes) {
             runCatching { firestore.collection(collection).document(uid).delete().await() }
         }
@@ -150,7 +151,7 @@ class FirebaseBridge(context: Context) {
         // grimper les pourcentages au-dessus de 100 %.
         for (id in unlockedAchievements) {
             runCatching {
-                firestore.collection("achvUnlocks").document(id).collection("players").document(uid).delete().await()
+                firestore.collection(ACHV_UNLOCKS).document(id).collection("players").document(uid).delete().await()
             }
         }
         // Les abonnements de ce compte jetable, sinon ils gonflent le nombre
@@ -336,7 +337,48 @@ class FirebaseBridge(context: Context) {
 
     private suspend fun countFollows(field: String, uid: String): Int {
         if (!isAvailable) return 0
-        return firestore.collection(FOLLOWS).whereEqualTo(field, uid).get().await().size()
+        return countDocs(firestore.collection(FOLLOWS).whereEqualTo(field, uid))
+    }
+
+    /** `countDocs()` côté site : l'agrégation `count()` compte côté serveur
+     *  sans télécharger les documents — un seul document lu facturé, quel que
+     *  soit le nombre de résultats. */
+    private suspend fun countDocs(query: Query): Int =
+        query.count().get(AggregateSource.SERVER).await().count.toInt()
+
+    // ---- Statistiques publiques des succès (% de joueurs) ----
+
+    /** `markPlayerActive()` : un compte est « actif » dès son premier lancer.
+     *  Dénominateur des pourcentages, sans exposer la moindre sauvegarde. */
+    suspend fun markPlayerActive(uid: String, totalThrows: Int) {
+        if (!isAvailable || totalThrows < 1) return
+        firestore.collection(ACTIVE_PLAYERS).document(uid).set(mapOf("active" to true), SetOptions.merge()).await()
+    }
+
+    /** `pushAchvUnlock(id)` : signale que ce compte a débloqué ce succès. */
+    suspend fun pushAchvUnlock(uid: String, achievementId: String, totalThrows: Int) {
+        if (!isAvailable) return
+        markPlayerActive(uid, totalThrows)
+        firestore.collection(ACHV_UNLOCKS).document(achievementId).collection("players").document(uid)
+            .set(mapOf("unlocked" to true), SetOptions.merge()).await()
+    }
+
+    /** Nombre de joueurs actifs, dénominateur de `loadAchievementStats()`. */
+    suspend fun countActivePlayers(): Int {
+        if (!isAvailable) return 0
+        return countDocs(firestore.collection(ACTIVE_PLAYERS))
+    }
+
+    /** Nombre de joueurs ayant débloqué [achievementId]. */
+    suspend fun countAchievementUnlocks(achievementId: String): Int {
+        if (!isAvailable) return 0
+        return countDocs(firestore.collection(ACHV_UNLOCKS).document(achievementId).collection("players"))
+    }
+
+    /** `computeRank()` : nombre de joueurs avec un meilleur record, plus un. */
+    suspend fun computeRank(collection: String, bestDistance: Double): Int {
+        if (!isAvailable) return 0
+        return countDocs(firestore.collection(collection).whereGreaterThan("bestDistance", bestDistance)) + 1
     }
 
     companion object {
@@ -348,6 +390,8 @@ class FirebaseBridge(context: Context) {
         private const val RECOVERY_CODES = "recoveryCodes"
         private const val RECOVERY_TOKENS = "recoveryTokens"
         private const val UPDATED_AT = "updatedAt"
+        private const val ACTIVE_PLAYERS = "activePlayers"
+        private const val ACHV_UNLOCKS = "achvUnlocks"
     }
 }
 

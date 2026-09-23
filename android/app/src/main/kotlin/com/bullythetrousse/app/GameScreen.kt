@@ -53,7 +53,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BumpMode
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.Milestones
@@ -713,7 +712,9 @@ private fun ThrowFlight(
             skidded = isSkidding,
             beach = beachOutcome,
         )
-        onSaveChange(Achievements.apply(updated))
+        // Les succès sont vérifiés par updateSave (MainActivity), point de
+        // passage unique : c'est lui qui annonce ceux qui tombent.
+        onSaveChange(updated)
     }
 
     return FlightDisplay(state = displayed, resolved = resolved && summary != null, summary = summary)

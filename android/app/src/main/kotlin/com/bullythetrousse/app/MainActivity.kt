@@ -14,7 +14,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -26,6 +28,11 @@ import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.HapticEvent
 import com.bullythetrousse.core.Lang
 import com.bullythetrousse.core.VolcanoCinematic
+import com.bullythetrousse.core.I18n
+import com.bullythetrousse.core.PlayTimeTracker
+import com.bullythetrousse.core.SfxCatalog
+import com.bullythetrousse.core.name
+import kotlinx.coroutines.delay
 import java.util.Locale
 
 /**
@@ -113,35 +120,15 @@ fun GameRoot() {
     // dessiner derrière le voile.
     var baseScreen by remember { mutableStateOf<Screen>(Screen.Menu) }
 
-    // Vibrations (voir HapticsPlayer) : créé ici, avant updateSave() plus
-    // bas, qui en a besoin pour le tic du succès débloqué.
+    // Lecteurs partagés par toute l'app (voir SfxPlayer, HapticsPlayer),
+    // créés avant updateSave() qui s'en sert pour le succès débloqué.
+    val sfx = rememberSfxPlayer()
     val haptics = rememberHapticsPlayer()
 
-    // Point de passage UNIQUE pour toute modification de la sauvegarde locale
-    // (portage de persist() côté web, qui appelle checkAchievements() à
-    // chaque appel — pas seulement après un lancer ou un achat). Sans ça,
-    // les succès qui se déclenchent sans passer par ThrowFlight/applyPurchase
-    // (débloquer le volcan, changer d'avatar, atteindre 5000 $...) ne
-    // seraient constatés qu'au prochain lancer ou achat, au lieu de l'instant
-    // où ils sont vraiment obtenus.
-    fun updateSave(updated: GameSave) {
-        val newlyUnlocked = Achievements.newlyUnlocked(updated)
-        val withAchievements = Achievements.apply(updated)
-        save = withAchievements
-        repository.save(withAchievements)
-        if (newlyUnlocked.isNotEmpty()) haptics.play(HapticEvent.ACHIEVEMENT)
-    }
-
-    // Langue jamais choisie : on devine d'après celle du téléphone, une seule
-    // fois, comme l'initialisation du site (`navigator.language`).
-    LaunchedEffect(Unit) {
-        if (save.lang.isEmpty()) {
-            updateSave(save.copy(lang = Lang.forDeviceLanguage(Locale.getDefault().language).id))
-        }
-    }
-
-    // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
-    WorldMusic(world = save.currentWorld, muted = save.musicMuted)
+    // Toasts de l'app entière, en file : plusieurs succès qui tombent d'un
+    // coup s'affichent l'un après l'autre au lieu de s'écraser (voir
+    // LocalToaster pour les écrans qui en émettent).
+    val toasts = remember { mutableStateListOf<String>() }
 
     // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
     // et sans effet tant que app/google-services.json n'est pas là : le jeu
@@ -155,17 +142,66 @@ fun GameRoot() {
         onSaveChange = { save = it },
     )
 
+    // Temps de jeu et série d'écoute musicale, accumulés en mémoire et
+    // reportés dans la sauvegarde toutes les 30 s (voir PlayTimeTracker).
+    val playClock = remember { PlayTimeTracker(save.musicListenSeconds) }
+
+    // Point de passage UNIQUE pour toute modification de la sauvegarde locale
+    // (portage de persist() côté web, qui appelle checkAchievements() à
+    // chaque appel — pas seulement après un lancer ou un achat). Sans ça,
+    // les succès qui se déclenchent sans passer par ThrowFlight/applyPurchase
+    // (débloquer le volcan, changer d'avatar, atteindre 5000 $...) ne
+    // seraient constatés qu'au prochain lancer ou achat, au lieu de l'instant
+    // où ils sont vraiment obtenus.
+    fun updateSave(updated: GameSave) {
+        // Les secondes de jeu en attente partent avec chaque écriture : sans
+        // ça, une sauvegarde faite entre deux reports les écraserait.
+        val withTime = playClock.flushInto(updated)
+        val newlyUnlocked = Achievements.newlyUnlocked(withTime)
+        val withAchievements = Achievements.apply(withTime)
+        save = withAchievements
+        repository.save(withAchievements)
+        if (newlyUnlocked.isNotEmpty()) {
+            // checkAchievements() : un toast par succès, sfxBuy(), et la
+            // publication pour le pourcentage de joueurs.
+            val lang = Lang.fromId(withAchievements.lang)
+            newlyUnlocked.forEach { toasts += I18n.tr("achvUnlockedPrefix", lang) + it.name(lang) }
+            sfx.play(SfxCatalog.BUY)
+            haptics.play(HapticEvent.ACHIEVEMENT)
+            cloud.publishUnlocks(newlyUnlocked.map { it.id }, withAchievements.totalThrows)
+        }
+    }
+
+    // Langue jamais choisie : on devine d'après celle du téléphone, une seule
+    // fois, comme l'initialisation du site (`navigator.language`).
+    LaunchedEffect(Unit) {
+        if (save.lang.isEmpty()) {
+            updateSave(save.copy(lang = Lang.forDeviceLanguage(Locale.getDefault().language).id))
+        }
+    }
+
+    // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()),
+    // en pause quand l'app n'est plus à l'écran.
+    val inForeground by rememberAppInForeground()
+    val musicPlaying = WorldMusic(world = save.currentWorld, muted = save.musicMuted, inForeground = inForeground)
+    val currentMusicPlaying by rememberUpdatedState(musicPlaying)
+    LaunchedEffect(inForeground) {
+        if (!inForeground) return@LaunchedEffect
+        while (true) {
+            delay(1000)
+            if (playClock.tick(currentMusicPlaying)) updateSave(save)
+        }
+    }
+
     // Le niveau de détail choisi dans les Réglages descend jusqu'aux écrans
     // qui dessinent, sans que les écrans intermédiaires aient à le porter
     // (voir LocalGraphicsQuality).
-    // Les bruitages sont synthétisés (voir SfxPlayer) : un seul lecteur pour
-    // toute l'app, pour que le cache PCM serve à tous les écrans.
-    val sfx = rememberSfxPlayer()
     CompositionLocalProvider(
         LocalGraphicsQuality provides GraphicsQuality.fromId(save.graphicsQuality),
         LocalSfx provides sfx,
         LocalHaptics provides haptics,
         LocalLang provides Lang.fromId(save.lang),
+        LocalToaster provides { message -> toasts += message },
     ) {
         GameContent(
             save = save,
@@ -179,6 +215,7 @@ fun GameRoot() {
                 screen = destination
             },
         )
+        Toast(message = toasts.firstOrNull(), onDismiss = { if (toasts.isNotEmpty()) toasts.removeAt(0) })
     }
 }
 
@@ -298,7 +335,7 @@ private fun ScreenContent(
             onBack = { goTo(Screen.Menu) },
         )
 
-        Screen.AchievementsList -> AchievementsScreen(save = save, onBack = { goTo(Screen.Menu) })
+        Screen.AchievementsList -> AchievementsScreen(save = save, session = cloud, onBack = { goTo(Screen.Menu) })
 
         Screen.Challenges -> ChallengesScreen(
             save = save,
