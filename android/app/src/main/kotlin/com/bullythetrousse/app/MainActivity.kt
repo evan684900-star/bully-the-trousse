@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.mutableStateListOf
@@ -122,7 +123,11 @@ private fun Screen.isModal(): Boolean = this in MODAL_SCREENS
 fun GameRoot() {
     val context = LocalContext.current
     val repository = remember { SaveRepository(context) }
-    var save by remember { mutableStateOf(repository.load()) }
+    // Le thème est appliqué dès le chargement, pour ne pas afficher une
+    // première image sombre avant de basculer en clair.
+    var save by remember { mutableStateOf(repository.load().also { AppTheme.isLight = it.theme == "light" }) }
+    // Puis suivi à chaque changement (bouton des Réglages, triche, cloud).
+    SideEffect { AppTheme.isLight = save.theme == "light" }
     var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
     // Le dernier écran de fond : une modale se pose PAR-DESSUS lui sans le
     // remplacer (voir isModal), donc il faut le retenir pour continuer à le
