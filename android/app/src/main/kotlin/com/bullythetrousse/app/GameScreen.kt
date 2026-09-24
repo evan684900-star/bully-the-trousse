@@ -38,6 +38,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +64,7 @@ import com.bullythetrousse.core.Economy
 import com.bullythetrousse.core.FlightState
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.HapticEvent
+import com.bullythetrousse.core.I18n
 import com.bullythetrousse.core.PhysicsConstants
 import com.bullythetrousse.core.PowerAndAccuracy
 import com.bullythetrousse.core.SfxCatalog
@@ -234,6 +237,11 @@ fun GameScreen(
             onVampireBoost = { vampireBoost = it },
             onToast = { toast = it },
         )
+        // Un lancer est « en cours » de l'envol à l'immobilisation finale,
+        // apesanteur et glissade comprises.
+        val inFlight = (current is ThrowState.Landed && !flight.resolved) || spaceFlight?.state != null
+        SideEffect { PlayState.throwInProgress = inFlight }
+        DisposableEffect(Unit) { onDispose { PlayState.throwInProgress = false } }
         ThrowCanvas(
             flightState = flight.state,
             world = save.currentWorld,
@@ -488,13 +496,13 @@ private fun ResultPanel(
         // #result-coin / #result-vampire : textes en dur côté site (pas dans STRINGS).
         summary.coinMultiplier?.let { m ->
             ResultNote(
-                "🪙 Multiplicateur x${formatMultiplier(m)} ! (+${summary.coinExtra}$ grâce au bonus)",
+                tr("app.coinResult", "mult" to formatMultiplier(m), "extra" to summary.coinExtra),
                 Accent,
             )
         }
         if (summary.vampireStolen > 0 || summary.vampireStealPct > 0) {
             ResultNote(
-                "🦇 -${summary.vampireStolen}$ volés par la malédiction (${summary.vampireStealPct.roundToInt()}%)",
+                tr("app.vampireResult", "stolen" to summary.vampireStolen, "pct" to summary.vampireStealPct.roundToInt()),
                 Color(0xFFB388FF),
             )
         }
@@ -566,6 +574,8 @@ private fun ThrowFlight(
 
     val sfx = LocalSfx.current
     val haptics = LocalHaptics.current
+    // Langue lue ici : les textes posés depuis une coroutine ne peuvent pas appeler tr().
+    val lang = LocalLang.current
     val result = state.result
     val isBeach = save.currentWorld == "plage"
     var flightFinished by remember(result) { mutableStateOf(false) }
@@ -703,7 +713,7 @@ private fun ThrowFlight(
             )
             updated = DailyStats.recordEarning(updated, reward.bonus, today)
             totalGained += reward.bonus
-            onToast("🎉 Palier des ${reward.meters}m atteint ! +${reward.bonus}$")
+            onToast(I18n.tr("app.milestone", lang, "meters" to reward.meters, "bonus" to reward.bonus))
         }
 
         updated = updated.copy(totalThrows = updated.totalThrows + 1)
@@ -847,3 +857,17 @@ private fun VampireBoostVignette(active: Boolean) {
 /** Hauteur du sol à l'écran (fraction de la hauteur), partagée entre le
  *  canvas et le test du toucher sur le 💩. */
 private const val GROUND_FRACTION = 0.68f
+
+/**
+ * État de partie partagé avec le reste de l'app, lu aussi bien par les
+ * écrans que par les boucles d'animation (d'où un état observable plutôt
+ * qu'un CompositionLocal, qu'une coroutine ne peut pas lire).
+ */
+object PlayState {
+    /** Un lancer est en l'air (vol, glissade ou apesanteur) — `throwInProgress()`
+     *  côté site. Une partie reçue d'un autre appareil attend qu'il finisse. */
+    var throwInProgress by mutableStateOf(false)
+
+    /** `gamePaused` : une fenêtre s'est ouverte par-dessus un lancer en cours. */
+    var paused by mutableStateOf(false)
+}

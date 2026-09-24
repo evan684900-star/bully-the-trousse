@@ -193,7 +193,7 @@ private fun MenuDialogs(
             val max = SkinStats.maxDurability(save)
             InfoLine(tr("labelDurability"), "${save.durability} / $max")
             DurabilityBar(fraction = if (max > 0) save.durability.toFloat() / max else 0f)
-            InfoLine(tr("labelName"), save.pseudo.ifBlank { "Trousse" })
+            InfoLine(tr("labelName"), save.pseudo.ifBlank { tr("app.trousseDefaultName") })
             InfoLine(tr("labelPlaytime"), formatPlayTime(save.playTime))
             val best = if (save.currentWorld == "plage") save.plageBestDistance else save.bestDistance
             InfoLine(tr("labelBest"), "${"%.1f".format(best)} m")
@@ -414,6 +414,7 @@ private fun WorldsRow(
     val needsClaquettes = tr("plageNeedsClaquettes")
     val volcanoRetry = tr("volcanoRetry")
     val comingSoon = tr("worldLocked")
+    val villeName = tr(WORLD_VILLE.name)
 
     fun refuse(message: String) {
         onToast(message)
@@ -448,7 +449,8 @@ private fun WorldsRow(
                 onSaveChange(save.copy(currentWorld = "cour"))
                 sfx.play(SfxCatalog.CHARGE)
             }
-            else -> refuse("🔒 ${world.name}$comingSoon")
+            // Seule la Ville arrive ici (« arrive bientôt »).
+            else -> refuse("🔒 $villeName$comingSoon")
         }
     }
 
@@ -515,7 +517,7 @@ private fun WorldCard(
         ) {
             Text(world.emoji, fontSize = 26.sp, textAlign = TextAlign.Center)
             Text(
-                world.name,
+                if (world.name.startsWith("app.")) tr(world.name) else world.name,
                 color = TextColor,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
@@ -539,10 +541,11 @@ private fun WorldCard(
     }
 }
 
+/** [name] est soit une clé de traduction (`app.world...`), soit un texte déjà traduit. */
 private data class World(val id: String, val name: String, val emoji: String)
 
 /** Portage du tableau `WORLDS` côté web, dans le même ordre. */
-private val WORLD_COUR = World("cour", "Cour d'école", "🏫")
-private val WORLD_VOLCANS = World("volcans", "Volcans", "🌋")
-private val WORLD_PLAGE = World("plage", "Plage", "🏖️")
-private val WORLD_VILLE = World("ville", "Ville", "🏙️")
+private val WORLD_COUR = World("cour", "app.worldCour", "🏫")
+private val WORLD_VOLCANS = World("volcans", "app.worldVolcans", "🌋")
+private val WORLD_PLAGE = World("plage", "app.worldPlage", "🏖️")
+private val WORLD_VILLE = World("ville", "app.worldVille", "🏙️")

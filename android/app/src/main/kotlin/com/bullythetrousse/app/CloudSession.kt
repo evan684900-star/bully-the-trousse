@@ -92,6 +92,23 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
 
     private var giftsListener: ListenerRegistration? = null
 
+    /** Reçoit une partie arrivée d'un autre appareil pendant la session
+     *  (voir [startSaveListener]). Branché par [rememberCloudSession]. */
+    internal var remoteSaveSink: ((CloudSave) -> Unit)? = null
+
+    private var saveListener: ListenerRegistration? = null
+
+    /** `startCloudSaveListener()` : suit la partie de ce compte en temps réel. */
+    internal fun startSaveListener(uid: String) {
+        stopSaveListener()
+        saveListener = bridge.listenCloudSave(uid, sessionId) { remote -> remoteSaveSink?.invoke(remote) }
+    }
+
+    internal fun stopSaveListener() {
+        saveListener?.remove()
+        saveListener = null
+    }
+
     /**
      * `checkIncomingGifts()` puis `startGiftsListener()`, dans cet ordre : le
      * ramassage marque d'abord « vus » les cadeaux en attente, pour que
@@ -188,6 +205,8 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
         }
 
         stopGifts()
+        // Une partie reçue de l'ANCIEN compte n'a plus rien à faire ici.
+        stopSaveListener()
         val joined = try {
             bridge.signInWithCode(code)
         } catch (e: Exception) {
@@ -196,6 +215,7 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
 
         uid = joined
         state = CloudState.LINKED
+        startSaveListener(joined)
         scope.launch { startGifts(joined) }
         return try {
             val cloud = bridge.fetchCloudSave(joined)
@@ -305,8 +325,9 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
                 runCatching { bridge.cleanupAbandonedAnonymousAccount(id, currentSave.unlockedAchievements) }
             }
         }
-        // Les cadeaux de l'ancien compte ne doivent plus être crédités ici.
+        // Les cadeaux et la partie de l'ancien compte ne doivent plus arriver ici.
         stopGifts()
+        stopSaveListener()
         bridge.signOut()
         uid = null
         state = if (bridge.isAvailable) CloudState.CONNECTING else CloudState.NOT_CONFIGURED
@@ -352,16 +373,33 @@ fun rememberCloudSession(
     repository: SaveRepository,
     onSaveChange: (GameSave) -> Unit,
     onGifts: (gifts: List<IncomingGift>, atLogin: Boolean) -> Unit,
+    onRemoteSave: (CloudSave) -> Unit,
+    inForeground: Boolean,
 ): CloudSession {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val session = remember { CloudSession(FirebaseBridge(context), scope) }
     val currentOnGifts by rememberUpdatedState(onGifts)
+    val currentOnRemoteSave by rememberUpdatedState(onRemoteSave)
     DisposableEffect(session) {
         session.giftSink = { gifts, atLogin -> currentOnGifts(gifts, atLogin) }
+        session.remoteSaveSink = { remote -> currentOnRemoteSave(remote) }
         onDispose {
             session.giftSink = null
+            session.remoteSaveSink = null
             session.stopGifts()
+            session.stopSaveListener()
+        }
+    }
+
+    // pingPresence() : toutes les 60 s tant que l'app est à l'écran, et dès
+    // qu'elle y revient (le `visibilitychange` du site).
+    LaunchedEffect(session.uid, inForeground) {
+        val id = session.uid ?: return@LaunchedEffect
+        if (!inForeground) return@LaunchedEffect
+        while (true) {
+            session.bridge.pingPresence(id)
+            delay(PRESENCE_PING_INTERVAL_MS)
         }
     }
 
@@ -400,6 +438,8 @@ fun rememberCloudSession(
                 session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
                 // Rattrape les succès obtenus hors ligne ou avant ce système.
                 session.syncAchievementStats(save)
+                // Parties jouées ailleurs pendant la session, en temps réel.
+                session.startSaveListener(signedIn)
                 // Cadeaux reçus pendant l'absence, puis écoute temps réel.
                 session.startGifts(signedIn)
                 return@LaunchedEffect
@@ -439,6 +479,9 @@ fun rememberCloudSession(
 
     return session
 }
+
+/** `PRESENCE_PING_INTERVAL_MS` côté site. */
+private const val PRESENCE_PING_INTERVAL_MS = 60_000L
 
 /** Le site écrit à chaque `persist()` ; ici on attend que la sauvegarde
  *  arrête de bouger, pour ne pas écrire dix fois pendant un seul lancer. */

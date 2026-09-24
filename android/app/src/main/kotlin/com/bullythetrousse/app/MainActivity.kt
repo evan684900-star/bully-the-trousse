@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
+import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.GraphicsQuality
@@ -126,9 +127,12 @@ fun GameRoot() {
     // Le thème est appliqué dès le chargement, pour ne pas afficher une
     // première image sombre avant de basculer en clair.
     var save by remember { mutableStateOf(repository.load().also { AppTheme.isLight = it.theme == "light" }) }
-    // Puis suivi à chaque changement (bouton des Réglages, triche, cloud).
-    SideEffect { AppTheme.isLight = save.theme == "light" }
     var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    // Puis suivi à chaque changement (bouton des Réglages, triche, cloud).
+    // Les cinématiques se jouent toujours en mode jour, comme sur le site
+    // (startVolcanoCinematic() force le thème clair le temps qu'elles durent).
+    SideEffect { AppTheme.isLight = save.theme == "light" || inCinematic }
     // Le dernier écran de fond : une modale se pose PAR-DESSUS lui sans le
     // remplacer (voir isModal), donc il faut le retenir pour continuer à le
     // dessiner derrière le voile.
@@ -183,6 +187,21 @@ fun GameRoot() {
         }
     }
 
+    val inForeground by rememberAppInForeground()
+
+    // Partie reçue d'un autre appareil pendant un lancer ou une cinématique :
+    // mise de côté jusqu'à la fin (pendingRemoteSave côté site), avec l'heure
+    // de réception pour savoir si le lancer l'a rendue périmée.
+    var pendingRemote by remember { mutableStateOf<Pair<CloudSave, Long>?>(null) }
+
+    /** `applyRemoteSave()` : la partie de l'autre appareil, temps de jeu gardé au max. */
+    fun applyRemoteSave(remote: CloudSave) {
+        val merged = CloudSaveSync.mergeRemote(remote.save, save)
+        repository.saveFromCloud(merged, remote.updatedAtMillis)
+        save = merged
+        toasts += I18n.tr("cloudSyncPulled", Lang.fromId(merged.lang))
+    }
+
     // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
     // et sans effet tant que app/google-services.json n'est pas là : le jeu
     // reste entièrement jouable hors ligne.
@@ -207,8 +226,31 @@ fun GameRoot() {
                 }
             }
         },
+        onRemoteSave = { remote ->
+            // Rien de neuf pour le joueur (juste le temps de jeu de l'autre
+            // appareil) : on ne touche à rien.
+            if (CloudSaveSync.differsMeaningfully(remote.save, save)) {
+                if (PlayState.throwInProgress || inCinematic) {
+                    pendingRemote = remote to System.currentTimeMillis()
+                } else {
+                    applyRemoteSave(remote)
+                }
+            }
+        },
+        inForeground = inForeground,
     )
     cloudRef = cloud
+
+    // flushPendingRemoteSave() : une fois le lancer ou la cinématique finis.
+    // Le lancer a sauvegardé APRÈS l'arrivée de la copie ? Elle est périmée
+    // (sans les gains ni le record de la manche) : l'appliquer l'annulerait.
+    val busy = PlayState.throwInProgress || inCinematic
+    LaunchedEffect(busy, pendingRemote) {
+        val (remote, receivedAt) = pendingRemote ?: return@LaunchedEffect
+        if (busy) return@LaunchedEffect
+        pendingRemote = null
+        if (CloudSaveSync.shouldApplyRemoteSave(repository.lastPersistAtMillis, receivedAt)) applyRemoteSave(remote)
+    }
 
     // Langue jamais choisie : on devine d'après celle du téléphone, une seule
     // fois, comme l'initialisation du site (`navigator.language`).
@@ -220,7 +262,6 @@ fun GameRoot() {
 
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()),
     // en pause quand l'app n'est plus à l'écran.
-    val inForeground by rememberAppInForeground()
     val musicPlaying = WorldMusic(world = save.currentWorld, muted = save.musicMuted, inForeground = inForeground)
     val currentMusicPlaying by rememberUpdatedState(musicPlaying)
     LaunchedEffect(inForeground) {
@@ -324,21 +365,34 @@ private fun GameContent(
         onMenuDialogShown = { menuDialogRequest = null },
     )
 
+    // pauseGame() / resumeGame() : une fenêtre ouverte par-dessus l'écran de
+    // jeu pendant un lancer fige la partie jusqu'à sa fermeture.
+    val paused = screen.isModal() && baseScreen == Screen.Game && PlayState.throwInProgress
+    val toaster = LocalToaster.current
+    val pausedText = tr("gamePaused")
+    LaunchedEffect(paused) {
+        PlayState.paused = paused
+        if (paused) toaster(pausedText)
+    }
+
     // Une modale se pose par-dessus l'écran de fond, assombri à 50 % —
-    // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. Sans ça
-    // les Réglages remplaçaient le menu au lieu de le recouvrir.
-    if (screen.isModal() && baseScreen != screen) {
-        ScreenContent(
-            save = save,
-            screen = baseScreen,
-            baseScreen = baseScreen,
-            cloud = cloud,
-            repository = repository,
-            updateSave = updateSave,
-            goTo = goTo,
-            onReplayTutorial = onReplayTutorial,
-            cheats = cheats,
-        )
+    // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. L'écran du
+    // dessous est TOUJOURS composé au même endroit, modale ouverte ou non :
+    // sinon il serait recréé à l'ouverture et perdrait son état (un lancer
+    // en cours repartirait de zéro au lieu d'être mis en pause).
+    val showModal = screen.isModal() && baseScreen != screen
+    ScreenContent(
+        save = save,
+        screen = if (showModal) baseScreen else screen,
+        baseScreen = baseScreen,
+        cloud = cloud,
+        repository = repository,
+        updateSave = updateSave,
+        goTo = goTo,
+        onReplayTutorial = onReplayTutorial,
+        cheats = cheats,
+    )
+    if (showModal) {
         // Le voile avale les taps : sans ça, toucher une zone vide des
         // Réglages actionnerait le bouton du menu resté visible dessous.
         Box(
@@ -351,19 +405,18 @@ private fun GameContent(
                     onClick = {},
                 ),
         )
+        ScreenContent(
+            save = save,
+            screen = screen,
+            baseScreen = baseScreen,
+            cloud = cloud,
+            repository = repository,
+            updateSave = updateSave,
+            goTo = goTo,
+            onReplayTutorial = onReplayTutorial,
+            cheats = cheats,
+        )
     }
-
-    ScreenContent(
-        save = save,
-        screen = screen,
-        baseScreen = baseScreen,
-        cloud = cloud,
-        repository = repository,
-        updateSave = updateSave,
-        goTo = goTo,
-        onReplayTutorial = onReplayTutorial,
-        cheats = cheats,
-    )
 
     // Tutoriels (startTutorial() côté web) : les bases au tout premier
     // lancement, Volcans et Plage à leur premier déblocage (jamais pendant

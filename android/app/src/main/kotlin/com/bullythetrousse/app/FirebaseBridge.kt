@@ -247,6 +247,43 @@ class FirebaseBridge(context: Context) {
     }
 
     /**
+     * `startCloudSaveListener()` : suit la partie en temps réel, pour qu'une
+     * partie jouée sur le site (ou un autre téléphone) arrive ici sans
+     * relancer l'app. Sont ignorés : le tout premier instantané (c'est ce que
+     * la connexion vient de charger), les écritures pas encore confirmées,
+     * et celles de CET appareil (même `sessionId`).
+     */
+    fun listenCloudSave(uid: String, sessionId: String, onRemote: (CloudSave) -> Unit): ListenerRegistration? {
+        if (!isAvailable) return null
+        var first = true
+        return firestore.collection(USERS).document(uid).addSnapshotListener { doc, error ->
+            if (error != null || doc == null) return@addSnapshotListener
+            if (first) {
+                first = false
+                return@addSnapshotListener
+            }
+            if (!doc.exists() || doc.metadata.hasPendingWrites()) return@addSnapshotListener
+            val data = doc.data ?: return@addSnapshotListener
+            if (data["sessionId"] == sessionId) return@addSnapshotListener
+            val updatedAt = doc.getTimestamp(UPDATED_AT)?.toDate()?.time ?: System.currentTimeMillis()
+            onRemote(CloudSave(SaveCodec.fromFieldMap(data), updatedAt))
+        }
+    }
+
+    /**
+     * `pingPresence()` : rafraîchit l'horodatage du profil public, que les
+     * autres joueurs lisent pour afficher « En ligne » ou « Vu il y a... ».
+     * Best-effort.
+     */
+    suspend fun pingPresence(uid: String) {
+        if (!isAvailable) return
+        runCatching {
+            firestore.collection(PROFILES).document(uid)
+                .set(mapOf(UPDATED_AT to FieldValue.serverTimestamp()), SetOptions.merge()).await()
+        }
+    }
+
+    /**
      * `pushCloudSave()` : la sauvegarde champ par champ, plus les deux
      * métadonnées du site. `sessionId` identifie CET appareil, pour que
      * l'écoute temps réel du site sache ignorer sa propre écriture.

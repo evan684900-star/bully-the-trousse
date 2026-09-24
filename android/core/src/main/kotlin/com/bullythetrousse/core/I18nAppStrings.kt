@@ -54,6 +54,21 @@ internal object I18nAppStrings {
         // pas au clic)
         "app.tapToShoot" to ("Touche l'écran pour tirer" to "Tap the screen to shoot"),
 
+        // Textes que le site écrit en dur en français (onLanded(), boutique,
+        // mondes) : le français est repris mot pour mot, l'anglais est un
+        // ajout de l'app.
+        "app.bought" to ("✅ {name} achetée !" to "✅ {name} bought!"),
+        "app.equippedToast" to ("✅ {name} équipée !" to "✅ {name} equipped!"),
+        "app.milestone" to ("🎉 Palier des {meters}m atteint ! +{bonus}$" to "🎉 {meters}m milestone reached! +{bonus}$"),
+        "app.coinResult" to ("🪙 Multiplicateur x{mult} ! (+{extra}$ grâce au bonus)" to "🪙 x{mult} multiplier! (+{extra}$ from the bonus)"),
+        "app.vampireResult" to ("🦇 -{stolen}$ volés par la malédiction ({pct}%)" to "🦇 -{stolen}$ stolen by the curse ({pct}%)"),
+        "app.worldCour" to ("Cour d'école" to "Schoolyard"),
+        "app.worldVolcans" to ("Volcans" to "Volcanoes"),
+        "app.worldPlage" to ("Plage" to "Beach"),
+        "app.worldVille" to ("Ville" to "City"),
+        "app.trousseDefaultName" to ("Trousse" to "Pencil case"),
+        "app.notOnBeach" to ("Tu n'es pas sur la plage." to "You're not on the beach."),
+
         "app.musicSaved" to ("⬇️ Enregistrée dans Téléchargements" to "⬇️ Saved to Downloads"),
         "app.musicSaveError" to ("Impossible d'enregistrer la musique." to "Couldn't save the music."),
     )

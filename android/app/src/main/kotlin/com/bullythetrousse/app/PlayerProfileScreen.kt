@@ -585,7 +585,7 @@ private fun SkinsDetailDialog(data: ProfileData, onDismiss: () -> Unit) {
     InfoDialog(title = tr("profileSkinsTitle"), onDismiss = onDismiss) {
         for (skin in Skins.ALL) {
             val owned = skin.id in data.ownedSkins
-            val name = SKIN_LABELS[skin.id]?.first ?: skin.id
+            val name = skinLabel(skin.id).first
             ListRow(modifier = Modifier.alpha(if (owned) 1f else 0.45f)) {
                 TrousseSprite(skinId = skin.id, contentDescription = null, modifier = Modifier.size(32.dp), locked = !owned)
                 Text(name, color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))

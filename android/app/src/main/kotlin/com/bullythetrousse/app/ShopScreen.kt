@@ -256,7 +256,10 @@ private fun UpgradesTab(save: GameSave, actions: ShopActions) {
 @Composable
 private fun SkinsTab(save: GameSave, actions: ShopActions) {
     for (skin in Skins.ALL) {
-        val (name, desc) = SKIN_LABELS[skin.id] ?: (skin.id to "")
+        val (name, desc) = skinLabel(skin.id)
+        // Résolus ici : tr() ne peut pas être appelé depuis un clic.
+        val boughtMsg = tr("app.bought", "name" to name)
+        val equippedMsg = tr("app.equippedToast", "name" to name)
         val owned = save.ownedSkins.contains(skin.id)
         val equipped = save.equippedSkin == skin.id
         CosmeticCard(
@@ -275,11 +278,11 @@ private fun SkinsTab(save: GameSave, actions: ShopActions) {
             onBuy = {
                 when (val result = SkinShop.buy(save, skin.id)) {
                     // Textes en dur côté site (pas dans STRINGS), comme le nom des skins.
-                    is SkinShop.PurchaseResult.Success -> actions.purchase(result.save, skin.cost, "✅ $name achetée !")
+                    is SkinShop.PurchaseResult.Success -> actions.purchase(result.save, skin.cost, boughtMsg)
                     else -> actions.notEnoughMoney()
                 }
             },
-            onEquip = { actions.equip(SkinShop.equip(save, skin.id), "✅ $name équipée !") },
+            onEquip = { actions.equip(SkinShop.equip(save, skin.id), equippedMsg) },
         )
     }
 }
@@ -288,7 +291,10 @@ private fun SkinsTab(save: GameSave, actions: ShopActions) {
 @Composable
 private fun TrailsTab(save: GameSave, actions: ShopActions) {
     for (trail in Trails.ALL) {
-        val (name, desc) = TRAIL_LABELS[trail.id] ?: (trail.id to "")
+        val (name, desc) = trailLabel(trail.id)
+        // Résolus ici : tr() ne peut pas être appelé depuis un clic.
+        val boughtMsg = tr("app.bought", "name" to name)
+        val equippedMsg = tr("app.equippedToast", "name" to name)
         val owned = save.ownedTrails.contains(trail.id)
         val equipped = save.equippedTrail == trail.id
         CosmeticCard(
@@ -300,11 +306,11 @@ private fun TrailsTab(save: GameSave, actions: ShopActions) {
             cost = trail.cost,
             onBuy = {
                 when (val result = TrailShop.buy(save, trail.id)) {
-                    is TrailShop.PurchaseResult.Success -> actions.purchase(result.save, trail.cost, "✅ $name achetée !")
+                    is TrailShop.PurchaseResult.Success -> actions.purchase(result.save, trail.cost, boughtMsg)
                     else -> actions.notEnoughMoney()
                 }
             },
-            onEquip = { actions.equip(TrailShop.equip(save, trail.id), "✅ $name équipée !") },
+            onEquip = { actions.equip(TrailShop.equip(save, trail.id), equippedMsg) },
         )
     }
 }

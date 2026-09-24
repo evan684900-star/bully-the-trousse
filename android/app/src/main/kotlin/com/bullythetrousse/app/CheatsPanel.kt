@@ -51,6 +51,7 @@ internal fun CheatsPanel(
 ) {
     val context = LocalContext.current
     val toaster = LocalToaster.current
+    val notOnBeach = tr("app.notOnBeach")
     var number by remember { mutableStateOf("") }
     var number2 by remember { mutableStateOf("") }
     var id by remember { mutableStateOf("") }
@@ -133,7 +134,7 @@ internal fun CheatsPanel(
             GameButton("resetPlage()", small = true) { run("resetPlage") { onSaveChange(Cheats.resetPlage(save)) } }
             GameButton("goPlage()", small = true) { run("goPlage") { onSaveChange(Cheats.goPlage(save)) } }
             GameButton("retourBus()", small = true) {
-                run("retourBus") { Cheats.retourBus(save)?.let(onSaveChange) ?: toaster("Tu n'es pas sur la plage.") }
+                run("retourBus") { Cheats.retourBus(save)?.let(onSaveChange) ?: toaster(notOnBeach) }
             }
             GameButton("toggleTheme()", small = true) { run("toggleTheme") { onSaveChange(Cheats.toggleTheme(save)) } }
         }

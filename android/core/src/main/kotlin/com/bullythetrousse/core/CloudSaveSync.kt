@@ -22,4 +22,20 @@ object CloudSaveSync {
      *  directement "faut-il appliquer ?", donc la négation. */
     fun shouldApplyRemoteSave(lastLocalPersistAtMillis: Long, remoteReceivedAtMillis: Long): Boolean =
         lastLocalPersistAtMillis <= remoteReceivedAtMillis
+
+    /**
+     * `meaningfulSaveFingerprint()` : deux parties qui ne diffèrent que par
+     * le temps de jeu (ou la série d'écoute) ne sont pas « différentes » pour
+     * le joueur — chaque appareil compte le sien, inutile de tout recharger
+     * et d'afficher « synchronisée » pour ça.
+     */
+    fun differsMeaningfully(a: GameSave, b: GameSave): Boolean =
+        a.copy(playTime = 0L, musicListenSeconds = 0L) != b.copy(playTime = 0L, musicListenSeconds = 0L)
+
+    /**
+     * `applyRemoteSave()` : la partie de l'autre appareil remplace la locale,
+     * mais le temps de jeu ne recule jamais — on garde le plus avancé.
+     */
+    fun mergeRemote(remote: GameSave, local: GameSave): GameSave =
+        remote.copy(playTime = maxOf(remote.playTime, local.playTime))
 }

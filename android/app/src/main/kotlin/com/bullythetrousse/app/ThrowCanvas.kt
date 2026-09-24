@@ -733,6 +733,9 @@ fun animateFlight(
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+            // Partie en pause (fenêtre ouverte en plein lancer) : l'image
+            // défile mais ni la physique ni les chronos n'avancent.
+            if (PlayState.paused) continue
 
             // Apogée atteinte (`vy <= 0` côté site) : on bascule en apesanteur
             // au lieu de laisser la trousse redescendre.
@@ -792,6 +795,9 @@ fun animateBeachFlight(
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+            // Partie en pause (fenêtre ouverte en plein lancer) : l'image
+            // défile mais ni la physique ni les chronos n'avancent.
+            if (PlayState.paused) continue
             if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
             if (state.hasLanded) {
@@ -840,6 +846,9 @@ fun animateSkid(landingWorldX: Double, onFinished: (finalWorldX: Double) -> Unit
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+            // Partie en pause (fenêtre ouverte en plein lancer) : l'image
+            // défile mais ni la physique ni les chronos n'avancent.
+            if (PlayState.paused) continue
             val step = Skid.step(worldX = state.worldX, targetWorldX = target, rotation = state.rotation, dt = dt)
             state = state.copy(worldX = step.worldX, rotation = step.rotation)
             finished = step.finished
