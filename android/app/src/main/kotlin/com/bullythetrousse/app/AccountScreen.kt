@@ -37,6 +37,10 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.RecoveryCode
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberUpdatedState
+import com.bullythetrousse.core.I18n
+import com.bullythetrousse.core.MergeChoice
+import com.bullythetrousse.core.SaveSummary
 
 /**
  * Écran Compte, porté de la section « Paramètres du compte » / « Mon compte »
@@ -59,14 +63,19 @@ fun AccountScreen(
 ) {
     val scope = rememberCoroutineScope()
     val clipboard = LocalClipboardManager.current
+    val toaster = LocalToaster.current
+    val lang = LocalLang.current
     var revealedCode by remember { mutableStateOf(save.recoveryCode.takeIf { RecoveryCode.isValid(it) }) }
     var typedCode by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf<String?>(null) }
+    var errorKey by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
+    // Code vérifié en attente du choix « quelle partie garder ? ».
+    var pending by remember { mutableStateOf<Pair<String, CodeLookup>?>(null) }
+    val currentSave by rememberUpdatedState(save)
 
-    ModalScreen("☁️ Compte", onBack) {
+    ModalScreen(tr("settingsAccountTitle"), onBack) {
         // --- Statut : "account-status" côté site ---
         InfoCard {
             Text(
@@ -77,44 +86,26 @@ fun AccountScreen(
                 textAlign = TextAlign.Center,
             )
             if (session.state == CloudState.NOT_CONFIGURED) {
-                Text(
-                    "Cette version de l'app n'a pas encore le fichier de configuration " +
-                        "Firebase. Le jeu fonctionne, mais le classement et la sauvegarde " +
-                        "en ligne sont coupés.",
-                    color = TextDim,
-                    fontSize = 12.sp,
-                    textAlign = TextAlign.Center,
-                )
+                Text(tr("app.accountNotConfigured"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
-            // Une tentative de connexion peut échouer sans que ce soit
-            // définitif (réseau pas encore prêt) : quelques essais
-            // automatiques suivent déjà (voir rememberCloudSession), ce
-            // bouton couvre le cas où ils ont tous échoué.
+            // Quelques essais automatiques suivent déjà un échec (voir
+            // rememberCloudSession) ; ce bouton couvre le cas où ils ont tous échoué.
             if (session.state == CloudState.OFFLINE) {
-                GameButton("🔄 Réessayer", secondary = true, small = true) {
-                    session.retryConnection()
-                }
+                GameButton(tr("app.accountRetry"), secondary = true, small = true) { session.retryConnection() }
             }
         }
 
-        // --- Mon code ---
+        // --- 🔑 Mon compte ---
         InfoCard {
-            Text("🔑 Mon compte", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "Ce code EST ton compte : entre-le sur un autre appareil et tu joues sur " +
-                    "la même partie, synchronisée dans les deux sens. Note-le quelque part, " +
-                    "c'est le seul moyen de retrouver ta partie si ce téléphone efface ses données.",
-                color = TextDim,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-            )
+            Text(tr("settingsRecoveryTitle"), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+            Text(tr("settingsRecoveryHint"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
             val code = revealedCode
             if (code == null) {
-                GameButton("🔑 Créer / afficher mon code", small = true) {
+                GameButton(tr("btnRecoveryReveal"), small = true) {
                     if (busy) return@GameButton
                     busy = true
                     scope.launch {
-                        revealedCode = session.revealOrCreateCode(save, onSaveChange)
+                        revealedCode = session.revealOrCreateCode(currentSave, onSaveChange)
                         busy = false
                     }
                 }
@@ -127,49 +118,43 @@ fun AccountScreen(
                     letterSpacing = 2.sp,
                     textAlign = TextAlign.Center,
                 )
-                GameButton("📋 Copier", secondary = true, small = true) {
+                val copied = tr("recoveryCopied")
+                GameButton(tr("btnRecoveryCopy"), secondary = true, small = true) {
                     clipboard.setText(AnnotatedString(code))
-                    message = "Code copié."
+                    toaster(copied)
                 }
-                Text(
-                    "⚠️ Garde-le pour toi : qui a ce code entre dans ton compte.",
-                    color = TextDim,
-                    fontSize = 11.sp,
-                    textAlign = TextAlign.Center,
-                )
+                Text(tr("settingsRecoveryWarn"), color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
             }
-        }
 
-        // --- Rejoindre un compte ---
-        InfoCard {
-            Text("📥 Utiliser un code", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "Entre le code de ta partie du site pour la retrouver ici. " +
-                    "La partie du compte remplacera celle de ce téléphone.",
-                color = TextDim,
-                fontSize = 12.sp,
-                textAlign = TextAlign.Center,
-            )
+            // .account-form : j'ai déjà un code.
             OutlinedTextField(
                 value = typedCode,
                 onValueChange = { typedCode = RecoveryCode.normalize(it).take(RecoveryCode.DIGITS) },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                placeholder = { Text("16 chiffres", color = TextDim, fontSize = 13.sp) },
+                placeholder = { Text(tr("settingsRecoveryPlaceholder"), color = TextDim, fontSize = 13.sp) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            GameButton(if (busy) "…" else "📥 Connecter cet appareil", small = true) {
+            errorKey?.let { Text(tr(it), color = Color(0xFFFF6B6B), fontSize = 12.sp, textAlign = TextAlign.Center) }
+            GameButton(if (busy) "…" else tr("btnRecoverySubmit"), small = true) {
                 if (busy) return@GameButton
-                if (!RecoveryCode.isValid(typedCode)) {
-                    message = "Un code fait 16 chiffres."
-                    return@GameButton
-                }
-                busy = true
-                message = null
-                scope.launch {
-                    message = session.joinAccount(typedCode, repository, save, onSaveChange)
-                        ?: "Compte rejoint : ta partie est à jour."
-                    busy = false
+                errorKey = null
+                // recoverFromCode() : format, hors ligne, déjà ce compte-là.
+                when {
+                    !RecoveryCode.isValid(typedCode) -> errorKey = "recoveryErrFormat"
+                    session.state != CloudState.GUEST && session.state != CloudState.LINKED -> errorKey = "recoveryErrOffline"
+                    typedCode == currentSave.recoveryCode && session.state == CloudState.LINKED -> errorKey = "recoveryErrSameAccount"
+                    else -> {
+                        busy = true
+                        val code = typedCode
+                        scope.launch {
+                            val found = runCatching { session.lookupCode(code) }
+                            found.onSuccess { lookup ->
+                                if (lookup == null) errorKey = "recoveryErrUnknown" else pending = code to lookup
+                            }.onFailure { errorKey = "recoveryErrWrongCode" }
+                            busy = false
+                        }
+                    }
                 }
             }
         }
@@ -181,21 +166,20 @@ fun AccountScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Compte privé", color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(tr("settingsPrivateLabel"), color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                val on = tr("settingsPrivateOn")
+                val off = tr("settingsPrivateOff")
                 GameButton(
-                    if (save.isPrivate) "🔒 Activé" else "🔓 Désactivé",
+                    tr(if (save.isPrivate) "app.privateOn" else "app.privateOff"),
                     secondary = !save.isPrivate,
                     small = true,
-                    onClick = { onSaveChange(save.copy(isPrivate = !save.isPrivate)) },
+                    onClick = {
+                        onSaveChange(save.copy(isPrivate = !save.isPrivate))
+                        toaster(if (save.isPrivate) off else on)
+                    },
                 )
             }
-            Text(
-                "Les autres joueurs verront une banderole \"Ce compte est privé\" au lieu " +
-                    "de ton profil. Ton score reste visible dans le classement.",
-                color = TextDim,
-                fontSize = 11.5.sp,
-                textAlign = TextAlign.Center,
-            )
+            Text(tr("settingsPrivateHint"), color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
         }
 
         // --- Photo de profil (AVATAR_EMOJIS côté site) ---
@@ -205,7 +189,7 @@ fun AccountScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("🖼️ Photo de profil", color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text(tr("settingsAvatarTitle"), color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -219,6 +203,7 @@ fun AccountScreen(
                 }
             }
             if (showAvatarPicker) {
+                Text(tr("settingsAvatarPickHint"), color = TextDim, fontSize = 11.5.sp)
                 FlowRowCentered(gap = 8.dp, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     for (emoji in AVATAR_EMOJIS) {
                         val selected = save.avatarEmoji == emoji
@@ -241,51 +226,111 @@ fun AccountScreen(
             }
         }
 
-        message?.let {
-            Text(it, color = TextColor, fontSize = 13.sp, textAlign = TextAlign.Center)
-        }
-
         // --- Déconnexion (btn-logout côté site) ---
         InfoCard {
-            GameButton("🚪 Se déconnecter", secondary = true, small = true) { showLogoutConfirm = true }
-            Text(
-                if (RecoveryCode.isValid(save.recoveryCode)) {
-                    "Ton compte reste accessible avec ton code sur n'importe quel appareil. " +
-                        "Cet appareil, lui, repart avec un compte tout neuf."
-                } else {
-                    "Tu n'as pas encore de code : repartir de zéro sur cet appareil perd " +
-                        "cette partie pour de bon."
-                },
-                color = TextDim,
-                fontSize = 11.5.sp,
-                textAlign = TextAlign.Center,
-            )
+            GameButton(tr("btnLogout"), secondary = true, small = true) { showLogoutConfirm = true }
+            Text(tr("settingsLogoutHint"), color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
         }
     }
 
-    if (showLogoutConfirm) {
-        ConfirmDialog(
-            title = "🚪 Se déconnecter ?",
-            text = if (RecoveryCode.isValid(save.recoveryCode)) {
-                "Cet appareil va repartir de zéro. Tu pourras retrouver cette partie " +
-                    "n'importe quand avec ton code."
-            } else {
-                "Tu vas repartir de zéro sur cet appareil, avec un compte tout neuf. " +
-                    "Sans code de récupération, cette partie sera perdue pour de bon."
-            },
-            confirmLabel = "🚪 Se déconnecter",
-            onConfirm = {
-                showLogoutConfirm = false
+    // Hors de ModalScreen : ces fenêtres couvrent l'écran entier.
+    pending?.let { (code, lookup) ->
+        MergeChoiceDialog(
+            current = SaveSummary.of(save),
+            other = SaveSummary.of(lookup.save),
+            onChoose = { choice ->
+                pending = null
+                busy = true
+                val done = I18n.tr(if (lookup is CodeLookup.Account) "accountConnected" else "recoveryDone", lang)
                 scope.launch {
-                    // onSaveChange (updateSave) écrit déjà sur disque : pas besoin
-                    // d'un repository.save() séparé ici.
-                    val fresh = session.logout(save)
-                    onSaveChange(fresh)
-                    onBack()
+                    val error = when (lookup) {
+                        is CodeLookup.Account -> session.joinAccount(code, choice, repository, currentSave, onSaveChange)
+                        is CodeLookup.Legacy -> session.restoreLegacy(code, lookup, choice, currentSave, onSaveChange)
+                    }
+                    if (error == null) {
+                        typedCode = ""
+                        revealedCode = code
+                        toaster(done)
+                    } else {
+                        errorKey = error
+                    }
+                    busy = false
                 }
             },
-            onDismiss = { showLogoutConfirm = false },
+            onCancel = { pending = null },
         )
+    }
+
+    if (showLogoutConfirm) {
+        InfoDialog(
+            title = tr("logoutConfirmTitle"),
+            onDismiss = { showLogoutConfirm = false },
+            buttons = {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GameButton(tr("logoutConfirmYes"), modifier = Modifier.weight(1f)) {
+                        showLogoutConfirm = false
+                        scope.launch {
+                            // onSaveChange (updateSave) écrit déjà sur disque.
+                            val fresh = session.logout(currentSave)
+                            onSaveChange(fresh)
+                            onBack()
+                        }
+                    }
+                    GameButton(tr("btnCancel"), secondary = true, modifier = Modifier.weight(1f)) { showLogoutConfirm = false }
+                }
+            },
+        ) {
+            // Un compte lié n'est jamais perdu : seul l'appareil repart de zéro.
+            DialogText(tr(if (RecoveryCode.isValid(save.recoveryCode)) "logoutConfirmTextLinked" else "logoutConfirmText"), color = TextColor)
+        }
+    }
+}
+
+/**
+ * `#merge-choice-modal` : deux cartes, la partie actuelle et celle du code ;
+ * toucher une carte la garde, l'autre est remplacée. Un appui à côté ne
+ * tranche rien (seul « Annuler » ferme), c'est un choix définitif.
+ */
+@Composable
+private fun MergeChoiceDialog(
+    current: SaveSummary,
+    other: SaveSummary,
+    onChoose: (MergeChoice) -> Unit,
+    onCancel: () -> Unit,
+) {
+    InfoDialog(
+        title = tr("mergeChoiceTitle"),
+        onDismiss = onCancel,
+        dismissOnScrim = false,
+        buttons = { GameButton(tr("btnCancel"), secondary = true, modifier = Modifier.fillMaxWidth(), onClick = onCancel) },
+    ) {
+        DialogText(tr("mergeChoiceHint"))
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            MergeCard(tr("mergeChoiceCurrentTitle"), current, Modifier.weight(1f)) { onChoose(MergeChoice.CURRENT) }
+            MergeCard(tr("mergeChoiceOtherTitle"), other, Modifier.weight(1f)) { onChoose(MergeChoice.OTHER) }
+        }
+    }
+}
+
+/** Une carte du choix : pseudo, argent, record, niveau (`renderMergeStatsHtml()`). */
+@Composable
+private fun MergeCard(title: String, stats: SaveSummary, modifier: Modifier, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(CardBg)
+            .border(2.dp, Accent, shape)
+            .clickable(onClick = onClick)
+            .padding(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        Text(title, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+        Text(stats.pseudo, color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text("💰 ${stats.money} $", color = TextColor, fontSize = 12.sp)
+        Text("📏 ${"%.1f".format(stats.bestDistance)} m", color = TextColor, fontSize = 12.sp)
+        Text("💪 ${tr("statLevel")} ${stats.level}", color = TextColor, fontSize = 12.sp)
     }
 }
 
@@ -312,44 +357,5 @@ internal fun InfoCard(content: @Composable () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         content()
-    }
-}
-
-/**
- * `#logout-confirm-modal` : une confirmation simple par-dessus l'écran
- * courant, avant une action qu'on ne veut pas déclencher par un tap
- * accidentel.
- */
-@Composable
-internal fun ConfirmDialog(
-    title: String,
-    text: String,
-    confirmLabel: String,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit,
-) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color.Black.copy(alpha = 0.6f)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(
-            modifier = Modifier
-                .padding(24.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(ShopBg)
-                .border(2.dp, PanelBorder, RoundedCornerShape(16.dp))
-                .padding(20.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Text(title, color = TextColor, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
-            Text(text, color = TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GameButton(confirmLabel, small = true, onClick = onConfirm)
-                GameButton("Annuler", secondary = true, small = true, onClick = onDismiss)
-            }
-        }
     }
 }

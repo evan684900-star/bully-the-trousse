@@ -34,6 +34,15 @@ internal object I18nAppStrings {
             "Particules, nuages en profondeur et sillages au maximum. Pour les téléphones à l'aise." to
                 "Maximum particles, layered clouds and trails. For phones that can handle it."
             ),
+        // Écran Compte (propre à l'app)
+        "app.accountRetry" to ("🔄 Réessayer" to "🔄 Retry"),
+        "app.accountNotConfigured" to (
+            "Cette version de l'app n'a pas encore le fichier de configuration Firebase. Le jeu fonctionne, mais le classement et la sauvegarde en ligne sont coupés." to
+                "This version of the app doesn't have its Firebase configuration file yet. The game works, but the leaderboard and online save are off."
+            ),
+        "app.privateOn" to ("🔒 Activé" to "🔒 On"),
+        "app.privateOff" to ("🔓 Désactivé" to "🔓 Off"),
+
         "app.musicSaved" to ("⬇️ Enregistrée dans Téléchargements" to "⬇️ Saved to Downloads"),
         "app.musicSaveError" to ("Impossible d'enregistrer la musique." to "Couldn't save the music."),
     )

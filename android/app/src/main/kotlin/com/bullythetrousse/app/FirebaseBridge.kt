@@ -4,6 +4,7 @@ import android.content.Context
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.IncomingGift
+import com.bullythetrousse.core.LegacySave
 import com.bullythetrousse.core.RecoveryCode
 import com.bullythetrousse.core.SaveCodec
 import com.bullythetrousse.core.SkinStats
@@ -11,6 +12,7 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
@@ -57,6 +59,8 @@ import kotlin.coroutines.resumeWithException
  * plomberie réseau.
  */
 class FirebaseBridge(context: Context) {
+
+    private val appContext: Context = context.applicationContext
 
     /**
      * Firebase s'initialise tout seul au démarrage, MAIS seulement si le
@@ -122,6 +126,70 @@ class FirebaseBridge(context: Context) {
             // réseau coupé : dans tous les cas on reste sur le compte courant,
             // le jeu continue. L'appelant décide quoi dire au joueur.
             false
+        }
+    }
+
+    /**
+     * `lookupAccountByCode()` : regarde ce que désigne un code SANS toucher à
+     * la connexion en cours, grâce à une deuxième instance Firebase isolée
+     * (`getVerifyApp()` côté site). Si le code est faux ou que le joueur
+     * annule ensuite, rien n'a bougé.
+     *
+     * - un vrai compte : sa partie, lue dans `users/{uid}` ;
+     * - un ANCIEN code (copie de partie dans `recoveryCodes`, d'avant la
+     *   refonte des comptes) ;
+     * - `null` : code inconnu.
+     */
+    suspend fun lookupCode(code: String): CodeLookup? {
+        if (!isAvailable) return null
+        val app = FirebaseApp.getApps(appContext).firstOrNull { it.name == VERIFY_APP }
+            ?: FirebaseApp.initializeApp(appContext, FirebaseApp.getInstance().options, VERIFY_APP)
+        val verifyAuth = FirebaseAuth.getInstance(app)
+        try {
+            val user = try {
+                verifyAuth.signInWithEmailAndPassword(RecoveryCode.emailFor(code), RecoveryCode.passwordFor(code)).await().user
+            } catch (e: FirebaseAuthException) {
+                // Pas de compte pour ce code : soit il est faux, soit il date
+                // d'avant la refonte, soit la connexion e-mail est désactivée
+                // dans la console. Dans les trois cas, on essaie l'ancien
+                // mécanisme plutôt que d'échouer (la protection anti-
+                // énumération de Firebase masque « introuvable » derrière
+                // « identifiants invalides », d'où le traitement groupé).
+                null
+            }
+            if (user != null) {
+                val doc = FirebaseFirestore.getInstance(app).collection(USERS).document(user.uid).get().await()
+                val save = if (doc.exists()) SaveCodec.fromFieldMap(doc.data.orEmpty()) else GameSave()
+                return CodeLookup.Account(user.uid, save)
+            }
+            val legacy = firestore.collection(RECOVERY_CODES).document(code).get().await()
+            val raw = legacy.get("save") as? Map<*, *> ?: return null
+            val rawSave = raw.entries.associate { (k, v) -> k.toString() to v }
+            return CodeLookup.Legacy(
+                oldUid = legacy.getString("uid"),
+                retireToken = legacy.getString("retireToken"),
+                save = LegacySave.migrate(SaveCodec.fromFieldMap(rawSave), rawSave),
+            )
+        } finally {
+            // `closeVerifyApp()` : on ne garde jamais cette session ouverte.
+            runCatching { verifyAuth.signOut() }
+            runCatching { app.delete() }
+        }
+    }
+
+    /**
+     * `retireOldLeaderboardEntry()` : un ancien code restauré ailleurs laisse
+     * l'entrée de classement de l'ANCIEN compte. On la remet à zéro, le
+     * jeton de retrait prouvant aux règles Firestore qu'on en a le droit.
+     */
+    suspend fun retireOldLeaderboardEntry(oldUid: String?, retireToken: String?, pseudo: String) {
+        if (!isAvailable || oldUid.isNullOrBlank() || retireToken.isNullOrBlank() || oldUid == uid) return
+        for (collection in listOf(SCORES, SCORES_PLAGE)) {
+            runCatching {
+                firestore.collection(collection).document(oldUid).set(
+                    mapOf("pseudo" to pseudo, "bestDistance" to 0.0, "retireToken" to retireToken),
+                ).await()
+            }
         }
     }
 
@@ -510,6 +578,7 @@ class FirebaseBridge(context: Context) {
         private const val RECOVERY_TOKENS = "recoveryTokens"
         private const val UPDATED_AT = "updatedAt"
         private const val GIFTS = "gifts"
+        private const val VERIFY_APP = "verify"
         private const val ACTIVE_PLAYERS = "activePlayers"
         private const val ACHV_UNLOCKS = "achvUnlocks"
     }
@@ -518,6 +587,18 @@ class FirebaseBridge(context: Context) {
 /** Sauvegarde reçue du cloud, avec l'horodatage serveur de sa dernière
  *  écriture (voir `CloudSaveSync` dans `:core`, qui décide si on l'applique). */
 data class CloudSave(val save: GameSave, val updatedAtMillis: Long)
+
+/** Ce que désigne un code de récupération (voir [FirebaseBridge.lookupCode]). */
+sealed interface CodeLookup {
+    val save: GameSave
+
+    /** Un vrai compte : on s'y connectera. */
+    data class Account(val uid: String, override val save: GameSave) : CodeLookup
+
+    /** Un ancien code : une simple copie de partie, qu'on restaure puis
+     *  qu'on rattache au compte de cet appareil. */
+    data class Legacy(val oldUid: String?, val retireToken: String?, override val save: GameSave) : CodeLookup
+}
 
 /** Sens d'une liste d'abonnements : ceux que je suis, ou ceux qui me suivent. */
 enum class FollowDirection { FOLLOWING, FOLLOWERS }

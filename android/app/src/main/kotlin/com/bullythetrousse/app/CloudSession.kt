@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.IncomingGift
+import com.bullythetrousse.core.MergeChoice
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.RecoveryCode
 import com.google.firebase.firestore.ListenerRegistration
@@ -153,65 +154,106 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
         append(System.currentTimeMillis().toString(36))
     }
 
+    /** `lookupAccountByCode()` : ce que désigne ce code, sans quitter le compte actuel. */
+    suspend fun lookupCode(code: String): CodeLookup? = bridge.lookupCode(code)
+
     /**
-     * Rejoint le compte désigné par [code] : la partie, le profil et
-     * l'entrée de classement deviennent ceux de ce compte, sur cet appareil
-     * comme sur le site.
+     * `joinAccount(code, choice)` : connecte cet appareil au compte du code.
      *
-     * La sauvegarde du compte l'emporte sur celle du téléphone : c'est le
-     * sens de la démarche (« je veux retrouver MA partie ici »), et le site
-     * fait le même choix quand le joueur ne demande pas explicitement
-     * l'inverse. Renvoie `null` si tout s'est bien passé, sinon le message
-     * à montrer au joueur.
+     * [choice] vient de la question « quelle partie garder ? » : avec
+     * [MergeChoice.OTHER], la partie du compte remplace celle du téléphone ;
+     * avec [MergeChoice.CURRENT], c'est la partie du téléphone qui écrase
+     * celle du compte. Jamais de mélange champ par champ : l'une OU l'autre,
+     * en entier.
+     *
+     * Renvoie `null` si tout s'est bien passé, sinon la clé du message à
+     * montrer au joueur.
      */
     suspend fun joinAccount(
         code: String,
+        choice: MergeChoice,
         repository: SaveRepository,
         currentSave: GameSave,
         onSaveChange: (GameSave) -> Unit,
     ): String? {
-        if (!bridge.isAvailable) return "Le compte en ligne n'est pas configuré dans cette version."
-        if (!RecoveryCode.isValid(code)) return "Un code fait 16 chiffres."
+        if (!bridge.isAvailable) return "recoveryErrOffline"
 
         // Le compte invité de cet appareil ne sert plus à rien une fois qu'on
-        // bascule sur un vrai compte : le nettoyer maintenant évite un pseudo
-        // fantôme dans le classement (voir cleanupAbandonedAnonymousAccount()
-        // côté site — même geste que joinAccount() y fait avant de se
-        // connecter au nouveau compte).
+        // bascule sur un vrai compte : le nettoyer évite un pseudo fantôme au
+        // classement (cleanupAbandonedAnonymousAccount() côté site).
         if (bridge.isAnonymous) {
             uid?.let { oldUid ->
                 runCatching { bridge.cleanupAbandonedAnonymousAccount(oldUid, currentSave.unlockedAchievements) }
             }
         }
 
+        stopGifts()
         val joined = try {
             bridge.signInWithCode(code)
         } catch (e: Exception) {
             null
-        } ?: return "Aucun compte ne correspond à ce code."
+        } ?: return "recoveryErrWrongCode"
 
-        stopGifts()
         uid = joined
         state = CloudState.LINKED
         scope.launch { startGifts(joined) }
         return try {
             val cloud = bridge.fetchCloudSave(joined)
-            if (cloud != null) {
+            if (choice == MergeChoice.OTHER && cloud != null) {
                 val restored = cloud.save.copy(recoveryCode = code)
                 repository.saveFromCloud(restored, cloud.updatedAtMillis)
                 onSaveChange(restored)
             } else {
-                // Compte existant mais sans sauvegarde (cas rare) : on y
-                // installe la partie de cet appareil plutôt que de repartir
-                // de zéro.
+                // Partie du téléphone gardée (ou compte sans partie) : elle
+                // devient celle du compte.
                 val adopted = currentSave.copy(recoveryCode = code)
                 onSaveChange(adopted)
                 bridge.pushCloudSave(joined, adopted, sessionId)
+                pushBothScores(joined, adopted)
             }
             null
         } catch (e: Exception) {
-            "Connecté, mais la partie du compte n'a pas pu être lue. Réessaie plus tard."
+            "leaderboardError"
         }
+    }
+
+    /**
+     * `restoreLegacyCode()` : un ancien code ne désigne pas un compte mais une
+     * COPIE de partie. On retire l'entrée de classement de l'ancien compte,
+     * on garde la partie choisie, puis on rattache le compte de cet appareil
+     * à ce code, pour que les prochains appareils s'y connectent vraiment.
+     */
+    suspend fun restoreLegacy(
+        code: String,
+        lookup: CodeLookup.Legacy,
+        choice: MergeChoice,
+        currentSave: GameSave,
+        onSaveChange: (GameSave) -> Unit,
+    ): String? {
+        if (!bridge.isAvailable) return "recoveryErrOffline"
+        return try {
+            bridge.retireOldLeaderboardEntry(lookup.oldUid, lookup.retireToken, lookup.save.pseudo)
+            val chosen = if (choice == MergeChoice.OTHER) lookup.save else currentSave
+            val restored = chosen.copy(
+                recoveryCode = code,
+                recoveryRetireToken = chosen.recoveryRetireToken.ifBlank { RecoveryCode.generate() },
+            )
+            onSaveChange(restored)
+            uid?.let { id ->
+                // Les deux classements tout de suite, sans attendre un record.
+                pushBothScores(id, restored)
+                runCatching { bridge.pushRecoverySnapshot(id, restored) }
+            }
+            if (bridge.linkToCode(code)) state = CloudState.LINKED
+            null
+        } catch (e: Exception) {
+            "recoveryErrWrongCode"
+        }
+    }
+
+    private suspend fun pushBothScores(id: String, save: GameSave) {
+        runCatching { bridge.pushScore("scores", id, save.pseudo, save.bestDistance) }
+        runCatching { bridge.pushScore("scoresPlage", id, save.pseudo, save.plageBestDistance) }
     }
 
     /**
