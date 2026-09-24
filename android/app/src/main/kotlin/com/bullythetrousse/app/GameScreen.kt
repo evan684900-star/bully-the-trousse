@@ -250,7 +250,7 @@ fun GameScreen(
         Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
             // .back-btn : coin haut-gauche, 10px de marge.
             GameButton(
-                "← Menu",
+                tr("btnBackMenu"),
                 secondary = true,
                 small = true,
                 modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
@@ -323,25 +323,23 @@ fun GameScreen(
     }
 }
 
-/** `#hint-text` : la consigne change selon l'étape du lancer. */
+/** `#hint-text` : la consigne change selon l'étape du lancer (textes du site). */
+@Composable
 private fun hintFor(state: ThrowState): String = when (state) {
-    is ThrowState.Idle -> "Clique / appuie pour charger la puissance !"
-    is ThrowState.ChargingPower ->
-        if (state.bounceCount > 0) {
-            "🏀 Rebond ! (${"%.1f".format(state.cumulativeDistanceMeters)} m) Appuie à nouveau !"
-        } else {
-            "Appuie pour figer la puissance !"
-        }
-    is ThrowState.ChargingAccuracy -> "Appuie pour lancer !"
+    is ThrowState.Idle -> tr("hintCharge")
+    // Trousse à Baskets : le rebond relance une charge (tryBasketBounce()).
+    is ThrowState.ChargingPower -> tr(if (state.bounceCount > 0) "hintBasketBounce" else "hintLockPower")
+    is ThrowState.ChargingAccuracy -> tr("hintLockAccuracy")
     is ThrowState.Landed -> ""
 }
 
-/** `hintZeroG` côté site, plus le numéro de l'anneau en cours : pendant le
- *  QTE, le joueur doit savoir où il en est dans la série. */
+/** `hintZeroG` pendant le flottement, puis `#qte-prompt` avec le numéro de
+ *  l'anneau en cours : le joueur doit savoir où il en est dans la série. */
+@Composable
 private fun hintForSpace(space: SpaceState): String = when (space.phase) {
     SpacePhase.TRANSITION, SpacePhase.DONE -> ""
-    SpacePhase.FLOATING -> "🛸 En apesanteur..."
-    SpacePhase.QTE -> "🎯 Tape quand les anneaux se superposent ! (${space.ringResults.size + 1})"
+    SpacePhase.FLOATING -> tr("hintZeroG")
+    SpacePhase.QTE -> "${tr("qtePrompt")} (${space.ringResults.size + 1})"
 }
 
 /**

@@ -396,7 +396,7 @@ fun BottomBar(
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("🔗 Mes liens", color = TextDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(tr("linksButton"), color = TextDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         // .corner-icons-right : deux ronds de 42px
         Row(
@@ -588,8 +588,16 @@ fun CoinPopup(multiplier: Double?, jackpot: Boolean, onDismiss: () -> Unit) {
                 fontSize = 54.sp,
                 fontWeight = FontWeight.Black,
             )
+            // #coin-popup-jackpot : le message du site pour x5 et pour x10.
             if (jackpot) {
-                Text("JACKPOT !", color = Accent2, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    tr(if (multiplier >= 10) "jackpotTextX10" else "jackpotTextX5"),
+                    color = Accent2,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
             }
         }
     }

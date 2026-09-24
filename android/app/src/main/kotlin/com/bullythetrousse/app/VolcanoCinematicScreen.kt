@@ -530,7 +530,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "Clique vite pour reprendre ton équilibre !",
+                    tr("cineClickPrompt"),
                     color = Color(0xFFFF4D4D),
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Black,
@@ -569,7 +569,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                 Box(modifier = Modifier.fillMaxHeight(0.26f), contentAlignment = Alignment.BottomCenter) {
                     Text(
-                        "🌋 Monde Volcan débloqué !",
+                        "🌋 ${tr("cineUnlocked")}",
                         color = Accent,
                         fontSize = 26.sp,
                         fontWeight = FontWeight.Black,

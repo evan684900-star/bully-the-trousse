@@ -43,6 +43,17 @@ internal object I18nAppStrings {
         "app.privateOn" to ("🔒 Activé" to "🔒 On"),
         "app.privateOff" to ("🔓 Désactivé" to "🔓 Off"),
 
+        // Navigation, classement, pseudo
+        "app.back" to ("← Retour" to "← Back"),
+        "app.leaderboardTapHint" to ("Touche une ligne pour voir le profil de ce joueur." to "Tap a row to see that player's profile."),
+        "app.pseudoHint" to ("C'est le nom que les autres voient au classement et sur ton profil." to "It's the name others see on the leaderboard and your profile."),
+        "app.pseudoPlaceholder" to ("Ton nom" to "Your name"),
+        "app.save" to ("Enregistrer" to "Save"),
+
+        // Cinématique de la plage : consigne sous « VISE !!! » (au doigt,
+        // pas au clic)
+        "app.tapToShoot" to ("Touche l'écran pour tirer" to "Tap the screen to shoot"),
+
         "app.musicSaved" to ("⬇️ Enregistrée dans Téléchargements" to "⬇️ Saved to Downloads"),
         "app.musicSaveError" to ("Impossible d'enregistrer la musique." to "Couldn't save the music."),
     )

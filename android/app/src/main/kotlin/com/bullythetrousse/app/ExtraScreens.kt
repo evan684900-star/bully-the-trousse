@@ -59,8 +59,13 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import com.bullythetrousse.core.SecretMath
 import com.bullythetrousse.core.Secrets
+import com.bullythetrousse.core.SkinStats
 import com.bullythetrousse.core.SfxCatalog
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Brush
+import java.time.LocalDate
+import com.bullythetrousse.core.Lang
 
 /**
  * Écrans ouverts depuis le menu (Succès, Défis, Classement, Profil). Côté
@@ -109,7 +114,7 @@ private fun BackButton(onBack: () -> Unit) {
             .clickable(onClick = onBack)
             .padding(horizontal = 20.dp, vertical = 10.dp),
     ) {
-        Text("← Retour", color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+        Text(tr("app.back"), color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
@@ -268,23 +273,48 @@ private fun AchievementDetailDialog(
     }
 }
 
-/** Les défis du jour (`#challenges-modal` côté web). */
+/**
+ * `#challenges-modal` / `renderDailyChallenges()` : les 3 défis du jour,
+ * générés dès l'ouverture s'ils ne le sont pas encore, avec leur
+ * description, une barre de progression, la récompense à réclamer et le
+ * compte à rebours jusqu'au renouvellement de minuit.
+ */
 @Composable
 fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: () -> Unit) {
-    ModalScreen("📅 Défis du jour", onBack) {
-        if (save.dailyChallenges.isEmpty()) {
-            Text(
-                "Les défis du jour apparaissent dès ton premier lancer ou premier achat de la journée.",
-                color = TextDim,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-            )
-            return@ModalScreen
+    val sfx = LocalSfx.current
+    val toaster = LocalToaster.current
+
+    // ensureDailyChallenges() : les défis du jour existent dès qu'on regarde.
+    LaunchedEffect(Unit) {
+        val ensured = DailyChallenges.ensure(save, LocalDate.now().toString(), SkinStats.totalPuissance(save), SkinStats.totalVitesse(save))
+        if (ensured != save) onSaveChange(ensured)
+    }
+
+    // Compte à rebours jusqu'à minuit, rafraîchi chaque seconde.
+    var countdown by remember { mutableStateOf(timeUntilMidnight()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            countdown = timeUntilMidnight()
+            delay(1000)
         }
+    }
+
+    ModalScreen(tr("challengesModalTitle"), onBack) {
+        Text(tr("challengesResetInfo", "time" to countdown), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
         save.dailyChallenges.forEachIndexed { index, challenge ->
+            val def = CHALLENGE_DISPLAY[challenge.kind]
+            val isDistance = challenge.kind == "distance" || challenge.kind == "distanceCumul"
+            val isMoney = challenge.kind == "earn" || challenge.kind == "gift" || challenge.kind == "spend"
+            val shownRaw = minOf(challenge.progress, challenge.target)
+            val shown = if (isDistance) "%.1f".format(shownRaw) else shownRaw.roundToInt().toString()
+            val target = if (challenge.target % 1.0 == 0.0) challenge.target.toLong().toString() else challenge.target.toString()
+            val unit = if (isDistance) " m" else if (isMoney) " $" else ""
+            val fraction = (challenge.progress / challenge.target).coerceIn(0.0, 1.0).toFloat()
+            val done = challenge.progress >= challenge.target
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .alpha(if (challenge.claimed) 0.55f else 1f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(CardBg)
                     .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
@@ -292,33 +322,70 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Column(modifier = Modifier.fillMaxWidth(0.7f)) {
-                    Text(challenge.kind, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(def?.first ?: "🎯", fontSize = 26.sp)
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "${challenge.progress.toInt()} / ${challenge.target.toInt()}   +${challenge.reward} $",
-                        color = TextDim,
-                        fontSize = 11.5.sp,
+                        def?.second?.let { tr(it, "target" to target) } ?: challenge.kind,
+                        color = TextColor,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
+                    // .challenge-bar : dégradé doré → orange.
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color(0x4D000000)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction)
+                                .height(10.dp)
+                                .background(Brush.horizontalGradient(listOf(Color(0xFFFFD23F), Color(0xFFFF9F43)))),
+                        )
+                    }
+                    Text("$shown / $target$unit", color = TextDim, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
                 when {
-                    challenge.claimed -> Text("✅", fontSize = 20.sp)
-                    challenge.progress >= challenge.target -> Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Accent)
-                            .clickable {
-                                val result = DailyChallenges.claim(save, index)
-                                if (result is DailyChallenges.ClaimResult.Success) onSaveChange(result.save)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        Text("Réclamer", color = OnAccent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    challenge.claimed -> Text(tr("challengeClaimed"), color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    done -> GameButton("+${challenge.reward} $", small = true) {
+                        // claimDailyChallenge() : sfxBuy() et « 🎯 +X$ ! ».
+                        val result = DailyChallenges.claim(save, index)
+                        if (result is DailyChallenges.ClaimResult.Success) {
+                            onSaveChange(result.save)
+                            sfx.play(SfxCatalog.BUY)
+                            toaster("🎯 +${result.reward}$ !")
+                        }
                     }
-                    else -> Text("${(challenge.progress / challenge.target * 100).toInt()} %", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    else -> Text("+${challenge.reward} $", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
     }
+}
+
+/** L'icône et la clé de description de chaque défi (`CHALLENGE_POOL` côté site). */
+private val CHALLENGE_DISPLAY: Map<String, Pair<String, String>> = mapOf(
+    "throws" to ("🎒" to "challengeThrowsDesc"),
+    "distance" to ("📏" to "challengeDistanceDesc"),
+    "earn" to ("💰" to "challengeEarnDesc"),
+    "perfect" to ("✨" to "challengePerfectDesc"),
+    "distanceCumul" to ("🛣️" to "challengeDistanceCumulDesc"),
+    "gift" to ("🎁" to "challengeGiftDesc"),
+    "qte" to ("🎯" to "challengeQteDesc"),
+    "spend" to ("🛍️" to "challengeSpendDesc"),
+    "volcan" to ("🌋" to "challengeVolcanDesc"),
+    "skid" to ("💨" to "challengeSkidDesc"),
+)
+
+/** « HH:MM:SS » jusqu'au prochain minuit local (`updateChallengesCountdown()`). */
+private fun timeUntilMidnight(): String {
+    val now = java.time.LocalDateTime.now()
+    val midnight = now.toLocalDate().plusDays(1).atStartOfDay()
+    val remaining = java.time.Duration.between(now, midnight).seconds
+    return "%02d:%02d:%02d".format(remaining / 3600, (remaining % 3600) / 60, remaining % 60)
 }
 
 /**
@@ -548,7 +615,8 @@ private fun SettingsRow(label: String, control: @Composable () -> Unit) {
  */
 @Composable
 fun ChangelogScreen(onBack: () -> Unit) {
-    ModalScreen("📋 Journal des changements", onBack) {
+    val english = LocalLang.current == Lang.EN
+    ModalScreen(tr("changelogTitle"), onBack) {
         for (entry in CHANGELOG) {
             Column(
                 modifier = Modifier
@@ -560,34 +628,54 @@ fun ChangelogScreen(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text("v${entry.version}", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                for (line in entry.major) {
-                    Text("• $line", color = TextColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                if (entry.major.isNotEmpty()) {
+                    Text(tr("changelogMajor"), color = TextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    for (line in entry.major) {
+                        Text("• ${if (english) line.en else line.fr}", color = TextColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
-                for (line in entry.minor) {
-                    Text("• $line", color = TextDim, fontSize = 12.sp)
+                if (entry.minor.isNotEmpty()) {
+                    Text(tr("changelogMinor"), color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    for (line in entry.minor) {
+                        Text("• ${if (english) line.en else line.fr}", color = TextDim, fontSize = 12.sp)
+                    }
                 }
             }
         }
     }
 }
 
-/** `#links-modal` : les deux liens du site, repris tels quels. */
+/** `#links-modal` : les deux liens du site, qui s'ouvrent dans le navigateur. */
 @Composable
 fun LinksScreen(onBack: () -> Unit) {
-    ModalScreen("🔗 Mes liens", onBack) {
-        LinkRow("🌐 evyverse.vercel.app", "Mon site")
-        LinkRow("💬 Chaîne WhatsApp", "Actus de ce jeu")
+    val context = LocalContext.current
+    ModalScreen(tr("linksTitle"), onBack) {
+        LinkRow("🌐 evyverse.vercel.app", tr("linksSiteDesc")) { openUrl(context, "https://evyverse.vercel.app") }
+        LinkRow("💬 ${tr("linksWhatsappLabel")}", tr("linksWhatsappDesc")) {
+            openUrl(context, "https://whatsapp.com/channel/0029VbDIKVI4IBh8MLKV2y25")
+        }
+    }
+}
+
+/** Ouvre une adresse dans le navigateur (ou l'app qui la gère, WhatsApp...). */
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
 
 @Composable
-private fun LinkRow(title: String, subtitle: String) {
+private fun LinkRow(title: String, subtitle: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(CardBg)
             .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Text(title, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -625,7 +713,7 @@ fun LeaderboardScreen(
 
     var editingPseudo by remember { mutableStateOf(false) }
 
-    ModalScreen(if (save.inPlage) "🏖️ Classement Plage" else "🏆 Classement", onBack, opaque = true) {
+    ModalScreen(tr(if (save.inPlage) "leaderboardTitlePlage" else "leaderboardTitle"), onBack, opaque = true) {
         // `#leaderboard-pseudo` + `btn-edit-pseudo` côté site : c'est d'ici
         // qu'on change le nom affiché aux autres joueurs.
         Row(
@@ -633,7 +721,7 @@ fun LeaderboardScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Ton pseudo : ${save.pseudo.ifBlank { "-" }}",
+                "${tr("pseudoLabel")}${save.pseudo.ifBlank { "-" }}",
                 color = TextDim,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
@@ -641,21 +729,18 @@ fun LeaderboardScreen(
             GameButton("✏️", secondary = true, small = true) { editingPseudo = true }
         }
         Text(
-            "Touche une ligne pour voir le profil de ce joueur.",
+            tr("app.leaderboardTapHint"),
             color = TextDim,
             fontSize = 11.5.sp,
             textAlign = TextAlign.Center,
         )
         val rows = entries
         when {
-            session.state == CloudState.NOT_CONFIGURED -> LeaderboardNotice(
-                "Le classement a besoin du compte en ligne, pas encore configuré dans cette version.",
-            )
-            failed || session.state == CloudState.OFFLINE -> LeaderboardNotice(
-                "Classement indisponible : pas de connexion.",
-            )
-            rows == null -> LeaderboardNotice("Chargement du classement…")
-            rows.isEmpty() -> LeaderboardNotice("Personne n'a encore de record. À toi de jouer.")
+            session.state == CloudState.NOT_CONFIGURED || session.state == CloudState.OFFLINE ->
+                LeaderboardNotice(tr("leaderboardUnavailable"))
+            failed -> LeaderboardNotice(tr("leaderboardError"))
+            rows == null -> LeaderboardNotice(tr("leaderboardLoading"))
+            rows.isEmpty() -> LeaderboardNotice(tr("leaderboardEmpty"))
             else -> rows.forEachIndexed { index, entry ->
                 LeaderboardRow(
                     rank = index + 1,
@@ -705,9 +790,9 @@ private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("✏️ Ton pseudo", color = Accent, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+            Text(tr("pseudoPrompt"), color = Accent, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
             Text(
-                "C'est le nom que les autres voient au classement et sur ton profil.",
+                tr("app.pseudoHint"),
                 color = TextDim,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
@@ -716,13 +801,13 @@ private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
                 value = typed,
                 onValueChange = { typed = it.take(Pseudo.MAX_LENGTH) },
                 singleLine = true,
-                placeholder = { Text("Ton nom", color = TextDim, fontSize = 13.sp) },
+                placeholder = { Text(tr("app.pseudoPlaceholder"), color = TextDim, fontSize = 13.sp) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Text("${typed.length} / ${Pseudo.MAX_LENGTH}", color = TextDim, fontSize = 11.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GameButton("Enregistrer", small = true) { onConfirm(typed) }
-                GameButton("Annuler", secondary = true, small = true, onClick = onDismiss)
+                GameButton(tr("app.save"), small = true) { onConfirm(typed) }
+                GameButton(tr("btnCancel"), secondary = true, small = true, onClick = onDismiss)
             }
         }
     }

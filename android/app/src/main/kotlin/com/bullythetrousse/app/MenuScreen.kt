@@ -332,7 +332,7 @@ private fun formatPlayTime(seconds: Long): String {
 private fun TitleCard(onOpenChangelog: () -> Unit, onOpenCheats: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            "v10.2.2",
+            "v$GAME_VERSION",
             color = TextColor,
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,

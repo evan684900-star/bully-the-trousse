@@ -132,11 +132,11 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
             // bcSetPhase() : ce que l'entrée dans une phase met en place.
             if (next.phase != previousPhase) {
                 message = when (next.phase) {
-                    BeachCinePhase.FORGOT -> CineMessage("Attends... elle a oublié son maillot.", fade = 1.5f)
-                    BeachCinePhase.CHEH -> CineMessage("cheh", fade = 0f)
+                    BeachCinePhase.FORGOT -> CineMessage("bcineForgot", fade = 1.5f)
+                    BeachCinePhase.CHEH -> CineMessage("bcineCheh", fade = 0f)
                     BeachCinePhase.AFTER_CHEH -> null
-                    BeachCinePhase.FLY1 -> CineMessage("🏖️ Monde Plage débloqué !", fade = 0.8f)
-                    BeachCinePhase.OUTRO -> CineMessage("Bref, bienvenue dans le monde Plage.", fade = 1.2f)
+                    BeachCinePhase.FLY1 -> CineMessage("bcineUnlocked", fade = 0.8f)
+                    BeachCinePhase.OUTRO -> CineMessage("bcineWelcome", fade = 1.2f)
                     else -> message
                 }
                 when (next.phase) {
@@ -430,7 +430,7 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                 Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
                     Box(modifier = Modifier.fillMaxHeight(0.22f), contentAlignment = Alignment.BottomCenter) {
                         Text(
-                            msg.text,
+                            tr(msg.key),
                             color = Color.White,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -453,14 +453,14 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 Text(
-                    "VISE !!!",
+                    tr("bcineAim"),
                     color = Color(0xFFFF3B30),
                     fontSize = 32.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
                 )
                 Text(
-                    if (aimRejectedAt != null) "Pas dans la zone verte !" else "Touche l'écran pour tirer",
+                    if (aimRejectedAt != null) tr("bcineNotGreen") else tr("app.tapToShoot"),
                     color = if (aimRejectedAt != null) Color(0xFFFF3B30) else TextDim,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -489,9 +489,9 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                         .padding(horizontal = 24.dp, vertical = 22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text(text, color = TextColor, fontSize = 16.sp, textAlign = TextAlign.Center)
+                    Text(tr(text), color = TextColor, fontSize = 16.sp, textAlign = TextAlign.Center)
                     Text(
-                        "appuyer n'importe où pour continuer",
+                        tr("bcineContinue"),
                         color = TextDim,
                         fontSize = 11.5.sp,
                         modifier = Modifier.padding(top = 8.dp),
@@ -561,7 +561,9 @@ private class Crab(var x: Float, var rise: Float)
 private class CineProp(val type: BeachPropType, val worldX: Float, var collapsed: Boolean = false)
 
 /** Message blanc en surimpression : `fade` = durée du fondu d'entrée. */
-private class CineMessage(val text: String, val fade: Float) {
+/** Un message de la cinématique : la clé de traduction (`bcMsg.key` côté site),
+ *  traduite à l'affichage puisqu'elle est posée depuis la boucle d'animation. */
+private class CineMessage(val key: String, val fade: Float) {
     var elapsed: Float = 0f
 }
 
@@ -586,18 +588,10 @@ private const val DOOR_OFFSET = 127f // centre de la porte depuis le coin avant-
  * CASTLE/TOWEL eux-mêmes ne survivant pas à l'entrée dans DIALOG.
  */
 private fun dialogueLines(nextPhase: BeachCinePhase): List<String> = when (nextPhase) {
-    BeachCinePhase.FLY2 -> listOf(
-        "les parasols sont très utiles pour rebondir dessus !",
-        "leurs apparitions sont aléatoires, n'essaie pas de repérer l'endroit et d'y aller à chaque fois 😝",
-    )
-    BeachCinePhase.FLY3 -> listOf(
-        "en temps normal ça se serait arrêté là, mais vu que c'est un tuto...",
-    )
-    BeachCinePhase.FLY4 -> listOf(
-        "les serviettes, elles, n'ont aucun effet particulier : juste de la déco sur le sable",
-        "on continue notre lancée sans s'arrêter dessus, promis",
-        "mais c'est toujours un tuto !",
-    )
+    // Clés de traduction, dans l'ordre de bcShowDialogs().
+    BeachCinePhase.FLY2 -> listOf("bcineParasol1", "bcineParasol2")
+    BeachCinePhase.FLY3 -> listOf("bcineTutoAnyway")
+    BeachCinePhase.FLY4 -> listOf("bcineTowel1", "bcineTowel2", "bcineTowel3")
     else -> emptyList()
 }
 
