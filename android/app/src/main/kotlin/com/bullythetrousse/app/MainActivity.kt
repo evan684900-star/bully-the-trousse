@@ -35,6 +35,13 @@ import com.bullythetrousse.core.SfxCatalog
 import com.bullythetrousse.core.name
 import kotlinx.coroutines.delay
 import java.util.Locale
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import com.bullythetrousse.core.SecretSequence
+import com.bullythetrousse.core.Secrets
 
 /**
  * Treizième tranche du portage natif : écrans séparés (Menu / Jeu /
@@ -229,18 +236,53 @@ fun GameRoot() {
         LocalLang provides Lang.fromId(save.lang),
         LocalToaster provides { message -> toasts += message },
     ) {
-        GameContent(
-            save = save,
-            screen = screen,
-            cloud = cloud,
-            repository = repository,
-            baseScreen = baseScreen,
-            updateSave = ::updateSave,
-            goTo = { destination ->
-                if (!destination.isModal()) baseScreen = destination
-                screen = destination
-            },
-        )
+        // Séquence secrète au doigt (secretStep() côté site) : écoute passive
+        // de toute l'app, qui ne consomme rien — le jeu, les boutons et les
+        // glissés continuent de fonctionner normalement.
+        val secretFound by rememberUpdatedState {
+            sfx.play(SfxCatalog.BUY)
+            toasts += I18n.tr("secretUnlocked", Lang.fromId(save.lang))
+            updateSave(Secrets.unlock(save))
+        }
+        val secretSequence = remember { SecretSequence() }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        var up: PointerInputChange? = null
+                        while (up == null) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            // Plusieurs doigts : ce n'est ni un glissé ni un tapoti.
+                            if (event.changes.size > 1) return@awaitEachGesture
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                            if (!change.pressed) up = change
+                        }
+                        // Seuils du site en pixels CSS : on raisonne en dp.
+                        val finger = up ?: return@awaitEachGesture
+                        val gesture = SecretSequence.classify(
+                            dx = (finger.position.x - down.position.x) / density,
+                            dy = (finger.position.y - down.position.y) / density,
+                            elapsedMillis = finger.uptimeMillis - down.uptimeMillis,
+                        ) ?: return@awaitEachGesture
+                        if (secretSequence.step(gesture)) secretFound()
+                    }
+                },
+        ) {
+            GameContent(
+                save = save,
+                screen = screen,
+                cloud = cloud,
+                repository = repository,
+                baseScreen = baseScreen,
+                updateSave = ::updateSave,
+                goTo = { destination ->
+                    if (!destination.isModal()) baseScreen = destination
+                    screen = destination
+                },
+            )
+        }
         receivedGifts?.let { (rows, total) ->
             GiftsReceivedDialog(rows = rows, total = total, onDismiss = { receivedGifts = null })
         }
@@ -263,6 +305,20 @@ private fun GameContent(
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
 ) {
+    // Tutoriel relu depuis les Réglages (null = aucun).
+    var replayTutorial by remember { mutableStateOf<Tutorial?>(null) }
+    val onReplayTutorial: (Tutorial?) -> Unit = { replayTutorial = it }
+
+    // Panneau des triches (appui long sur la version) et ce qu'il déclenche.
+    var showCheats by remember { mutableStateOf(false) }
+    var menuDialogRequest by remember { mutableStateOf<MenuDialog?>(null) }
+    var cheatCoin by remember { mutableStateOf<Double?>(null) }
+    val cheats = CheatHooks(
+        open = { showCheats = true },
+        menuDialog = menuDialogRequest,
+        onMenuDialogShown = { menuDialogRequest = null },
+    )
+
     // Une modale se pose par-dessus l'écran de fond, assombri à 50 % —
     // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. Sans ça
     // les Réglages remplaçaient le menu au lieu de le recouvrir.
@@ -275,6 +331,8 @@ private fun GameContent(
             repository = repository,
             updateSave = updateSave,
             goTo = goTo,
+            onReplayTutorial = onReplayTutorial,
+            cheats = cheats,
         )
         // Le voile avale les taps : sans ça, toucher une zone vide des
         // Réglages actionnerait le bouton du menu resté visible dessous.
@@ -298,19 +356,43 @@ private fun GameContent(
         repository = repository,
         updateSave = updateSave,
         goTo = goTo,
+        onReplayTutorial = onReplayTutorial,
+        cheats = cheats,
     )
 
-    // Tutoriel du tout premier lancement (showTutorialIfNeeded() côté web) :
-    // il recouvre tout tant qu'il n'est pas terminé ou passé.
-    if (!save.tutorialSeen) {
-        TutorialOverlay(onDone = { updateSave(save.copy(tutorialSeen = true)) })
+    // Tutoriels (startTutorial() côté web) : les bases au tout premier
+    // lancement, Volcans et Plage à leur premier déblocage (jamais pendant
+    // la cinématique elle-même), ou celui qu'on relit depuis les Réglages.
+    // Il recouvre tout tant qu'il n'est pas terminé ou passé.
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    val tutorial = replayTutorial ?: when {
+        !save.tutorialSeen -> Tutorial.BASICS
+        inCinematic -> null
+        save.volcanUnlocked && !save.volcanTutorialSeen -> Tutorial.VOLCANO
+        save.plageUnlocked && !save.plageTutorialSeen -> Tutorial.PLAGE
+        else -> null
+    }
+    if (tutorial != null) {
+        TutorialOverlay(tutorial = tutorial, onDone = {
+            if (replayTutorial != null) {
+                // Relu depuis les Réglages : rien à retenir.
+                onReplayTutorial(null)
+            } else {
+                updateSave(
+                    when (tutorial) {
+                        Tutorial.BASICS -> save.copy(tutorialSeen = true)
+                        Tutorial.VOLCANO -> save.copy(volcanTutorialSeen = true)
+                        Tutorial.PLAGE -> save.copy(plageTutorialSeen = true)
+                    },
+                )
+            }
+        })
         return
     }
 
     // .links-btn + .corner-icons-right : en position:fixed côté web, donc
     // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
     // qui occupent l'écran entier.
-    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
     if (!inCinematic) {
         BottomBar(
             musicMuted = save.musicMuted,
@@ -319,6 +401,23 @@ private fun GameContent(
             onOpenSettings = { goTo(Screen.Settings) },
         )
     }
+
+    // Par-dessus tout le reste, barre du bas comprise.
+    if (showCheats) {
+        CheatsPanel(
+            save = save,
+            onSaveChange = updateSave,
+            onGoTo = { destination -> showCheats = false; goTo(destination) },
+            onMenuDialog = { dialog ->
+                // Les popups du menu s'affichent… sur le menu.
+                goTo(Screen.Menu)
+                menuDialogRequest = dialog
+            },
+            onCoinPopup = { cheatCoin = it },
+            onDismiss = { showCheats = false },
+        )
+    }
+    CoinPopup(multiplier = cheatCoin, jackpot = (cheatCoin ?: 0.0) >= 5.0, onDismiss = { cheatCoin = null })
 }
 
 /** Un écran, sans le décor commun (voile des modales, tutoriel, barre du bas). */
@@ -331,6 +430,8 @@ private fun ScreenContent(
     repository: SaveRepository,
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
+    onReplayTutorial: (Tutorial?) -> Unit,
+    cheats: CheatHooks,
 ) {
     // Fermer une modale rend la main à l'écran qu'elle recouvrait (le jeu,
     // le profil...), pas systématiquement au menu — comme côté site, où la
@@ -349,6 +450,9 @@ private fun ScreenContent(
             onStartVolcanoCinematic = { goTo(Screen.VolcanoCinematic) },
             onStartBeachCinematic = { goTo(Screen.BeachCinematic) },
             onOpenChangelog = { goTo(Screen.Changelog) },
+            onOpenCheats = cheats.open,
+            requestedDialog = cheats.menuDialog,
+            onRequestedDialogShown = cheats.onMenuDialogShown,
         )
 
         Screen.Leaderboard -> LeaderboardScreen(
@@ -408,6 +512,10 @@ private fun ScreenContent(
             session = cloud,
             onSaveChange = updateSave,
             onOpenAccount = { goTo(Screen.Account) },
+            onReplayTutorial = { tutorial ->
+                closeModal()
+                onReplayTutorial(tutorial)
+            },
             onBack = closeModal,
         )
 
@@ -434,3 +542,10 @@ private fun ScreenContent(
         })
     }
 }
+
+/** Ce que le panneau des triches doit pouvoir faire au menu. */
+internal class CheatHooks(
+    val open: () -> Unit,
+    val menuDialog: MenuDialog?,
+    val onMenuDialogShown: () -> Unit,
+)

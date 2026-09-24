@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dossier partagé par le FileProvider : les musiques copiées pour
+     partage sur Android 8-9 (voir MusicExport.kt). Rien d'autre. -->
+<paths>
+    <cache-path name="music" path="music/" />
+</paths>

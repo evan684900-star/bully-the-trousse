@@ -34,6 +34,7 @@ internal object I18nAppStrings {
             "Particules, nuages en profondeur et sillages au maximum. Pour les téléphones à l'aise." to
                 "Maximum particles, layered clouds and trails. For phones that can handle it."
             ),
-        "app.shareMusic" to ("📤 Partager" to "📤 Share"),
+        "app.musicSaved" to ("⬇️ Enregistrée dans Téléchargements" to "⬇️ Saved to Downloads"),
+        "app.musicSaveError" to ("Impossible d'enregistrer la musique." to "Couldn't save the music."),
     )
 }

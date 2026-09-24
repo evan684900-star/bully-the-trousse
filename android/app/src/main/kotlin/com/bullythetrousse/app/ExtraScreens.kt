@@ -50,6 +50,17 @@ import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.I18n
 import kotlin.math.roundToInt
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import com.bullythetrousse.core.SecretMath
+import com.bullythetrousse.core.Secrets
+import com.bullythetrousse.core.SfxCatalog
+import kotlinx.coroutines.delay
 
 /**
  * Écrans ouverts depuis le menu (Succès, Défis, Classement, Profil). Côté
@@ -311,9 +322,9 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
 }
 
 /**
- * `#settings-modal` : thème, langue, et le rappel du tutoriel. Le thème
- * clair et le bilingue ne sont pas encore portés, donc leurs boutons
- * affichent l'état courant sans le changer.
+ * `#settings-modal` : thème, langue, relecture des tutoriels, compte, musique,
+ * qualité graphique (propre au portage), téléchargement des musiques, et le
+ * point quasi invisible du bas qui ouvre le calcul mental secret.
  */
 @Composable
 fun SettingsScreen(
@@ -321,67 +332,195 @@ fun SettingsScreen(
     session: CloudSession,
     onSaveChange: (GameSave) -> Unit,
     onOpenAccount: () -> Unit,
+    onReplayTutorial: (Tutorial) -> Unit,
     onBack: () -> Unit,
 ) {
-    ModalScreen("⚙️ Réglages", onBack) {
-        SettingsRow("Compte") {
-            GameButton("☁️ Gérer", secondary = true, small = true, onClick = onOpenAccount)
-        }
-        Text(
-            session.statusText,
-            color = if (session.state == CloudState.LINKED) Money else TextDim,
-            fontSize = 11.5.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        )
-        SettingsRow("Musique") {
-            GameButton(
-                if (save.musicMuted) "🔇" else "🔊",
-                secondary = true,
-                small = true,
-            ) { onSaveChange(save.copy(musicMuted = !save.musicMuted)) }
-        }
-        // Qualité : un bouton qui fait défiler Basse → Normale → Élevée.
-        // Propre au portage Android — le site n'a pas ce réglage, mais un
-        // téléphone d'entrée de gamme en a besoin.
-        val quality = GraphicsQuality.fromId(save.graphicsQuality)
-        SettingsRow("Qualité graphique") {
-            GameButton(quality.label, secondary = true, small = true) {
-                onSaveChange(save.copy(graphicsQuality = GraphicsQuality.next(quality).id))
-            }
-        }
-        Text(
-            qualityHint(quality),
-            color = TextDim,
-            fontSize = 11.5.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        )
-        // Thème : la bascule jour/nuit du ciel (`applyTheme()` côté site).
-        // Le reste de l'interface reste sombre pour l'instant — seul le ciel
-        // suit, avec la même animation de lever/coucher que le site.
+    var secretMath by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val toaster = LocalToaster.current
+    val saved = tr("app.musicSaved")
+    val saveError = tr("app.musicSaveError")
+
+    ModalScreen(tr("settingsTitle"), onBack) {
+        // Thème : bascule jour/nuit de toute l'interface (applyTheme()).
         val night = save.theme != "light"
-        SettingsRow("Thème") {
+        SettingsRow(tr("settingsThemeLabel")) {
             GameButton(if (night) "🌙" else "☀️", secondary = true, small = true) {
                 onSaveChange(save.copy(theme = if (night) "light" else "dark"))
             }
         }
-        // Bouton de langue : bascule FR <-> EN, toute l'interface suit
-        // immédiatement (voir LocalLang).
+        // Langue : FR <-> EN, toute l'interface suit immédiatement (LocalLang).
         SettingsRow(tr("settingsLangLabel")) {
             GameButton(if (save.lang == "en") "EN" else "FR", secondary = true, small = true) {
                 onSaveChange(save.copy(lang = if (save.lang == "en") "fr" else "en"))
             }
         }
+
+        // 📖 Revoir le tutoriel : Volcans et Plage seulement une fois débloqués.
+        SettingsSection(tr("settingsTutoTitle"))
+        SettingsRow(tr("settingsTutoBasics")) {
+            GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.BASICS) }
+        }
+        if (save.volcanUnlocked) {
+            SettingsRow(tr("settingsTutoVolcan")) {
+                GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.VOLCANO) }
+            }
+        }
+        if (save.plageUnlocked) {
+            SettingsRow(tr("settingsTutoPlage")) {
+                GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.PLAGE) }
+            }
+        }
+
+        // Compte : code de récupération, compte privé, avatar, déconnexion —
+        // regroupés sur un écran à part (AccountScreen).
+        SettingsSection(tr("settingsAccountTitle"))
+        SettingsRow(tr("app.settingsAccount")) {
+            GameButton(tr("app.settingsManage"), secondary = true, small = true, onClick = onOpenAccount)
+        }
+        Text(
+            tr(session.statusKey),
+            color = if (session.state == CloudState.LINKED) Money else TextDim,
+            fontSize = 11.5.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+
+        SettingsRow(tr("app.settingsMusic")) {
+            GameButton(if (save.musicMuted) "🔇" else "🔊", secondary = true, small = true) {
+                onSaveChange(save.copy(musicMuted = !save.musicMuted))
+            }
+        }
+        // Qualité : Basse → Normale → Élevée. Propre au portage Android — le
+        // site n'a pas ce réglage, mais un téléphone d'entrée de gamme en a besoin.
+        val quality = GraphicsQuality.fromId(save.graphicsQuality)
+        SettingsRow(tr("app.settingsQuality")) {
+            GameButton(tr(qualityKey(quality)), secondary = true, small = true) {
+                onSaveChange(save.copy(graphicsQuality = GraphicsQuality.next(quality).id))
+            }
+        }
+        Text(
+            tr(qualityKey(quality) + "Hint"),
+            color = TextDim,
+            fontSize = 11.5.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+
+        // 🎵 Musiques du jeu : chaque piste téléchargeable.
+        SettingsSection(tr("settingsMusicTitle"))
+        for ((labelKey, track) in listOf(
+            "settingsMusicNormal" to (R.raw.music_cour to "musique-fond.mp3"),
+            "settingsMusicPlage" to (R.raw.music_plage to "musique-plage.mp3"),
+            "settingsMusicVolcan" to (R.raw.music_volcan to "musique-volcan.mp3"),
+        )) {
+            SettingsRow(tr(labelKey)) {
+                GameButton(tr("btnMusicDownload"), secondary = true, small = true) {
+                    when (exportMusic(context, track.first, track.second)) {
+                        MusicExportResult.SAVED -> toaster(saved)
+                        MusicExportResult.SHARED -> Unit
+                        MusicExportResult.FAILED -> toaster(saveError)
+                    }
+                }
+            }
+        }
+
+        // .settings-secret-trigger : un point presque invisible.
+        Text(
+            "·",
+            color = TextColor.copy(alpha = 0.15f),
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { secretMath = true }
+                .padding(top = 14.dp, bottom = 2.dp),
+        )
+    }
+
+    if (secretMath) {
+        SecretMathDialog(
+            onSolved = {
+                secretMath = false
+                onSaveChange(Secrets.unlock(save))
+            },
+            onDismiss = { secretMath = false },
+        )
     }
 }
 
-/** Ce que chaque niveau change, en une ligne : sans ça le bouton ne dit pas
- *  au joueur ce qu'il gagne ou perd en le touchant. */
-private fun qualityHint(quality: GraphicsQuality): String = when (quality) {
-    GraphicsQuality.LOW ->
-        "Effets d'ambiance coupés et particules réduites : à choisir si le jeu saccade."
-    GraphicsQuality.MEDIUM -> "Tous les effets, en quantité mesurée. Recommandé."
-    GraphicsQuality.HIGH ->
-        "Particules, nuages en profondeur et sillages au maximum. Pour les téléphones à l'aise."
+/** La clé de traduction du niveau de qualité (`app.qualityLow`...). */
+private fun qualityKey(quality: GraphicsQuality): String = when (quality) {
+    GraphicsQuality.LOW -> "app.qualityLow"
+    GraphicsQuality.MEDIUM -> "app.qualityMedium"
+    GraphicsQuality.HIGH -> "app.qualityHigh"
+}
+
+/** `.settings-section-title` */
+@Composable
+private fun SettingsSection(title: String) {
+    Text(
+        title,
+        color = Accent,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+    )
+}
+
+/**
+ * `#secret-math-modal` : 4 calculs, 5 s chacun. Une mauvaise réponse ou le
+ * temps écoulé referment tout sans un mot (échec silencieux, pas d'indice).
+ */
+@Composable
+private fun SecretMathDialog(onSolved: () -> Unit, onDismiss: () -> Unit) {
+    var index by remember { mutableIntStateOf(0) }
+    var typed by remember { mutableStateOf("") }
+    var remaining by remember { mutableLongStateOf(SecretMath.SECONDS_PER_QUESTION * 1000L) }
+    val sfx = LocalSfx.current
+    val toaster = LocalToaster.current
+    val unlocked = tr("secretUnlocked")
+
+    LaunchedEffect(index) {
+        val deadline = System.currentTimeMillis() + SecretMath.SECONDS_PER_QUESTION * 1000L
+        while (true) {
+            remaining = deadline - System.currentTimeMillis()
+            if (remaining <= 0) {
+                onDismiss()
+                return@LaunchedEffect
+            }
+            delay(100)
+        }
+    }
+
+    fun submit() {
+        if (!SecretMath.isCorrect(index, typed)) return onDismiss()
+        if (index == SecretMath.QUESTIONS.lastIndex) {
+            sfx.play(SfxCatalog.BUY)
+            toaster(unlocked)
+            onSolved()
+        } else {
+            typed = ""
+            index++
+        }
+    }
+
+    InfoDialog(
+        title = SecretMath.QUESTIONS[index].text,
+        onDismiss = onDismiss,
+        buttons = { GameButton(tr("secretMathSubmit"), modifier = Modifier.fillMaxWidth()) { submit() } },
+    ) {
+        DialogText("${SecretMath.secondsLeft(remaining)}s")
+        OutlinedTextField(
+            value = typed,
+            onValueChange = { typed = it.filter { c -> c.isDigit() || c == '-' }.take(6) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /** `.settings-row` : libellé à gauche, contrôle à droite. */

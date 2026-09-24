@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Beach
@@ -73,6 +74,7 @@ fun ThrowCanvas(
     /** Non nul pendant le détour en apesanteur : le décor devient spatial et
      *  le QTE se dessine par-dessus (voir [SpaceFlight]). */
     spaceState: SpaceState? = null,
+    showPoopEgg: Boolean = false,
     groundVerticalFraction: Float = 0.68f,
     // `#game-canvas` occupe tout l'écran côté web.
     modifier: Modifier = Modifier.fillMaxSize(),
@@ -118,7 +120,7 @@ fun ThrowCanvas(
         if (spaceState != null) {
             drawSpaceBackdrop(cameraX, groundScreenY, animationTimeSeconds)
         } else {
-            drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds)
+            drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds, showPoopEgg = showPoopEgg)
         }
 
         // Le sillage ne vit que pendant le vol : au repos on repart de zéro,
@@ -191,6 +193,8 @@ internal fun DrawScope.drawWorldBackdrop(
     // ne suit pas les transformations appliquées au canvas.
     width: Float = size.width,
     height: Float = size.height,
+    // Easter egg 💩 de la cour, seulement avant le décollage.
+    showPoopEgg: Boolean = false,
 ) {
     val palette = paletteFor(world)
     drawRect(
@@ -222,7 +226,7 @@ internal fun DrawScope.drawWorldBackdrop(
         }
         else -> {
             drawClouds(cameraX, width.toDouble(), groundScreenY, timeSeconds, tint = Color.White.copy(alpha = 0.7f))
-            drawCourDecor(cameraX, width.toDouble(), groundScreenY)
+            drawCourDecor(cameraX, width.toDouble(), groundScreenY, showPoopEgg)
         }
     }
 }
@@ -434,7 +438,7 @@ private fun trailColor(rgb: String, timeSeconds: Float): Color {
 /** Bâtiments en parallaxe puis arbres sur la ligne d'horizon, portage du
  *  corps de drawBackground() côté web (les arbres recouvrent les bâtiments
  *  qui défilent derrière eux, d'où l'ordre). */
-private fun DrawScope.drawCourDecor(cameraX: Double, screenWidth: Double, groundScreenY: Float) {
+private fun DrawScope.drawCourDecor(cameraX: Double, screenWidth: Double, groundScreenY: Float, showPoopEgg: Boolean) {
     for (index in CourDecor.visibleBuildingIndices(cameraX, screenWidth)) {
         val bx = CourDecor.buildingScreenX(index, cameraX)
         if (bx < -220.0 || bx > screenWidth + 40.0) continue
@@ -444,8 +448,24 @@ private fun DrawScope.drawCourDecor(cameraX: Double, screenWidth: Double, ground
         val worldPos = CourDecor.treeWorldX(index)
         val sx = worldPos - cameraX
         if (sx < -40.0 || sx > screenWidth + 40.0) continue
+        // Dessiné juste AVANT cet arbre précis, pour que son feuillage plein
+        // le recouvre entièrement : on ne le trouve qu'en touchant l'arbre.
+        if (showPoopEgg && index == CourDecor.POOP_EGG_TREE_INDEX) {
+            drawPoopEgg(CourDecor.poopEggScreenX(cameraX).toFloat(), groundScreenY + CourDecor.POOP_EGG_OFFSET_Y.toFloat())
+        }
         drawCourTree(sx.toFloat(), groundScreenY + 6f, index)
     }
+}
+
+/** `drawPoopEgg()` : l'émoji centré sur (x, y). */
+private fun DrawScope.drawPoopEgg(x: Float, y: Float) {
+    val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        textSize = CourDecor.POOP_EGG_SIZE.toFloat()
+        textAlign = android.graphics.Paint.Align.CENTER
+    }
+    // Centrage vertical comme `textBaseline = "middle"`.
+    val baseline = y - (paint.descent() + paint.ascent()) / 2f
+    drawContext.canvas.nativeCanvas.drawText("\uD83D\uDCA9", x, baseline, paint)
 }
 
 /** Deux couches de volcans en parallaxe puis fissures incandescentes au

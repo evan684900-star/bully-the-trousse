@@ -70,7 +70,7 @@ fun AccountScreen(
         // --- Statut : "account-status" côté site ---
         InfoCard {
             Text(
-                session.statusText,
+                tr(session.statusKey),
                 color = if (session.state == CloudState.LINKED) Money else TextDim,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,

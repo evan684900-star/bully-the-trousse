@@ -77,6 +77,10 @@ import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
 import java.time.LocalDate
 import kotlin.math.roundToInt
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.bullythetrousse.core.CourDecor
 
 /**
  * Écran de jeu, porté de `#screen-game` (index.html) : le canvas en plein
@@ -151,15 +155,47 @@ fun GameScreen(
         }
     }
 
+    // Easter egg 💩 : visible dans la cour tant que la trousse n'est pas
+    // partie (poopEggVisible() côté site). La position du dernier appui est
+    // retenue pour savoir si le tap est tombé dessus.
+    val poopVisible = save.currentWorld == "cour" && current !is ThrowState.Landed &&
+        !(current is ThrowState.ChargingPower && current.bounceCount > 0)
+    val lastDown = remember { floatArrayOf(-1f, -1f) }
+    val lastDownHeight = remember { floatArrayOf(0f) }
+    val poopHitRadius = with(LocalDensity.current) { maxOf(CourDecor.POOP_EGG_HIT_RADIUS.toFloat(), 16.dp.toPx()) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .onSizeChanged { lastDownHeight[0] = it.height.toFloat() }
+            // Observe l'appui sans le consommer : le tap reste géré plus bas.
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                    lastDown[0] = down.position.x
+                    lastDown[1] = down.position.y
+                }
+            }
             // Le tap se prend sur tout l'écran, sans effet d'ondulation (le web
             // n'en a pas) : d'où interactionSource + indication nulle.
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
                 onClick = {
+                    // Un tap sur le 💩 est « absorbé » : il ne lance pas la charge,
+                    // le temps de voir la découverte (revealPoopEgg()).
+                    if (poopVisible && CourDecor.hitsPoopEgg(
+                            tapX = lastDown[0].toDouble(),
+                            tapY = lastDown[1].toDouble(),
+                            cameraX = 0.0,
+                            groundScreenY = (lastDownHeight[0] * GROUND_FRACTION).toDouble(),
+                            hitRadius = poopHitRadius.toDouble(),
+                        )
+                    ) {
+                        toast = "💩"
+                        if (!save.hasFoundPoopEgg) onSaveChange(save.copy(hasFoundPoopEgg = true))
+                        return@clickable
+                    }
                     // En apesanteur, le tap sert au QTE — pas à relancer.
                     val space = spaceFlight
                     if (space?.state != null) {
@@ -204,6 +240,8 @@ fun GameScreen(
             equippedSkin = save.equippedSkin,
             equippedTrail = save.equippedTrail,
             spaceState = spaceFlight?.state,
+            showPoopEgg = poopVisible,
+            groundVerticalFraction = GROUND_FRACTION,
             modifier = Modifier.fillMaxSize(),
         )
         // #screen-game .sky-anim { bottom: 32% } — jour/nuit selon save.theme
@@ -807,3 +845,7 @@ private fun VampireBoostVignette(active: Boolean) {
             ),
     )
 }
+
+/** Hauteur du sol à l'écran (fraction de la hauteur), partagée entre le
+ *  canvas et le test du toucher sur le 💩. */
+private const val GROUND_FRACTION = 0.68f

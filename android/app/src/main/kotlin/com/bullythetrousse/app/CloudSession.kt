@@ -272,13 +272,14 @@ class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope
         return GameSave()
     }
 
-    val statusText: String
+    /** La clé de traduction de l'état du compte (`#account-status` côté site). */
+    val statusKey: String
         get() = when (state) {
-            CloudState.NOT_CONFIGURED -> "🔌 Compte en ligne non configuré dans cette version."
-            CloudState.CONNECTING -> "Connexion…"
-            CloudState.GUEST -> "📱 Partie locale à cet appareil. Crée ton code pour la retrouver ailleurs."
-            CloudState.LINKED -> "✅ Appareil connecté à ton compte — la partie se synchronise automatiquement."
-            CloudState.OFFLINE -> "🔌 Hors ligne : compte indisponible pour le moment."
+            CloudState.NOT_CONFIGURED -> "onlineOfflineNoConfig"
+            CloudState.CONNECTING -> "onlineConnecting"
+            CloudState.GUEST -> "accountStatusLocal"
+            CloudState.LINKED -> "accountStatusLinked"
+            CloudState.OFFLINE -> "accountStatusOffline"
         }
 }
 
