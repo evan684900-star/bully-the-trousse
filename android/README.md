@@ -214,6 +214,37 @@ Android) avant d'être branché à l'affichage dans `:app`.
   Menu en pleine charge (avant le 3e tap) abandonne ce lancer plutôt que de
   le mettre en pause — un nouvel écran Jeu repart toujours de `Idle`.
 
+- **Monde Ville (v11.0.0)** : portage de `ville.js`, `ville-levels.js` et
+  `ville-art.js`. Côté `:core`, testé (257 tests au total) :
+  - `Ville` (arrivée/départ, prix ×1,2 et gains ×1,2, départs de
+    l'aéroport, `normalizeOnLoad`), `VilleEvents` (calendrier coupure/fuite/
+    pluie/canicule tiré par le même `mulberry32` que le site, vérifié
+    à l'identique contre Node), `VilleRooftop` (flaques, glissade, barre de
+    relance, canicule qui met la trousse au repos 2 min), `PlaneCrash` (le
+    lancer parfait sur la Plage qui s'encastre dans l'avion), `Cosmetics`
+    (les 8 accessoires de La Trousserie) et `VilleCredits` (générique et
+    statistiques).
+  - `VilleEngine` + `VilleLevels` : le moteur de plateforme complet (ville,
+    réception de La Tour, escaliers, pièce noire, monde bugué, boss, fuite,
+    générique). Les séquences scriptées du site (générateurs JS) sont des
+    `sequence {}` Kotlin ; tout ce qui touche l'extérieur (sauvegarde, sons,
+    boutique, toit) passe par l'interface `VilleHost`. `VilleEngineTest`
+    joue toute l'histoire du début à la fin.
+
+  Côté `:app` : `VilleScreen.kt` (boucle `withFrameNanos`, canvas virtuel
+  à la même échelle que le site, transitions iris/fondu/glitch/flou),
+  `Ctx2D.kt` (une petite API façon canvas 2D au-dessus de `DrawScope`, pour
+  porter les fonctions de dessin ligne à ligne), `VilleArt.kt`/
+  `VilleCityArt.kt`/`VilleIndoorArt.kt`/`VilleRenderer.kt` (le dessin),
+  `VilleOverlays.kt` (HUD, bulles, popups, choix, La Trousserie, générique,
+  boutons tactiles), `VilleAudio.kt` (musique du boss, pas, pneus),
+  `RooftopFlight.kt` (lancer depuis le toit avec les flaques, et le crash
+  sur l'avion). Adaptations assumées : les commandes clavier du site sont
+  remplacées par des boutons tactiles (◀ ▶ ⚔️ ⚡ E ▲) et les textes qui les
+  citent sont adaptés ; la transition « flou » n'est floue qu'à partir
+  d'Android 12 (en dessous, simple fondu au noir) ; les accessoires sont
+  centrés sur toutes les trousses (le site les décale sur deux skins).
+
 - **Firebase (compte, sauvegarde cloud, classement)** : l'app rejoint le
   projet Firebase qui fait DÉJÀ tourner le site (`bully-the-trousse`) au
   lieu d'en créer un à elle. C'est la contrainte qui gouverne tout le

@@ -88,7 +88,7 @@ import kotlin.random.Random
  * Non porté : les particules de poussière (`spawnDust`), décoratives.
  */
 @Composable
-fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome) -> Unit) {
+fun VolcanoCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", onFinished: (VolcanoCineOutcome) -> Unit) {
     var state by remember { mutableStateOf(VolcanoCineState()) }
 
     // Pendant état visuel (aucune incidence sur l'issue, cf. KDoc).
@@ -383,9 +383,9 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
             val body: DrawScope.() -> Unit = {
                 when (phase) {
                     CinePhase.FADE, CinePhase.APPROACH, CinePhase.QUAKE, CinePhase.ERUPTION ->
-                        drawCineYard(phase, state.phaseElapsed, rotation, clock, smoke, profile, sprite, equippedSkin, skinFilter)
+                        drawCineYard(phase, state.phaseElapsed, rotation, clock, smoke, profile, sprite, equippedSkin, equippedCosmetic, skinFilter)
                     CinePhase.LANDING, CinePhase.OUTRO ->
-                        drawCineArrival(phase, state.phaseElapsed, rotation, clock, profile, sprite, equippedSkin, skinFilter)
+                        drawCineArrival(phase, state.phaseElapsed, rotation, clock, profile, sprite, equippedSkin, equippedCosmetic, skinFilter)
                     else ->
                         drawCineSky(
                             phase = phase,
@@ -401,6 +401,7 @@ fun VolcanoCinematicScreen(equippedSkin: String, onFinished: (VolcanoCineOutcome
                             profile = profile,
                             sprite = sprite,
                             skinId = equippedSkin,
+                            cosmetic = equippedCosmetic,
                             skinFilter = skinFilter,
                         )
                 }
@@ -620,6 +621,8 @@ private fun DrawScope.drawCineYard(
     profile: QualityProfile,
     sprite: ImageBitmap,
     skinId: String,
+    /** Cosmétique de La Trousserie porté (voir drawCosmetic). */
+    cosmetic: String = "",
     skinFilter: ColorFilter?,
 ) {
     val w = size.width
@@ -692,7 +695,7 @@ private fun DrawScope.drawCineYard(
             height = max(0f, fy - ty),
         )
     }
-    drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, rot, skinFilter, filterQuality = profile.spriteFilter)
+    drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, rot, skinFilter, filterQuality = profile.spriteFilter, cosmetic = cosmetic)
 }
 
 /** `cineDrawCracks()` : les fissures qui s'ouvrent dans le sol de la cour. */
@@ -759,6 +762,8 @@ private fun DrawScope.drawCineSky(
     profile: QualityProfile,
     sprite: ImageBitmap,
     skinId: String,
+    /** Cosmétique de La Trousserie porté (voir drawCosmetic). */
+    cosmetic: String = "",
     skinFilter: ColorFilter?,
 ) {
     val w = size.width
@@ -832,6 +837,7 @@ private fun DrawScope.drawCineSky(
     drawTrousseSprite(
         image = sprite,
         skinId = skinId,
+        cosmetic = cosmetic,
         centerX = tx,
         centerY = ty,
         size = 70f,
@@ -991,6 +997,8 @@ private fun DrawScope.drawCineArrival(
     profile: QualityProfile,
     sprite: ImageBitmap,
     skinId: String,
+    /** Cosmétique de La Trousserie porté (voir drawCosmetic). */
+    cosmetic: String = "",
     skinFilter: ColorFilter?,
 ) {
     val w = size.width
@@ -1041,5 +1049,5 @@ private fun DrawScope.drawCineArrival(
     if (profile.ambientEffects) {
         drawGroundShadow(centerX = cx, groundY = groundY + 6f, objectSize = 70f, height = max(0f, groundY - 22f - ty))
     }
-    drawTrousseSprite(sprite, skinId, cx, ty, 70f, rotation, skinFilter, filterQuality = profile.spriteFilter)
+    drawTrousseSprite(sprite, skinId, cx, ty, 70f, rotation, skinFilter, filterQuality = profile.spriteFilter, cosmetic = cosmetic)
 }

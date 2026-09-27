@@ -115,6 +115,8 @@ fun DrawScope.drawTrousseSprite(
     colorFilter: ColorFilter?,
     alpha: Float = 1f,
     filterQuality: FilterQuality = FilterQuality.Medium,
+    /** Cosmétique de La Trousserie porté par-dessus ("" = aucun, voir drawCosmetic). */
+    cosmetic: String = "",
 ) {
     val skin = Skins.find(skinId)
     rotateRad(rotationRadians, pivot = Offset(centerX, centerY)) {
@@ -135,6 +137,7 @@ fun DrawScope.drawTrousseSprite(
             )
         }
     }
+    if (cosmetic.isNotEmpty()) drawCosmetic(cosmetic, centerX, centerY, size, rotationRadians)
 }
 
 /** `drawPixelCoin()` : une pièce dessinée case par case sur une grille 14×14,

@@ -2,6 +2,10 @@ package com.bullythetrousse.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.text.style.TextAlign
+import com.bullythetrousse.core.Ville
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -54,6 +58,13 @@ fun ShopScreen(
     onSaveChange: (GameSave) -> Unit,
     onBackToMenu: () -> Unit,
     onBackToGame: () -> Unit,
+    /**
+     * Boutique ouverte depuis le monde Ville (réception ou résultat du toit,
+     * `body.ville-shop` côté site) : une croix remplace les deux boutons, et
+     * les skins ne s'y vendent plus — c'est La Trousserie, dans la rue.
+     */
+    villeMode: Boolean = false,
+    onCloseVille: () -> Unit = {},
 ) {
     var tab by remember { mutableIntStateOf(0) }
     var toast by remember { mutableStateOf<String?>(null) }
@@ -84,13 +95,30 @@ fun ShopScreen(
                 .windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(horizontal = 16.dp),
         ) {
-            // .back-btn / .forward-btn : même hauteur, aux deux coins.
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                GameButton("← Menu", secondary = true, small = true, onClick = onBackToMenu)
-                GameButton("🎮 Retour au jeu", small = true, onClick = onBackToGame)
+            if (villeMode) {
+                // #btn-shop-close-ville : rond de 42px en haut à droite.
+                Box(modifier = Modifier.fillMaxWidth().padding(top = 10.dp), contentAlignment = Alignment.CenterEnd) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(PanelBg)
+                            .border(2.dp, PanelBorder, CircleShape)
+                            .clickable(onClick = onCloseVille),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text("✕", color = TextColor, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+                    }
+                }
+            } else {
+                // .back-btn / .forward-btn : même hauteur, aux deux coins.
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    GameButton("← Menu", secondary = true, small = true, onClick = onBackToMenu)
+                    GameButton("🎮 Retour au jeu", small = true, onClick = onBackToGame)
+                }
             }
 
             // .shop-header : centré, argent + bonus de gains cumulé.
@@ -106,7 +134,7 @@ fun ShopScreen(
 
             Box(modifier = Modifier.padding(top = 10.dp, bottom = 10.dp)) {
                 ShopTabs(
-                    tabs = listOf("⚙️ Améliorations", "🎨 Skins", "🌈 Traînées"),
+                    tabs = if (villeMode) listOf("⚙️ Améliorations", "🌈 Traînées") else listOf("⚙️ Améliorations", "🎨 Skins", "🌈 Traînées"),
                     selectedIndex = tab,
                     onSelect = { tab = it },
                 )
@@ -120,9 +148,9 @@ fun ShopScreen(
                     .padding(bottom = 64.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                when (tab) {
-                    0 -> UpgradesTab(save, ::purchase, ::notEnoughMoney)
-                    1 -> SkinsTab(save, ::equip, ::purchase, ::notEnoughMoney)
+                when {
+                    tab == 0 -> UpgradesTab(save, ::purchase, ::notEnoughMoney)
+                    tab == 1 && !villeMode -> SkinsTab(save, ::equip, ::purchase, ::notEnoughMoney)
                     else -> TrailsTab(save, ::equip, ::purchase, ::notEnoughMoney)
                 }
             }
@@ -134,13 +162,24 @@ fun ShopScreen(
 /** Onglet "Améliorations" : Puissance et Vitesse (voir renderShopTab côté web). */
 @Composable
 private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onNotEnoughMoney: () -> Unit) {
+    // .ville-shop-note : en Ville, le rappel de la règle du +20 %.
+    if (save.currentWorld == Ville.WORLD_ID) {
+        Text(
+            "ici, tout est 20% plus cher mais vous gagnez 20% plus d'argent",
+            color = Money,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.ExtraBold,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
     ShopCard(
         title = "Puissance",
         description = "Augmente la force maximale de ton lancer, et l'argent gagné à chaque lancer (+3%/niveau).",
         levelBadge = "Niv. ${save.puissanceLevel}",
         leading = { Text("💪", fontSize = 30.sp) },
     ) {
-        GameButton("${Economy.upgradeCost(save.puissanceLevel)} $", small = true) {
+        GameButton("${Ville.price(Economy.upgradeCost(save.puissanceLevel), save)} $", small = true) {
             when (val result = Shop.buyPuissance(save)) {
                 is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
                 else -> onNotEnoughMoney()
@@ -153,7 +192,7 @@ private fun UpgradesTab(save: GameSave, onPurchase: (GameSave, Int) -> Unit, onN
         levelBadge = "Niv. ${save.vitesseLevel}",
         leading = { Text("⚡", fontSize = 30.sp) },
     ) {
-        GameButton("${Economy.upgradeCost(save.vitesseLevel)} $", small = true) {
+        GameButton("${Ville.price(Economy.upgradeCost(save.vitesseLevel), save)} $", small = true) {
             when (val result = Shop.buyVitesse(save)) {
                 is Shop.PurchaseResult.Success -> onPurchase(result.save, result.cost)
                 else -> onNotEnoughMoney()
@@ -209,10 +248,10 @@ private fun SkinsTab(
             description = desc,
             owned = owned,
             equipped = equipped,
-            cost = skin.cost,
+            cost = SkinShop.price(save, skin.id),
             onBuy = {
                 when (val result = SkinShop.buy(save, skin.id)) {
-                    is SkinShop.PurchaseResult.Success -> onPurchase(result.save, skin.cost)
+                    is SkinShop.PurchaseResult.Success -> onPurchase(result.save, SkinShop.price(save, skin.id))
                     else -> onNotEnoughMoney()
                 }
             },
@@ -239,10 +278,10 @@ private fun TrailsTab(
             description = desc,
             owned = owned,
             equipped = equipped,
-            cost = trail.cost,
+            cost = TrailShop.price(save, trail.id),
             onBuy = {
                 when (val result = TrailShop.buy(save, trail.id)) {
-                    is TrailShop.PurchaseResult.Success -> onPurchase(result.save, trail.cost)
+                    is TrailShop.PurchaseResult.Success -> onPurchase(result.save, TrailShop.price(save, trail.id))
                     else -> onNotEnoughMoney()
                 }
             },

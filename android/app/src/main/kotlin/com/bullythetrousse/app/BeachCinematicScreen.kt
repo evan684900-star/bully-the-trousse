@@ -84,7 +84,7 @@ import kotlin.math.sin
  * pendant "chase").
  */
 @Composable
-fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
+fun BeachCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", onFinished: () -> Unit) {
     var state by remember { mutableStateOf(BeachCineState()) }
 
     // État purement visuel, décalque des variables `bc*` côté web.
@@ -377,6 +377,7 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                         clock = clock,
                         sprite = sprite,
                         skinId = equippedSkin,
+                        cosmetic = equippedCosmetic,
                         skinFilter = skinFilter,
                     )
                 } else {
@@ -396,6 +397,7 @@ fun BeachCinematicScreen(equippedSkin: String, onFinished: () -> Unit) {
                         clock = clock,
                         sprite = sprite,
                         skinId = equippedSkin,
+                        cosmetic = equippedCosmetic,
                         skinFilter = skinFilter,
                     )
                 }
@@ -616,6 +618,8 @@ private fun DrawScope.drawBeachCineYard(
     clock: Float,
     sprite: ImageBitmap,
     skinId: String,
+    /** Cosmétique de La Trousserie porté (voir drawCosmetic). */
+    cosmetic: String = "",
     skinFilter: ColorFilter?,
 ) {
     val w = size.width
@@ -660,6 +664,7 @@ private fun DrawScope.drawBeachCineYard(
                 passenger = onBus,
                 sprite = sprite,
                 skinId = skinId,
+                cosmetic = cosmetic,
                 skinFilter = skinFilter,
                 filterQuality = profile.spriteFilter,
                 wheelAngle = busX / 22f, // périmètre de la roue : l'angle suit la distance
@@ -692,7 +697,7 @@ private fun DrawScope.drawBeachCineYard(
                     height = 0f,
                 )
             }
-            drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, lean, skinFilter, alpha, profile.spriteFilter)
+            drawTrousseSprite(sprite, skinId, tx, ty, trousseSize, lean, skinFilter, alpha, profile.spriteFilter, cosmetic = cosmetic)
         }
     }
 }
@@ -715,6 +720,8 @@ private fun DrawScope.drawBeachCineBeach(
     clock: Float,
     sprite: ImageBitmap,
     skinId: String,
+    /** Cosmétique de La Trousserie porté (voir drawCosmetic). */
+    cosmetic: String = "",
     skinFilter: ColorFilter?,
 ) {
     val w = size.width
@@ -795,6 +802,7 @@ private fun DrawScope.drawBeachCineBeach(
                 passenger = onBus,
                 sprite = sprite,
                 skinId = skinId,
+                cosmetic = cosmetic,
                 skinFilter = skinFilter,
                 filterQuality = profile.spriteFilter,
                 wheelAngle = busX / 22f,
@@ -831,7 +839,7 @@ private fun DrawScope.drawBeachCineBeach(
                         height = max(0f, fy - ty),
                     )
                 }
-                drawTrousseSprite(sprite, skinId, tx, ty, TROUSSE_SIZE, lean, skinFilter, alpha, profile.spriteFilter)
+                drawTrousseSprite(sprite, skinId, tx, ty, TROUSSE_SIZE, lean, skinFilter, alpha, profile.spriteFilter, cosmetic = cosmetic)
             }
             // Le « ! » de surprise au-dessus de la trousse quand le crabe sort.
             if (bang > 0.01f) drawSurpriseBang(tx, ty - 66f, bang)
@@ -871,6 +879,8 @@ private fun DrawScope.drawBus(
     passenger: Boolean,
     sprite: ImageBitmap,
     skinId: String,
+    /** Cosmétique de La Trousserie porté (voir drawCosmetic). */
+    cosmetic: String = "",
     skinFilter: ColorFilter?,
     filterQuality: FilterQuality,
     // Ajouts par rapport au site : les roues tournent et la caisse tressaute
@@ -924,7 +934,7 @@ private fun DrawScope.drawBus(
         // ne recouvre pas.
         if (passenger && i == 2) {
             clipRect(left = wx, top = top + 14f, right = wx + 52f, bottom = top + 66f) {
-                drawTrousseSprite(sprite, skinId, wx + 26f, top + 62f, 48f, 0f, skinFilter, 1f, filterQuality)
+                drawTrousseSprite(sprite, skinId, wx + 26f, top + 62f, 48f, 0f, skinFilter, 1f, filterQuality, cosmetic = cosmetic)
             }
         }
     }

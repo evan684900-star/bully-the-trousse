@@ -47,7 +47,11 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.Beach
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.SfxCatalog
 import com.bullythetrousse.core.SkinStats
+import com.bullythetrousse.core.Ville
+import com.bullythetrousse.core.VilleEntry
+import androidx.compose.runtime.LaunchedEffect
 
 /**
  * Écran d'accueil, porté à l'identique de `#screen-menu` (index.html) :
@@ -68,8 +72,14 @@ fun MenuScreen(
     onStartVolcanoCinematic: () -> Unit,
     onStartBeachCinematic: () -> Unit,
     onOpenChangelog: () -> Unit,
+    /** Entrée dans le monde Ville (vol depuis la carte, ou "Jouer" quand on y est coincé). */
+    onEnterVille: (VilleEntry) -> Unit = {},
+    /** Message à afficher en arrivant sur le menu ("✈️ Bon vol !" après un départ de la Ville). */
+    initialToast: String? = null,
+    onInitialToastShown: () -> Unit = {},
 ) {
-    var toast by remember { mutableStateOf<String?>(null) }
+    var toast by remember { mutableStateOf(initialToast) }
+    LaunchedEffect(initialToast) { if (initialToast != null) onInitialToastShown() }
 
     Box(modifier = Modifier.fillMaxSize().background(ScreenBackground)) {
         // #screen-menu .sky-anim { bottom: 40% } — jour/nuit selon save.theme
@@ -93,13 +103,20 @@ fun MenuScreen(
             FlowRowCentered(gap = 10.dp) {
                 StatChip("Puissance", SkinStats.totalPuissance(save).toString())
                 StatChip("Vitesse", SkinStats.totalVitesse(save).toString())
-                val record = if (save.currentWorld == "plage") save.plageBestDistance else save.bestDistance
+                val record = when (save.currentWorld) {
+                    "plage" -> save.plageBestDistance
+                    Ville.WORLD_ID -> save.villeBestDistance
+                    else -> save.bestDistance
+                }
                 StatChip("Record", "${"%.1f".format(record)} m")
             }
 
             // .menu-buttons
             FlowRowCentered(gap = 14.dp) {
-                GameButton("🚀 Jouer", onClick = onPlay)
+                // En Ville, "Jouer" ramène à la réception de la Tour.
+                GameButton("🚀 Jouer", onClick = {
+                    if (save.currentWorld == Ville.WORLD_ID && save.inVille) onEnterVille(VilleEntry.RECEPTION) else onPlay()
+                })
                 GameButton("🛒 Boutique", secondary = true, onClick = onOpenShop)
                 GameButton("🏆 Classement", secondary = true, onClick = onOpenLeaderboard)
                 GameButton("👤 Profil", secondary = true, onClick = onOpenProfile)
@@ -112,6 +129,7 @@ fun MenuScreen(
                 onOpenChallenges = onOpenChallenges,
                 onStartVolcanoCinematic = onStartVolcanoCinematic,
                 onStartBeachCinematic = onStartBeachCinematic,
+                onEnterVille = onEnterVille,
                 onToast = { toast = it },
             )
 
@@ -126,7 +144,7 @@ fun MenuScreen(
 private fun TitleCard(onOpenChangelog: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(
-            "v10.2.2",
+            "v11.0.0",
             color = TextColor,
             fontSize = 12.sp,
             fontWeight = FontWeight.ExtraBold,
@@ -189,9 +207,32 @@ private fun WorldsRow(
     onOpenChallenges: () -> Unit,
     onStartVolcanoCinematic: () -> Unit,
     onStartBeachCinematic: () -> Unit,
+    onEnterVille: (VilleEntry) -> Unit,
     onToast: (String) -> Unit,
 ) {
+    val sfx = LocalSfx.current
     fun click(world: World) {
+        // Coincé en Ville : seul un vol au départ de l'aéroport permet d'en sortir.
+        if (save.inVille && world.id != Ville.WORLD_ID) {
+            onToast("✈️ Pour quitter la Ville, prends un vol au comptoir des départs de l'aéroport.")
+            sfx.play(SfxCatalog.ERROR)
+            return
+        }
+        if (world.id == Ville.WORLD_ID) {
+            when {
+                save.inVille -> Unit
+                !save.villeUnlocked -> {
+                    onToast("🔒 Ville : un lancer parfait sur la Plage pourrait bien t'emmener très loin…")
+                    sfx.play(SfxCatalog.ERROR)
+                }
+                save.inPlage -> {
+                    onToast("🚌 Tu es coincé sur la plage tant que tu n'as pas repris le bus.")
+                    sfx.play(SfxCatalog.ERROR)
+                }
+                else -> onEnterVille(VilleEntry.FLY_IN)
+            }
+            return
+        }
         // Coincé sur la plage : aucun autre monde tant que le bus n'est pas payé.
         if (save.inPlage && world.id != "plage") {
             onToast("🚌 Tu es coincé sur la plage tant que tu n'as pas repris le bus.")
@@ -248,7 +289,11 @@ private fun WorldsRow(
             playable = save.plageUnlocked,
             selected = save.currentWorld == "plage" && save.plageUnlocked,
         ) { click(WORLD_PLAGE) }
-        WorldCard(WORLD_VILLE, playable = false, selected = false) { click(WORLD_VILLE) }
+        WorldCard(
+            WORLD_VILLE,
+            playable = save.villeUnlocked,
+            selected = save.currentWorld == Ville.WORLD_ID && save.villeUnlocked,
+        ) { click(WORLD_VILLE) }
     }
 }
 

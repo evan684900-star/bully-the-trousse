@@ -72,6 +72,15 @@ import com.bullythetrousse.core.SpaceSequence
 import com.bullythetrousse.core.SpaceState
 import com.bullythetrousse.core.ThrowSequence
 import com.bullythetrousse.core.ThrowState
+import com.bullythetrousse.core.Ville
+import com.bullythetrousse.core.VilleEvents
+import com.bullythetrousse.core.VilleRooftop
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.foundation.layout.offset
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 
 /**
@@ -90,12 +99,45 @@ fun GameScreen(
     onSaveChange: (GameSave) -> Unit,
     onBackToMenu: () -> Unit,
     onOpenShop: () -> Unit,
+    /** Toit de la Ville : "← Réception" redescend par l'ascenseur. */
+    onBackToReception: () -> Unit = {},
+    /** Plage : un lancer parfait s'est encastré dans un avion — direction la Ville. */
+    onPlaneCrash: () -> Unit = {},
 ) {
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
     val sfx = LocalSfx.current
+    val isVille = save.currentWorld == Ville.WORLD_ID
+    var toast by remember { mutableStateOf<String?>(null) }
+    // Monde Ville : la graine des flaques est retirée à chaque nouveau lancer
+    // (villeResetThrow), et le pilote du lancer en cours gère glissade/relance.
+    var rooftopSeed by remember { mutableDoubleStateOf(kotlin.random.Random.nextDouble() * 1000) }
+    var rooftopFlight by remember { mutableStateOf<RooftopFlight?>(null) }
+    val planeCrash = remember { PlaneCrashFlight() }
+    var canvasWidth by remember { mutableFloatStateOf(1080f) }
+    // La distance et le "parfait" réellement obtenus : sur le toit, une
+    // flaque prolonge le lancer au-delà de la distance calculée au départ.
+    var outcome by remember { mutableStateOf<Pair<Double, Boolean>?>(null) }
+    // Horloge du compte à rebours de la canicule.
+    var clock by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(isVille) {
+        while (isVille) {
+            clock = System.currentTimeMillis()
+            delay(250)
+        }
+    }
 
     fun tap() {
+        // Canicule : la trousse se repose, impossible de lancer (startChargingPower).
+        val startsNewThrow = state is ThrowState.Idle || state is ThrowState.Landed
+        if (startsNewThrow && VilleRooftop.isResting(save, System.currentTimeMillis())) {
+            sfx.play(SfxCatalog.ERROR)
+            return
+        }
+        if (startsNewThrow) {
+            outcome = null
+            rooftopSeed = kotlin.random.Random.nextDouble() * 1000
+        }
         // Trousse Claude : fenêtre du lancer parfait élargie (isClaude côté web).
         val equippedSkin = Skins.find(save.equippedSkin)
         val perfectWindow =
@@ -149,7 +191,11 @@ fun GameScreen(
                 onClick = {
                     // En apesanteur, le tap sert au QTE — pas à relancer.
                     val space = spaceFlight
-                    if (space?.state != null) {
+                    if (planeCrash.state != null) {
+                        // Encastrée dans l'avion : plus rien à faire.
+                    } else if (rooftopFlight?.tap() == true) {
+                        // Toit de la Ville : relance depuis la flaque.
+                    } else if (space?.state != null) {
                         val ringsBefore = space.state?.ringResults?.size ?: 0
                         space.tap()
                         // advanceQteRing(hit) : sfxCharge() si touché, sinon sfxError().
@@ -178,6 +224,13 @@ fun GameScreen(
             },
             onSpaceFlight = { spaceFlight = it },
             onVampireBoost = { vampireBoost = it },
+            rooftopSeed = rooftopSeed,
+            onRooftop = { rooftopFlight = it },
+            planeCrash = planeCrash,
+            canvasWidth = { canvasWidth.toDouble() },
+            onPlaneCrash = onPlaneCrash,
+            onOutcome = { outcome = it },
+            onHeatRest = { toast = "🥵 Canicule ! La trousse doit se reposer 2 minutes à l'ombre." },
         )
         ThrowCanvas(
             flightState = flight.state,
@@ -185,19 +238,25 @@ fun GameScreen(
             equippedSkin = save.equippedSkin,
             equippedTrail = save.equippedTrail,
             spaceState = spaceFlight?.state,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxSize().onSizeChanged { canvasWidth = it.width.toFloat() },
+            rooftop = if (isVille) RooftopView(rooftopFlight?.puddleSeed ?: rooftopSeed) else null,
+            planeCrash = planeCrash.state,
+            equippedCosmetic = save.equippedCosmetic,
         )
-        // #screen-game .sky-anim { bottom: 32% } — jour/nuit selon save.theme
-        SkyAnimation(heightFraction = 0.68f, night = save.theme != "light", world = save.currentWorld)
+        // #screen-game .sky-anim { bottom: 32% } — jour/nuit selon save.theme.
+        // Pas sur le toit de la Ville : son ciel suit l'heure réelle.
+        if (!isVille) SkyAnimation(heightFraction = 0.68f, night = save.theme != "light", world = save.currentWorld)
 
         Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
-            // .back-btn : coin haut-gauche, 10px de marge.
+            // .back-btn : coin haut-gauche, 10px de marge. Sur le toit de la
+            // Ville, on redescend à la réception plutôt qu'au menu.
+            val toReception = isVille && save.inVille
             GameButton(
-                "← Menu",
+                if (toReception) "← Réception" else "← Menu",
                 secondary = true,
                 small = true,
                 modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
-                onClick = onBackToMenu,
+                onClick = if (toReception) onBackToReception else onBackToMenu,
             )
 
             // .hud-top : sous le bouton retour, argent à gauche, distance à droite.
@@ -209,7 +268,16 @@ fun GameScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 MoneyPill("💰 ${save.money} $", small = true)
-                MoneyPill("📏 ${"%.0f".format(landedDistance)} m", small = true, color = TextColor)
+                val crash = planeCrash.state
+                if (crash != null) {
+                    // "???" qui clignote, puis la pastille s'efface avec les nuages.
+                    val alpha = if (crash.sweepStart != null) {
+                        (1f - crash.sweep.toFloat() * 1.6f).coerceIn(0f, 1f)
+                    } else if ((crash.t * 3).toInt() % 2 != 0) 0.2f else 1f
+                    MoneyPill("📏 ??? m", small = true, color = TextColor, modifier = Modifier.alpha(alpha))
+                } else {
+                    MoneyPill("📏 ${"%.0f".format(landedDistance)} m", small = true, color = TextColor)
+                }
             }
 
             // .hint-text (bottom: 90px) et #meter-wrap (bottom: 70px)
@@ -218,8 +286,18 @@ fun GameScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
-                HintText(spaceFlight?.state?.let { hintForSpace(it) } ?: hintFor(current))
-                Meter(current)
+                val rooftopPhase = rooftopFlight?.phase
+                val restLeft = if (isVille && current is ThrowState.Idle) VilleRooftop.restSecondsLeft(save, clock) else 0L
+                val hint = when {
+                    planeCrash.state != null -> ""
+                    rooftopPhase == RooftopPhase.AIMING -> "💦 Ça glisse ! Vise pour repartir encore plus vite !"
+                    rooftopPhase == RooftopPhase.SLIDING -> ""
+                    spaceFlight?.state != null -> hintForSpace(spaceFlight!!.state!!)
+                    restLeft > 0 -> "🥵 Trop chaud ! La trousse se repose encore ${VilleRooftop.formatRest(restLeft)}"
+                    else -> hintFor(current)
+                }
+                HintText(hint)
+                if (rooftopPhase == RooftopPhase.AIMING) PuddleAimMeter(rooftopFlight!!) else if (planeCrash.state == null) Meter(current)
             }
 
             // Le panneau n'apparaît qu'une fois la trousse VRAIMENT immobilisée :
@@ -230,8 +308,8 @@ fun GameScreen(
             if (current is ThrowState.Landed && flight.resolved) {
                 ResultPanel(
                     save = save,
-                    distanceMeters = current.result.distanceMeters,
-                    isPerfect = current.result.isPerfect,
+                    distanceMeters = outcome?.first ?: current.result.distanceMeters,
+                    isPerfect = outcome?.second ?: current.result.isPerfect,
                     onThrowAgain = { tap() },
                     onOpenShop = onOpenShop,
                     modifier = Modifier.align(Alignment.Center),
@@ -261,6 +339,56 @@ fun GameScreen(
             jackpot = coinJackpot,
             onDismiss = { coinMultiplier = null },
         )
+        Toast(message = toast, onDismiss = { toast = null })
+    }
+}
+
+/**
+ * La barre de relance après une glissade sur une flaque (`puddle_aim`) :
+ * la même que la visée d'un lancer, mais qui tremble beaucoup et oscille
+ * plus vite (voir [VilleRooftop.aimValue]).
+ */
+@Composable
+private fun PuddleAimMeter(rooftop: RooftopFlight) {
+    var value by remember { mutableDoubleStateOf(0.0) }
+    var jitter by remember { mutableStateOf(Offset.Zero) }
+    LaunchedEffect(rooftop.aimStartedAtMillis) {
+        while (true) {
+            withFrameNanos { }
+            value = rooftop.aimValue(System.currentTimeMillis())
+            jitter = Offset((kotlin.random.Random.nextFloat() - 0.5f) * 22f, (kotlin.random.Random.nextFloat() - 0.5f) * 14f)
+        }
+    }
+    val shape = RoundedCornerShape(999.dp)
+    Box(
+        modifier = Modifier
+            .offset(x = jitter.x.dp, y = jitter.y.dp)
+            .widthIn(max = 420.dp)
+            .fillMaxWidth(0.8f)
+            .height(26.dp)
+            .clip(shape)
+            .background(Color(0x8C0A0C14))
+            .border(2.dp, Color(0xFF222633), shape),
+    ) {
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .width(6.dp)
+                .fillMaxHeight()
+                .background(Color.White.copy(alpha = 0.35f)),
+        )
+        val marker = ((value + 1.0) / 2.0).toFloat().coerceIn(0f, 1f)
+        Box(modifier = Modifier.fillMaxSize()) {
+            Box(modifier = Modifier.fillMaxWidth(marker)) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .width(4.dp)
+                        .fillMaxHeight()
+                        .background(Color.White),
+                )
+            }
+        }
     }
 }
 
@@ -378,7 +506,11 @@ private fun ResultPanel(
     modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(18.dp)
-    val record = if (save.currentWorld == "plage") save.plageBestDistance else save.bestDistance
+    val record = when (save.currentWorld) {
+        "plage" -> save.plageBestDistance
+        Ville.WORLD_ID -> save.villeBestDistance
+        else -> save.bestDistance
+    }
     Column(
         modifier = modifier
             .widthIn(min = 260.dp, max = 340.dp)
@@ -430,6 +562,15 @@ private fun ThrowFlight(
     onEarnings: (SkinEarningsResult) -> Unit,
     onSpaceFlight: (SpaceFlight?) -> Unit,
     onVampireBoost: (VampireBoostController?) -> Unit,
+    rooftopSeed: Double,
+    onRooftop: (RooftopFlight?) -> Unit,
+    planeCrash: PlaneCrashFlight,
+    canvasWidth: () -> Double,
+    onPlaneCrash: () -> Unit,
+    /** Distance et "parfait" réellement obtenus, une fois le lancer résolu. */
+    onOutcome: (Pair<Double, Boolean>) -> Unit,
+    /** La canicule vient d'imposer une pause (5e lancer). */
+    onHeatRest: () -> Unit,
 ): FlightDisplay {
     if (state !is ThrowState.Landed) {
         // Après un rebond (Trousse à Baskets), la trousse reste à sa position
@@ -451,6 +592,7 @@ private fun ThrowFlight(
     val sfx = LocalSfx.current
     val result = state.result
     val isBeach = save.currentWorld == "plage"
+    val isVille = save.currentWorld == Ville.WORLD_ID
     var flightFinished by remember(result) { mutableStateOf(false) }
     var beachOutcome by remember(result) { mutableStateOf<BeachFlightOutcome?>(null) }
 
@@ -473,6 +615,14 @@ private fun ThrowFlight(
         onSpaceFlight(if (goesToSpace) spaceFlight else null)
     }
 
+    // Toit de la Ville : les flaques (pas en apesanteur, `!inSpaceMode`).
+    val perfectWindow = if (equipped.isClaude) PhysicsConstants.PERFECT_WINDOW_CLAUDE else PhysicsConstants.PERFECT_WINDOW
+    val rooftop = remember(result) {
+        if (isVille && !goesToSpace) RooftopFlight(perfectWindow, result.isPerfect, rooftopSeed) else null
+    }
+    LaunchedEffect(result) { onRooftop(rooftop) }
+    var rooftopLanding by remember(result) { mutableStateOf<FlightState?>(null) }
+
     // Boost 🦇 : réarmé à chaque lancer (une utilisation par lancer). L'écran
     // n'en reçoit un que tant que la trousse est en l'air — le bouton doit
     // disparaître dès l'atterrissage, comme la condition `state === "flying"`
@@ -482,14 +632,25 @@ private fun ThrowFlight(
         onVampireBoost(if (flightFinished) null else vampireBoost)
     }
 
-    val flightState: FlightState = if (isBeach) {
-        animateBeachFlight(result, vampire = vampireBoost) { _, outcome ->
+    val flightState: FlightState = when {
+        isBeach -> animateBeachFlight(
+            result,
+            vampire = vampireBoost,
+            planeCrash = planeCrash,
+            screenWidth = canvasWidth,
+            onPlaneImpact = { sfx.play(SfxCatalog.CRASH) },
+            onPlaneHandOver = onPlaneCrash,
+        ) { _, outcome ->
             beachOutcome = outcome
             flightFinished = true
             sfx.play(SfxCatalog.LAND)
         }
-    } else {
-        animateFlight(
+        rooftop != null -> animateVilleFlight(result, rooftop, vampire = vampireBoost) { landing ->
+            rooftopLanding = landing
+            flightFinished = true
+            sfx.play(SfxCatalog.LAND)
+        }
+        else -> animateFlight(
             result,
             space = if (goesToSpace) spaceFlight else null,
             vampire = vampireBoost,
@@ -512,7 +673,7 @@ private fun ThrowFlight(
         }
     }
 
-    val displayed = if (isSkidding && !skidFinished) {
+    val displayed = planeCrash.state?.flight ?: if (isSkidding && !skidFinished) {
         animateSkid(landingWorldX = flightState.worldX) { skidFinished = true }
     } else {
         flightState
@@ -525,24 +686,47 @@ private fun ThrowFlight(
     val resolved = flightFinished && skidDecided && (!isSkidding || skidFinished)
     LaunchedEffect(resolved, result) {
         if (!resolved) return@LaunchedEffect
+        // Sur le toit, une flaque prolonge le lancer : c'est la position
+        // finale qui fait foi (`worldX / SCALE` dans onLanded() côté site).
+        val distance = rooftopLanding?.let { it.worldX / PhysicsConstants.SCALE } ?: result.distanceMeters
+        val isPerfect = rooftop?.perfect ?: result.isPerfect
+        onOutcome(distance to isPerfect)
         val equippedSkin = Skins.find(save.equippedSkin)
         val totalPuissance = SkinStats.totalPuissance(save)
         val totalVitesse = SkinStats.totalVitesse(save)
-        val baseEarn = Economy.moneyEarned(result.distanceMeters, result.isPerfect, totalPuissance + totalVitesse)
-        val earnings: SkinEarningsResult = SkinEarnings.apply(baseEarn, equippedSkin, result.distanceMeters)
+        // +20 % en Ville, après le bonus des niveaux et avant la Pièce/le Vampire.
+        val baseEarn = Ville.applyEarnMultiplier(
+            Economy.moneyEarned(distance, isPerfect, totalPuissance + totalVitesse),
+            save,
+        )
+        val earnings: SkinEarningsResult = SkinEarnings.apply(baseEarn, equippedSkin, distance)
         onEarnings(earnings)
 
-        // Record par monde : le monde normal et la plage ont chacun le leur.
-        val previousRecord = if (isBeach) save.plageBestDistance else save.bestDistance
-        if (result.distanceMeters > previousRecord) sfx.play(SfxCatalog.RECORD)
-        var updated = if (isBeach) {
-            save.copy(
-                plageBestDistance = maxOf(save.plageBestDistance, result.distanceMeters),
+        // Record par monde : la cour, la plage et le toit ont chacun le leur.
+        val previousRecord = when {
+            isBeach -> save.plageBestDistance
+            isVille -> save.villeBestDistance
+            else -> save.bestDistance
+        }
+        if (distance > previousRecord) sfx.play(SfxCatalog.RECORD)
+        var updated = when {
+            isBeach -> save.copy(
+                plageBestDistance = maxOf(save.plageBestDistance, distance),
                 plageThrows = save.plageThrows + 1,
                 plageMoneyEarned = save.plageMoneyEarned + earnings.finalEarn,
             )
-        } else {
-            save.copy(bestDistance = maxOf(save.bestDistance, result.distanceMeters))
+            isVille -> save.copy(
+                villeBestDistance = maxOf(save.villeBestDistance, distance),
+                villeMoneyEarned = save.villeMoneyEarned + earnings.finalEarn,
+                villePuddles = save.villePuddles + (rooftop?.slides ?: 0),
+            )
+            else -> save.copy(bestDistance = maxOf(save.bestDistance, distance))
+        }
+        if (isVille) {
+            val event = VilleEvents.activeEvent(System.currentTimeMillis())?.type
+            val (counted, restStarted) = VilleRooftop.onThrowCounted(updated, event, System.currentTimeMillis())
+            updated = counted
+            if (restStarted) onHeatRest()
         }
         updated = updated.copy(
             money = updated.money + earnings.finalEarn,
@@ -560,12 +744,12 @@ private fun ThrowFlight(
         // Défis quotidiens (voir bumpDailyChallenge() côté web).
         updated = DailyChallenges.ensure(updated, LocalDate.now().toString(), totalPuissance, totalVitesse)
         updated = DailyChallenges.bump(updated, "throws", 1.0, BumpMode.ADD)
-        updated = DailyChallenges.bump(updated, "distance", result.distanceMeters, BumpMode.MAX)
-        updated = DailyChallenges.bump(updated, "distanceCumul", result.distanceMeters, BumpMode.ADD)
+        updated = DailyChallenges.bump(updated, "distance", distance, BumpMode.MAX)
+        updated = DailyChallenges.bump(updated, "distanceCumul", distance, BumpMode.ADD)
         updated = DailyChallenges.bump(updated, "earn", earnings.finalEarn.toDouble(), BumpMode.ADD)
-        if (result.isPerfect) updated = DailyChallenges.bump(updated, "perfect", 1.0, BumpMode.ADD)
+        if (isPerfect) updated = DailyChallenges.bump(updated, "perfect", 1.0, BumpMode.ADD)
         if (isSkidding) updated = DailyChallenges.bump(updated, "skid", 1.0, BumpMode.ADD)
-        if (result.isPerfect) updated = updated.copy(hasPerfectThrow = true)
+        if (isPerfect) updated = updated.copy(hasPerfectThrow = true)
 
         // Passage par l'apesanteur : le succès de l'easter egg, et celui des
         // réflexes parfaits si tous les anneaux ont été réussis d'affilée.

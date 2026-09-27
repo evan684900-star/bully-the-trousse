@@ -2,13 +2,23 @@ package com.bullythetrousse.app
 
 /**
  * Le journal des changements du site (`CHANGELOG` dans index.html), repris
- * intégralement : 96 versions, dans le même ordre, avec leurs entrées
+ * intégralement : 97 versions, dans le même ordre, avec leurs entrées
  * majeures et mineures en français. Accessible en touchant le numéro de
  * version sur le menu, comme `#version-tag` côté web.
  */
 data class ChangelogEntry(val version: String, val major: List<String>, val minor: List<String>)
 
 val CHANGELOG: List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.0.0",
+        listOf(
+            "Nouveau monde : la Ville ! Un lancer parfait sur la Plage, juste avant le sommet de la trajectoire, finit encastré sur le flanc d'un avion de ligne... direction la Ville. Là-bas, la trousse se déplace à pied : aéroport, rue (attention au passage piéton), La Trousserie et la Tour. On n'en repart qu'en reprenant un vol à l'aéroport",
+            "Sur le toit de la Tour, un nouveau terrain de lancer : tout y coûte 20% plus cher, mais rapporte 20% de plus. Des évènements (coupure de courant, fuite d'eau, pluie, canicule) y tombent au même moment pour tous les joueurs, annoncés sur le tableau de la réception",
+            "Un mode histoire, jusqu'au générique",
+            "La Trousserie : des cosmétiques purement décoratifs (nœud papillon, casquette, couronne...) à porter sur n'importe quel skin",
+        ),
+        listOf(),
+    ),
     ChangelogEntry("10.2.2", listOf(), listOf("Ajoute un délai de 30s entre deux envois de cadeaux, pour empêcher le spam")),
     ChangelogEntry("10.2.1", listOf(), listOf("Chance de bonus de la Trousse Pièce augmentée (40% → 50%)")),
     ChangelogEntry("10.2.0", listOf("8 nouveaux succès : Étourdi (oublier son argent à la plage), 20 000m et 50 000m, Multimillionnaire (10M\$), Change de tête (choisir un avatar), 5000m à la plage, 1000 lancers, et Niveau 100"), listOf()),

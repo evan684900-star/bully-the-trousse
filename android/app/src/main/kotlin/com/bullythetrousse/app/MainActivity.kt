@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -22,6 +23,9 @@ import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.GraphicsQuality
+import com.bullythetrousse.core.Ville
+import com.bullythetrousse.core.VilleEntry
+import com.bullythetrousse.core.VilleMusic
 import com.bullythetrousse.core.VolcanoCinematic
 
 /**
@@ -74,6 +78,12 @@ sealed interface Screen {
     data object VolcanoCinematic : Screen
     data object BeachCinematic : Screen
 
+    /** Le monde Ville en plateforme (voir VilleScreen), et par où on y entre. */
+    data class Ville(val entry: VilleEntry) : Screen
+
+    /** La boutique ouverte depuis le résultat d'un lancer sur le toit de la Ville. */
+    data object VilleShop : Screen
+
     /** Le profil public d'un autre joueur, ouvert depuis le classement. */
     data class PlayerProfile(val uid: String) : Screen
 }
@@ -102,8 +112,13 @@ private fun Screen.isModal(): Boolean = this in MODAL_SCREENS
 fun GameRoot() {
     val context = LocalContext.current
     val repository = remember { SaveRepository(context) }
-    var save by remember { mutableStateOf(repository.load()) }
+    // On reste en Ville d'une session à l'autre tant qu'on n'a pas repris
+    // l'avion (voir Ville.normalizeOnLoad, l'initialisation du site).
+    var save by remember { mutableStateOf(Ville.normalizeOnLoad(repository.load())) }
     var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
+    // Le mode histoire de la Ville fait taire la musique du monde.
+    var villeMusic by remember { mutableStateOf(VilleMusic.WORLD) }
+    var menuToast by remember { mutableStateOf<String?>(null) }
     // Le dernier écran de fond : une modale se pose PAR-DESSUS lui sans le
     // remplacer (voir isModal), donc il faut le retenir pour continuer à le
     // dessiner derrière le voile.
@@ -123,7 +138,11 @@ fun GameRoot() {
     }
 
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
-    WorldMusic(world = save.currentWorld, muted = save.musicMuted)
+    WorldMusic(
+        world = save.currentWorld,
+        muted = save.musicMuted,
+        paused = screen is Screen.Ville && villeMusic != VilleMusic.WORLD,
+    )
 
     // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
     // et sans effet tant que app/google-services.json n'est pas là : le jeu
@@ -158,6 +177,11 @@ fun GameRoot() {
                 if (!destination.isModal()) baseScreen = destination
                 screen = destination
             },
+            ville = VilleNav(
+                menuToast = menuToast,
+                onMenuToast = { menuToast = it },
+                onMusicChange = { villeMusic = it },
+            ),
         )
     }
 }
@@ -176,6 +200,7 @@ private fun GameContent(
     baseScreen: Screen,
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
+    ville: VilleNav,
 ) {
     // Une modale se pose par-dessus l'écran de fond, assombri à 50 % —
     // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. Sans ça
@@ -188,6 +213,7 @@ private fun GameContent(
             repository = repository,
             updateSave = updateSave,
             goTo = goTo,
+            ville = ville,
         )
         // Le voile avale les taps : sans ça, toucher une zone vide des
         // Réglages actionnerait le bouton du menu resté visible dessous.
@@ -210,6 +236,7 @@ private fun GameContent(
         repository = repository,
         updateSave = updateSave,
         goTo = goTo,
+        ville = ville,
     )
 
     // Tutoriel du tout premier lancement (showTutorialIfNeeded() côté web) :
@@ -222,7 +249,8 @@ private fun GameContent(
     // .links-btn + .corner-icons-right : en position:fixed côté web, donc
     // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
     // qui occupent l'écran entier.
-    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    // Le monde Ville masque aussi la barre (`body.ville-active` côté site).
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic || screen is Screen.Ville
     if (!inCinematic) {
         BottomBar(
             musicMuted = save.musicMuted,
@@ -233,6 +261,13 @@ private fun GameContent(
     }
 }
 
+/** Ce que le monde Ville partage avec le reste de l'app. */
+private class VilleNav(
+    val menuToast: String?,
+    val onMenuToast: (String?) -> Unit,
+    val onMusicChange: (VilleMusic) -> Unit,
+)
+
 /** Un écran, sans le décor commun (voile des modales, tutoriel, barre du bas). */
 @Composable
 private fun ScreenContent(
@@ -242,6 +277,7 @@ private fun ScreenContent(
     repository: SaveRepository,
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
+    ville: VilleNav,
 ) {
     when (screen) {
         Screen.Menu -> MenuScreen(
@@ -256,6 +292,9 @@ private fun ScreenContent(
             onStartVolcanoCinematic = { goTo(Screen.VolcanoCinematic) },
             onStartBeachCinematic = { goTo(Screen.BeachCinematic) },
             onOpenChangelog = { goTo(Screen.Changelog) },
+            onEnterVille = { goTo(Screen.Ville(it)) },
+            initialToast = ville.menuToast,
+            onInitialToastShown = { ville.onMenuToast(null) },
         )
 
         Screen.Leaderboard -> LeaderboardScreen(
@@ -290,7 +329,11 @@ private fun ScreenContent(
             save = save,
             onSaveChange = updateSave,
             onBackToMenu = { goTo(Screen.Menu) },
-            onOpenShop = { goTo(Screen.Shop) },
+            // En Ville : la boutique s'ouvre "à la Ville" (croix de retour),
+            // et le retour mène à la réception par l'ascenseur.
+            onOpenShop = { goTo(if (save.currentWorld == Ville.WORLD_ID) Screen.VilleShop else Screen.Shop) },
+            onBackToReception = { goTo(Screen.Ville(VilleEntry.ELEVATOR)) },
+            onPlaneCrash = { goTo(Screen.Ville(VilleEntry.ARRIVAL)) },
         )
 
         Screen.Shop -> ShopScreen(
@@ -299,6 +342,31 @@ private fun ScreenContent(
             onBackToMenu = { goTo(Screen.Menu) },
             onBackToGame = { goTo(Screen.Game) },
         )
+
+        Screen.VilleShop -> ShopScreen(
+            save = save,
+            onSaveChange = updateSave,
+            onBackToMenu = { goTo(Screen.Menu) },
+            onBackToGame = { goTo(Screen.Game) },
+            villeMode = true,
+            onCloseVille = { goTo(Screen.Game) },
+        )
+
+        // Une entrée différente = une partie de Ville repartie de zéro.
+        is Screen.Ville -> key(screen) {
+            VilleScreen(
+            entry = screen.entry,
+            save = save,
+            onSaveChange = updateSave,
+            onMusicChange = ville.onMusicChange,
+            onExitToMenu = { goTo(Screen.Menu) },
+            onGoRooftop = { goTo(Screen.Game) },
+            onLeaveVille = {
+                ville.onMenuToast("✈️ Bon vol !")
+                goTo(Screen.Menu)
+            },
+            )
+        }
 
         Screen.Settings -> SettingsScreen(
             save = save,
@@ -320,12 +388,12 @@ private fun ScreenContent(
 
         Screen.Changelog -> ChangelogScreen(onBack = { goTo(Screen.Menu) })
 
-        Screen.VolcanoCinematic -> VolcanoCinematicScreen(equippedSkin = save.equippedSkin, onFinished = { outcome ->
+        Screen.VolcanoCinematic -> VolcanoCinematicScreen(equippedSkin = save.equippedSkin, equippedCosmetic = save.equippedCosmetic, onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
             goTo(Screen.Menu)
         })
 
-        Screen.BeachCinematic -> BeachCinematicScreen(equippedSkin = save.equippedSkin, onFinished = {
+        Screen.BeachCinematic -> BeachCinematicScreen(equippedSkin = save.equippedSkin, equippedCosmetic = save.equippedCosmetic, onFinished = {
             updateSave(BeachCinematic.applyOutcome(save))
             goTo(Screen.Menu)
         })

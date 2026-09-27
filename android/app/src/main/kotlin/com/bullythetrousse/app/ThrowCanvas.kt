@@ -25,6 +25,13 @@ import com.bullythetrousse.core.BeachEvents
 import com.bullythetrousse.core.BeachLandingOutcome
 import com.bullythetrousse.core.BeachPropType
 import com.bullythetrousse.core.Camera
+import com.bullythetrousse.core.PlaneCrash
+import com.bullythetrousse.core.PlaneCrashState
+import com.bullythetrousse.core.Puddle
+import com.bullythetrousse.core.VilleEventType
+import com.bullythetrousse.core.VilleEvents
+import com.bullythetrousse.core.VilleRooftop
+import androidx.compose.ui.text.rememberTextMeasurer
 import com.bullythetrousse.core.CourDecor
 import com.bullythetrousse.core.FlightSimulator
 import com.bullythetrousse.core.FlightState
@@ -76,6 +83,12 @@ fun ThrowCanvas(
     groundVerticalFraction: Float = 0.68f,
     // `#game-canvas` occupe tout l'écran côté web.
     modifier: Modifier = Modifier.fillMaxSize(),
+    /** Monde Ville : le toit-terrain de lancer (évènement du moment et flaques). */
+    rooftop: RooftopView? = null,
+    /** Le crash sur l'avion, depuis la Plage (voir [PlaneCrashFlight]). */
+    planeCrash: PlaneCrashState? = null,
+    /** Cosmétique de La Trousserie porté par la trousse ("" = aucun). */
+    equippedCosmetic: String = "",
 ) {
     // Horloge d'ambiance (nuages, vagues) : tourne en continu tant que le
     // Canvas est affiché, indépendamment de l'état du lancer — sans elle,
@@ -103,6 +116,7 @@ fun ThrowCanvas(
     val spriteFilter = spriteFilterQuality()
 
     val trailPoints = remember { mutableListOf<TrailPoint>() }
+    val textMeasurer = rememberTextMeasurer(cacheSize = 64)
     val trailRgb = remember(equippedTrail) { Trails.ALL.firstOrNull { it.id == equippedTrail }?.rgb ?: "255,255,255" }
 
     Canvas(modifier = modifier) {
@@ -115,8 +129,16 @@ fun ThrowCanvas(
 
         // Pendant l'apesanteur, c'est le décor spatial qui remplace le monde —
         // et les nuages de la transition cachent la bascule, comme côté site.
+        val ctx = Ctx2D(this, textMeasurer)
+        val detail = density // voir drawRooftop : décor à l'échelle de la trousse
         if (spaceState != null) {
             drawSpaceBackdrop(cameraX, groundScreenY, animationTimeSeconds)
+        } else if (world == "ville" && rooftop != null) {
+            val w = size.width.toDouble()
+            ctx.drawRooftop(
+                size.width, size.height, cameraX.toFloat(), groundScreenY, rooftop.event,
+                rooftop.puddles(cameraX - 200 * detail, cameraX + w + 200 * detail), detail,
+            )
         } else {
             drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds)
         }
@@ -140,6 +162,8 @@ fun ThrowCanvas(
             )
         }
 
+        if (planeCrash != null) ctx.drawCrashPlane(planeCrash, cameraX.toFloat(), groundScreenY, detail)
+
         val worldY = flightState?.worldY ?: 0.0
         val screen = Camera.worldToScreen(
             worldX = flightState?.worldX ?: 0.0,
@@ -156,7 +180,13 @@ fun ThrowCanvas(
             rotationRadians = (flightState?.rotation ?: 0.0).toFloat(),
             colorFilter = skinFilter,
             filterQuality = spriteFilter,
+            cosmetic = equippedCosmetic,
         )
+
+        if (world == "ville" && rooftop != null && spaceState == null) {
+            ctx.drawVilleWeather(size.width, size.height, groundScreenY, rooftop.event, detail)
+        }
+        if (planeCrash != null) ctx.drawCrashClouds(planeCrash, detail)
 
         if (spaceState != null) {
             when (spaceState.phase) {
@@ -752,6 +782,12 @@ data class BeachFlightOutcome(val parasolBounced: Boolean, val towelFound: Boole
 fun animateBeachFlight(
     result: ThrowResult,
     vampire: VampireBoostController? = null,
+    /** Le crash sur l'avion : un lancer parfait peut s'y encastrer (voir [PlaneCrash]). */
+    planeCrash: PlaneCrashFlight? = null,
+    /** Largeur du canvas (px) : l'avion arrive de derrière le bord gauche. */
+    screenWidth: () -> Double = { 1080.0 },
+    onPlaneImpact: () -> Unit = {},
+    onPlaneHandOver: () -> Unit = {},
     onLanded: (FlightState, BeachFlightOutcome) -> Unit,
 ): FlightState {
     var state by remember(result) { mutableStateOf(result.toInitialFlightState()) }
@@ -774,6 +810,18 @@ fun animateBeachFlight(
             lastFrameMillis = now
             if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
             state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
+            // Monde Plage : un lancer parfait, juste avant l'apogée, finit
+            // encastré sur le flanc d'un avion de ligne — direction la Ville.
+            // Le lancer ne se termine jamais : pas d'atterrissage ni de gain.
+            if (planeCrash != null && PlaneCrash.shouldStart("plage", result.isPerfect, inSpaceMode = false, flight = state)) {
+                planeCrash.run(
+                    PlaneCrash.start(state, rotSpeed, screenWidth()),
+                    result.effectiveGravity,
+                    onImpact = onPlaneImpact,
+                    onHandOver = onPlaneHandOver,
+                )
+                return@LaunchedEffect
+            }
             if (state.hasLanded) {
                 when (Beach.landingOutcome(events, used, inSpaceMode = false)) {
                     BeachLandingOutcome.PARASOL_BOUNCE -> {
@@ -828,4 +876,63 @@ fun animateSkid(landingWorldX: Double, onFinished: (finalWorldX: Double) -> Unit
     }
 
     return state
+}
+
+/**
+ * Ce que le canvas doit savoir du toit de la Ville pour le dessiner : la
+ * graine des flaques du lancer en cours. L'évènement, lui, est relu à chaque
+ * image (le calendrier avance pendant qu'on joue).
+ */
+class RooftopView(private val puddleSeed: Double) {
+    val event: VilleEventType? get() = VilleEvents.activeEvent(System.currentTimeMillis())?.type
+    fun puddles(fromX: Double, toX: Double): List<Puddle> = VilleRooftop.puddlesInRange(fromX, toX, event, puddleSeed)
+}
+
+/**
+ * L'avion du crash et ses traits de vitesse (`drawPlaneCrashPlane()`).
+ * [k] : voir drawRooftop — l'avion est dessiné à l'échelle de la trousse,
+ * ancré au point où elle s'encastre pour que les deux coïncident.
+ */
+internal fun Ctx2D.drawCrashPlane(pc: PlaneCrashState, cameraX: Float, groundScreenY: Float, k: Float) {
+    val scale = PlaneCrash.PLANE_SCALE.toFloat() * k
+    val stick = (PlaneCrash.STICK_X * PlaneCrash.PLANE_SCALE).toFloat()
+    val shakeX = (kotlin.random.Random.nextFloat() - 0.5f) * pc.shake.toFloat() * k
+    val shakeY = (kotlin.random.Random.nextFloat() - 0.5f) * pc.shake.toFloat() * k
+    // Le point d'encastrement (px + STICK_X) est un point du MONDE ; le
+    // centre de l'avion en est à STICK_X * échelle, dans le repère agrandi.
+    val sx = pc.px.toFloat() + stick - cameraX - stick * k + shakeX
+    val sy = groundScreenY - pc.py.toFloat() + shakeY
+    saved {
+        stroke(Ctx2D.rgba(255, 255, 255, 0.35f)); lineWidth = 2f * k
+        for (i in 0 until 6) {
+            val yy = sy + (-40 + i * 16) * k
+            line(sx - (300 * PlaneCrash.PLANE_SCALE.toFloat() + 40 + i * 13) * k, yy, sx - (300 * PlaneCrash.PLANE_SCALE.toFloat() + 180 + i * 25) * k, yy)
+        }
+    }
+    drawAirliner(sx, sy, scale, dir = 1)
+}
+
+/** Les nuages qui balaient l'écran de droite à gauche au bout de 3 s (`drawPlaneCrashClouds()`). */
+internal fun Ctx2D.drawCrashClouds(pc: PlaneCrashState, k: Float) {
+    if (pc.sweepStart == null) return
+    val w = ds.size.width
+    val h = ds.size.height
+    val p = minOf(1f, pc.sweep.toFloat())
+    val edge = w * (1.08f - 1.5f * p * p)
+    saved {
+        fill(Ctx2D.hex("#eef3f8"))
+        fillRect(edge + 70 * k, 0f, w - edge + 80 * k, h)
+        for (i in 0 until 9) {
+            val cy = (i / 8f) * h
+            val r = (90 + sr(i * 5.1) * 70) * k
+            beginPath()
+            arc(edge + sr(i * 2.3) * 70 * k, cy, r, 0f, (2 * Math.PI).toFloat())
+            arc(edge + (90 + sr(i * 9.7) * 60) * k, cy + 30 * k, r * 0.9f, 0f, (2 * Math.PI).toFloat())
+            fill()
+        }
+        if (p >= 0.92f) {
+            alpha = (p - 0.92f) / 0.08f
+            fillRect(0f, 0f, w, h)
+        }
+    }
 }
