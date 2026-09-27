@@ -45,11 +45,14 @@ object TrailShop {
         data object NotEnoughMoney : PurchaseResult
     }
 
+    /** Le prix réellement débité : +20 % en Ville (voir [Ville.price]). */
+    fun price(save: GameSave, trailId: String): Int = Ville.price(Trails.find(trailId).cost, save)
+
     fun buy(save: GameSave, trailId: String): PurchaseResult {
-        val trail = Trails.find(trailId)
-        if (save.money < trail.cost) return PurchaseResult.NotEnoughMoney
+        val cost = price(save, trailId)
+        if (save.money < cost) return PurchaseResult.NotEnoughMoney
         return PurchaseResult.Success(
-            save.copy(money = save.money - trail.cost, ownedTrails = save.ownedTrails + trailId, equippedTrail = trailId),
+            save.copy(money = save.money - cost, ownedTrails = save.ownedTrails + trailId, equippedTrail = trailId),
         )
     }
 

@@ -70,10 +70,13 @@ object SkinShop {
         data object NotEnoughMoney : PurchaseResult
     }
 
+    /** Le prix réellement débité : +20 % en Ville (voir [Ville.price]). */
+    fun price(save: GameSave, skinId: String): Int = Ville.price(Skins.find(skinId).cost, save)
+
     fun buy(save: GameSave, skinId: String): PurchaseResult {
-        val skin = Skins.find(skinId)
-        if (save.money < skin.cost) return PurchaseResult.NotEnoughMoney
-        val debited = save.copy(money = save.money - skin.cost, ownedSkins = save.ownedSkins + skinId)
+        val cost = price(save, skinId)
+        if (save.money < cost) return PurchaseResult.NotEnoughMoney
+        val debited = save.copy(money = save.money - cost, ownedSkins = save.ownedSkins + skinId)
         return PurchaseResult.Success(equip(debited, skinId))
     }
 

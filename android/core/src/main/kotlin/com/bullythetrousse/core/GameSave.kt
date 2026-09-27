@@ -67,6 +67,44 @@ data class GameSave(
     val plageParasolBounces: Int = 0,
     val plageTowelsFound: Int = 0,
     val plageCastlesCrushed: Int = 0,
+    // --- Monde Ville (voir Ville.kt / VilleEngine.kt) ---
+    /** Arrivé une première fois par l'avion (crash depuis la Plage). */
+    val villeUnlocked: Boolean = false,
+    /** Coincé en Ville tant qu'on ne reprend pas un vol à l'aéroport. */
+    val inVille: Boolean = false,
+    /** A parlé à la réception : l'ascenseur devient utilisable. */
+    val villeReceptionDone: Boolean = false,
+    /** Mode histoire terminé au moins une fois (générique vu). */
+    val villeStoryDone: Boolean = false,
+    val villeStoryRuns: Int = 0,
+    /** Record du toit-terrain de lancer. */
+    val villeBestDistance: Double = 0.0,
+    val villeThrows: Int = 0,
+    val villeMoneyEarned: Int = 0,
+    /** Percuté au passage piéton. */
+    val villeCrosswalkDeaths: Int = 0,
+    /** Pixels parcourus à pied (plateformes) : un flottant côté site, qui
+     *  l'additionne image par image — un Int ne relirait pas sa valeur. */
+    val villeWalked: Double = 0.0,
+    val villeJumps: Int = 0,
+    val villeDashes: Int = 0,
+    val villeStairs: Int = 0,
+    val villeElevator: Int = 0,
+    /** Glissades sur une flaque (fuite d'eau / pluie). */
+    val villePuddles: Int = 0,
+    val villeBossAttempts: Int = 0,
+    val villeHeartsLost: Int = 0,
+    val villeSwordHits: Int = 0,
+    /** Lancers pendant la canicule depuis la dernière pause. */
+    val villeHeatThrows: Int = 0,
+    /** Horodatage (ms) : la trousse se repose jusque-là. */
+    val villeHeatRestUntil: Long = 0L,
+    val villeArrivedAt: Long = 0L,
+    val villeStoryDoneAt: Long = 0L,
+    /** Cosmétiques de La Trousserie (purement décoratifs, voir [Cosmetics]). */
+    val ownedCosmetics: List<String> = emptyList(),
+    /** Un seul porté à la fois, "" = aucun. */
+    val equippedCosmetic: String = "",
     // --- Succès ---
     val unlockedAchievements: List<String> = emptyList(),
     val totalThrows: Int = 0,

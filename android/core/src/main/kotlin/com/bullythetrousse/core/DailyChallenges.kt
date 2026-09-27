@@ -108,6 +108,7 @@ object DailyChallenges {
             money = save.money + challenge.reward,
             totalMoneyEarned = save.totalMoneyEarned + challenge.reward,
         )
-        return ClaimResult.Success(updated, challenge.reward)
+        // recordDailyEarning() : la récompense compte aussi pour la Plage/la Ville.
+        return ClaimResult.Success(Ville.recordWorldEarning(updated, challenge.reward), challenge.reward)
     }
 }

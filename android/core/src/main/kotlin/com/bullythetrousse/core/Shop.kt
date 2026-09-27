@@ -25,7 +25,8 @@ object Shop {
         buyLevel(save, save.vitesseLevel) { s, newLevel -> s.copy(vitesseLevel = newLevel) }
 
     private inline fun buyLevel(save: GameSave, currentLevel: Int, applyLevel: (GameSave, Int) -> GameSave): PurchaseResult {
-        val cost = Economy.upgradeCost(currentLevel)
+        // Monde Ville : tout est 20 % plus cher (voir Ville.price).
+        val cost = Ville.price(Economy.upgradeCost(currentLevel), save)
         if (save.money < cost) return PurchaseResult.NotEnoughMoney
         val debited = save.copy(money = save.money - cost)
         return PurchaseResult.Success(applyLevel(debited, currentLevel + 1), cost)
