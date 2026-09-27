@@ -1192,7 +1192,9 @@
         C.pauseWorldMusic();
         C.playA(C.aBoss, true);
     }
-    function circleRadius() { return clamp(V.VW / 6, 110, 185); }
+    // Rayon des cercles d'attaque du boss (dessin ET zone de dégâts), un
+    // tiers plus petits qu'à l'origine (V.VW / 6, entre 110 et 185).
+    function circleRadius() { return clamp(V.VW / 9, 75, 125); }
     function hurtPlayer() {
         const f = V.story.fight;
         if (P.hurt > 0 || !f || f.over) return;

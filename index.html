@@ -1403,7 +1403,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.2.2</div>
+                <div class="version-tag" id="version-tag">v11.2.3</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -10408,8 +10408,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.2.2";
+    const VERSION_NUMBER = "11.2.3";
     const CHANGELOG = [
+        {
+            version: "11.2.3",
+            major: [],
+            minor: [
+                { fr: "Mode histoire de la Ville : les cercles d'attaque du boss sont environ un tiers plus petits", en: "City story mode: the boss's attack circles are about a third smaller" },
+            ],
+        },
         {
             version: "11.2.2",
             major: [],
