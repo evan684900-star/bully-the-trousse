@@ -215,7 +215,7 @@ Android) avant d'être branché à l'affichage dans `:app`.
   le mettre en pause — un nouvel écran Jeu repart toujours de `Idle`.
 
 - **Monde Ville (v11.0.0)** : portage de `ville.js`, `ville-levels.js` et
-  `ville-art.js`. Côté `:core`, testé (317 tests au total) :
+  `ville-art.js`. Côté `:core`, testé (321 tests au total) :
   - `Ville` (arrivée/départ, prix ×1,2 et gains ×1,2, départs de
     l'aéroport, `normalizeOnLoad`), `VilleEvents` (calendrier coupure/fuite/
     pluie/canicule tiré par le même `mulberry32` que le site, vérifié
@@ -230,6 +230,9 @@ Android) avant d'être branché à l'affichage dans `:app`.
     `sequence {}` Kotlin ; tout ce qui touche l'extérieur (sauvegarde, sons,
     boutique, toit) passe par l'interface `VilleHost`. `VilleEngineTest`
     joue toute l'histoire du début à la fin.
+  - Les 13 succès de la Ville (mêmes identifiants et seuils que le site) et
+    son tutoriel (`Tutorial.VILLE`, généré avec les autres depuis le site),
+    affiché une fois à la première entrée, la Ville figée pendant ce temps.
 
   Côté `:app` : `VilleScreen.kt` (boucle `withFrameNanos`, canvas virtuel
   à la même échelle que le site, transitions iris/fondu/glitch/flou ; la

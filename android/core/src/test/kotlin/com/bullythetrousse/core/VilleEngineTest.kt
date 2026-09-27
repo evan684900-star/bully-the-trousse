@@ -66,6 +66,30 @@ class VilleEngineTest {
     private fun interact() = play(1 / 60.0) { engine.input.interact = true }
 
     @Test
+    fun `le tutoriel de la Ville s'ouvre une seule fois et fige la Ville en attendant`() {
+        var shown = 0
+        var close: (() -> Unit)? = null
+        val tutoHost = object : VilleHost by host {
+            override fun startVilleTutorial(onDone: () -> Unit) { shown++; close = onDone }
+        }
+        val e = VilleEngine(tutoHost, Random(7)).apply { resize(1520.0, 1080.0) }
+        e.enter(VilleEntry.AIRPORT)
+        assertEquals(1, shown)
+        assertTrue(e.lock)
+        val x0 = e.player.x
+        repeat(90) { e.input.right = true; e.frame(1 / 60.0) }
+        assertEquals(x0, e.player.x, "la trousse a bougé pendant le tutoriel")
+        // Ce que fait l'écran à la fermeture : marquer le tutoriel comme vu.
+        host.save = host.save.copy(villeTutorialSeen = true)
+        close!!()
+        assertFalse(e.lock)
+        repeat(90) { e.input.right = true; e.frame(1 / 60.0) }
+        assertTrue(e.player.x > x0)
+        e.enter(VilleEntry.RECEPTION)
+        assertEquals(1, shown)
+    }
+
+    @Test
     fun `le repere virtuel garde 540 px de haut`() {
         assertEquals(2.0, engine.scale)
         assertEquals(760.0, engine.viewWidth)
@@ -324,36 +348,48 @@ class VilleEngineTest {
         playUntil(10.0) { story.stage == 2.0 }
         assertTrue(p.invert, "après le glitch, c'est le joueur qui est inversé")
 
-        // Deuxième rencontre : l'autre répète mot pour mot.
+        // Deuxième rencontre : l'autre répète mot pour mot les deux réponses, dans l'ordre.
         playUntil(20.0, each = { engine.input.right = true }) { story.stage == 2.5 }
         engine.input.right = false
+        playUntil(5.0) { engine.npcs.firstOrNull()?.say == "Tu es... moi ?" }
         playUntil(5.0) { engine.npcs.firstOrNull()?.say == "Hein ? Réponds !" }
         playUntil(10.0) { story.stage == 3.0 }
         assertFalse(p.invert)
 
-        // Troisième rencontre, puis le boss.
-        playUntil(20.0, each = { engine.input.right = true }) { engine.choices != null }
+        // Troisième rencontre : aucun choix, l'autre dit seulement « Et maintenant qui est qui ? ».
+        playUntil(20.0, each = { engine.input.right = true }) { story.stage == 3.5 }
         engine.input.right = false
-        engine.pickChoice(0)
-        playUntil(8.0) { engine.choices != null }
-        engine.pickChoice(1)
-        playUntil(30.0) { story.fight != null }
+        playUntil(5.0, each = { assertNull(engine.choices) }) { engine.npcs.firstOrNull()?.say == "Et maintenant qui est qui ?" }
+        playUntil(30.0, each = { assertNull(engine.choices) }) { story.fight != null }
         assertTrue(p.sword)
         assertEquals(VilleMusic.BOSS, engine.music)
         assertEquals(1, host.save.villeBossAttempts)
         assertEquals(4, engine.platforms().size)
         val boss = assertNotNull(story.boss)
 
-        // Le combat : on se colle au boss et on frappe jusqu'à la victoire.
+        // Le combat : on se colle au boss et on frappe jusqu'à la victoire. À
+        // mi-vie, il lâche sa réplique lettre par lettre.
+        val bossLines = LinkedHashSet<String>()
         playUntil(120.0, each = {
             p.x = boss.x - 58
             p.alt = boss.alt + boss.size * 0.19 - 28
             p.dir = 1
             p.hurt = 1.0 // invulnérable pour le test
             engine.input.attack = true
+            if (boss.say.isNotEmpty()) bossLines += boss.say
         }) { story.fight?.over == true }
         engine.flushStats()
         assertEquals(VilleLevels.BOSS_HP, host.save.villeSwordHits)
+        assertEquals("J", bossLines.first())
+        assertTrue(VilleLevels.HALF_LIFE_TAUNT in bossLines, "réplique de mi-vie jamais écrite en entier")
+
+        // Le boss vaincu, sa musique s'éteint en fondu d'une seconde.
+        play(0.5)
+        assertEquals(VilleMusic.BOSS, engine.music)
+        assertTrue(engine.bossVolume < 0.5f)
+        play(0.6)
+        assertEquals(VilleMusic.SILENT, engine.music)
+        assertEquals(0.5f, engine.bossVolume)
 
         // Victoire : le boss s'effondre, parle, se désintègre ; tout tremble.
         playUntil(40.0) { story.escape != null }
@@ -367,7 +403,7 @@ class VilleEngineTest {
         playUntil(30.0, each = { engine.input.left = true; engine.input.dash = true }) { engine.level.id == "darkroom" }
         engine.input.left = false
         assertTrue(story.escaped)
-        assertEquals(VilleMusic.BOSS, engine.music, "la musique du boss accompagne la sortie")
+        assertEquals(VilleMusic.SILENT, engine.music, "la fuite se fait sans la musique du boss")
 
         // La porte : générique.
         play(1.0) // fin de la transition
@@ -377,9 +413,9 @@ class VilleEngineTest {
         playUntil(3.0) { engine.mode == VilleMode.CREDITS }
         val credits = assertNotNull(engine.credits)
         assertEquals("oh Evan tu as fini mon jeu ?", credits.intro.first())
-        assertEquals("Hein ? Réponds !", credits.answer)
         assertEquals("1 fois", credits.stats.last().second)
-        assertEquals(0.3f, engine.bossVolume)
+        assertEquals(VilleMusic.SILENT, engine.music)
+        assertEquals(0.5f, engine.bossVolume)
 
         engine.endCredits()
         assertTrue(host.save.villeStoryDone)

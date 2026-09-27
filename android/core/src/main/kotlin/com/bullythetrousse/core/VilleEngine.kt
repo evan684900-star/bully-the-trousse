@@ -25,6 +25,9 @@ import kotlin.random.Random
 /** Taille de la trousse (px virtuels). */
 const val VILLE_TS = 64.0
 
+/** Durée du fondu de sortie de la musique du boss (s). */
+const val BOSS_FADE_SECONDS = 1.0
+
 enum class VilleMode { PLAY, ARRIVAL, STAIRS, CREDITS }
 
 /** La musique que l'app doit jouer (voir setLevel()/startFight() côté site). */
@@ -218,6 +221,13 @@ interface VilleHost {
     fun goRooftop()
     fun exitToMenu()
     fun leaveVille(destination: String)
+
+    /**
+     * Le tutoriel du monde Ville (`startVilleTutorial` côté site) : l'écran
+     * l'affiche, marque `villeTutorialSeen`, puis appelle [onDone]. Par
+     * défaut (tests), il est considéré comme lu aussitôt.
+     */
+    fun startVilleTutorial(onDone: () -> Unit) = onDone()
 }
 
 /** Où l'on entre dans la Ville (voir VilleWorld côté site). */
@@ -281,9 +291,12 @@ class VilleEngine(
     var bossMusicStarts = 0
     var footstepsOn = false
         private set
-    /** Volume de la musique du boss (baissé pendant le générique). */
+    /** Volume de la musique du boss (baissé pendant le générique, ou en fondu à sa défaite). */
     var bossVolume = 0.5f
         private set
+    /** Fondu de sortie de la musique du boss : secondes restantes, 0 = aucun. */
+    private var bossFade = 0.0
+    private var bossFadeFrom = 0.5f
     /** Le bouton "← Menu" (masqué dans le mode histoire et le générique). */
     var showBackButton = true
         private set
@@ -397,6 +410,29 @@ class VilleEngine(
     /** `pauseWorldMusic()` : silence (mode histoire). */
     fun silenceMusic() {
         music = VilleMusic.SILENT
+    }
+
+    /**
+     * Boss vaincu (`fadeOutBossMusic()` côté site) : sa musique s'éteint en
+     * fondu d'une seconde, puis retrouve son volume d'origine pour un
+     * prochain combat.
+     */
+    fun fadeOutBossMusic() {
+        if (music != VilleMusic.BOSS) return
+        bossFade = BOSS_FADE_SECONDS
+        bossFadeFrom = bossVolume
+    }
+
+    private fun updateBossFade(dt: Double) {
+        if (bossFade <= 0) return
+        bossFade -= dt
+        if (bossFade <= 0) {
+            bossFade = 0.0
+            if (music == VilleMusic.BOSS) music = VilleMusic.SILENT
+            bossVolume = 0.5f
+        } else {
+            bossVolume = bossFadeFrom * (bossFade / BOSS_FADE_SECONDS).toFloat()
+        }
     }
 
     /* ============ PARTICULES ============ */
@@ -639,9 +675,8 @@ class VilleEngine(
         resetPlayer(x, dir)
         lv.enter()
         snapCamera()
-        // Le mode histoire coupe la musique du monde, mais celle du boss
-        // continue jusqu'au générique (le site ne la met en pause qu'en
-        // quittant la Ville ou en revenant à un niveau normal).
+        // Le mode histoire coupe la musique du monde ; celle du boss continue
+        // d'un niveau à l'autre jusqu'à sa défaite (voir fadeOutBossMusic).
         music = when {
             !lv.story -> VilleMusic.WORLD
             music == VilleMusic.BOSS -> VilleMusic.BOSS
@@ -680,6 +715,7 @@ class VilleEngine(
 
     private fun update(dt: Double) {
         updateTimers(dt)
+        updateBossFade(dt)
         updateTransition(dt)
         tickCoroutine(dt)
         if (messageTimer > 0) {
@@ -804,6 +840,18 @@ class VilleEngine(
         } else if (first) {
             showMessage("✈️ Atterrissage... mouvementé.", 3.0)
         }
+        maybeVilleTutorial()
+    }
+
+    /**
+     * `maybeVilleTutorial()` : une seule fois, à la première entrée dans la
+     * Ville — y compris pour qui y était déjà avant qu'il existe. La Ville
+     * reste figée ([lock]) tant qu'il est affiché.
+     */
+    private fun maybeVilleTutorial() {
+        if (host.save.villeTutorialSeen) return
+        lock = true
+        host.startVilleTutorial { lock = false }
     }
 
     /* ============ ESCALIERS (coupure de courant) : "Gère ton souffle" x7 ============ */
@@ -908,9 +956,10 @@ class VilleEngine(
         hideMessage()
         footsteps(false)
         flushStats()
-        credits = VilleCredits.build(host.save, pseudo, story?.answer2.orEmpty())
+        credits = VilleCredits.build(host.save, pseudo)
         showBackButton = false
-        bossVolume = 0.3f
+        // Baissée seulement si elle joue encore (`!aBoss.paused` côté site).
+        if (music == VilleMusic.BOSS) bossVolume = 0.3f
     }
 
     /** Le joueur a touché l'écran une fois le générique arrêté. */
@@ -956,6 +1005,7 @@ class VilleEngine(
             else -> setLevel("reception", 190.0, 1)
         }
         openingTransition(VilleTransKind.IRIS, 1.2)
+        maybeVilleTutorial()
     }
 
     fun flyIn() {

@@ -7,9 +7,31 @@ import kotlin.test.assertTrue
 
 class AchievementsTest {
     @Test
-    fun `il y a bien 47 succes, avec des ids uniques`() {
-        assertEquals(47, Achievements.ALL.size)
-        assertEquals(47, Achievements.ALL.map { it.id }.toSet().size)
+    fun `il y a bien 60 succes, avec des ids uniques et leurs textes`() {
+        assertEquals(60, Achievements.ALL.size)
+        assertEquals(60, Achievements.ALL.map { it.id }.toSet().size)
+        // Chaque succès a son nom et sa description (clés générées depuis le site).
+        for (a in Achievements.ALL) {
+            val (nameKey, descKey) = ACHIEVEMENT_KEYS.getValue(a.id)
+            assertTrue(I18n.has(nameKey) && I18n.has(descKey), a.id)
+        }
+    }
+
+    @Test
+    fun `les succes de la Ville se debloquent aux memes seuils que sur le site`() {
+        // La même partie que celle testée dans le navigateur côté site.
+        val save = GameSave(
+            villeUnlocked = true, villeThrows = 150, villeBestDistance = 12000.0, villePuddles = 3,
+            villeMoneyEarned = 2_000_000, villeCrosswalkDeaths = 5, villeStairs = 2, ownedCosmetics = listOf("noeud"),
+        )
+        val ville = Achievements.newlyUnlocked(save).map { it.id }.filter { it.startsWith("ville") }.sorted()
+        assertEquals(
+            listOf("villeCosmetique", "villeDebloquee", "villePieton", "villeSalaire", "villeToit100", "villeToit10000m", "villeToit1000m"),
+            ville,
+        )
+        val all = save.copy(villeStoryDone = true, villeBestDistance = 50_000.0, villePuddles = 25, villeMoneyEarned = 25_000_000,
+            villeStairs = 10, ownedCosmetics = Cosmetics.ALL.map { it.id })
+        assertEquals(13, Achievements.newlyUnlocked(all).count { it.id.startsWith("ville") })
     }
 
     @Test

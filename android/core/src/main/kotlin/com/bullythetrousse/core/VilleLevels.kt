@@ -50,6 +50,11 @@ class VilleFight(arenaCenter: Double) {
     /** Coup d'épée en cours de résolution (petit délai), -1 = aucun. */
     var pending = -1.0
     var over = false
+    /** La réplique de mi-vie du boss, écrite lettre par lettre (null avant). */
+    var tauntText: String? = null
+    var tauntShown = 0
+    var tauntTimer = 0.0
+    var tauntDone = false
 }
 
 class VilleStory {
@@ -543,7 +548,12 @@ class VilleLevels(private val e: VilleEngine) {
             e.glitch = 0.7
             yieldAll(fadeNpc(n, 1.0))
             yield(wait(0.5))
-            n.say = st.answer2 // mot pour mot ce que le joueur a dit
+            // Mot pour mot ce que le joueur lui a dit : ses deux réponses, dans l'ordre.
+            n.say = st.answer1
+            yield(wait(2.6))
+            n.say = ""
+            yield(wait(0.4))
+            n.say = st.answer2
             yield(wait(2.6))
             n.say = ""
             yield(wait(1.1)) // le joueur ne répond rien
@@ -560,17 +570,9 @@ class VilleLevels(private val e: VilleEngine) {
             val n = VilleNpc(x = ARENA_X + 70, alt = 0.0, dir = -1, variant = TrousseVariant.PLAYER, alpha = 0.0)
             e.npcs = mutableListOf(n)
             yieldAll(fadeNpc(n, 1.0))
-            yield(wait(0.5))
-            // Mêmes choix qu'à la première rencontre, mais l'autre répète mot pour mot.
-            for (options in listOf(FIRST_QUESTIONS, SECOND_QUESTIONS)) {
-                var said = ""
-                yieldAll(choose(options) { said = it; p.say = it; p.sayT = 2.0 })
-                yield(wait(2.2))
-                n.say = said
-                yield(wait(2.2))
-                n.say = ""
-                yield(wait(0.4))
-            }
+            // Troisième rencontre : pas de choix de dialogue, le joueur ne dit
+            // rien ; l'autre lâche seulement « Et maintenant qui est qui ? ».
+            yield(wait(0.8))
             n.say = "Et maintenant qui est qui ?"
             yield(wait(2.8))
             n.say = ""
@@ -637,7 +639,8 @@ class VilleLevels(private val e: VilleEngine) {
             e.bossMusicStarts++
         }
 
-        private fun circleRadius(): Double = (e.viewWidth / 6).coerceIn(110.0, 185.0)
+        /** Rayon des cercles d'attaque (dessin ET zone de dégâts), un tiers plus petits qu'à l'origine. */
+        private fun circleRadius(): Double = (e.viewWidth / 9).coerceIn(75.0, 125.0)
 
         private fun hurtPlayer() {
             val f = st.fight ?: return
@@ -756,6 +759,36 @@ class VilleLevels(private val e: VilleEngine) {
             }
             f.streakTimer -= dt
             if (f.streakTimer <= 0) f.streak = 0
+            updateTaunt(f, b, dt)
+        }
+
+        /**
+         * À la moitié de sa vie, le boss lâche une réplique lettre par lettre
+         * (même voix que son « ON VA VOIR ÇA »), sans arrêter le combat. Géré à
+         * chaque image plutôt qu'en séquence : une défaite ou une victoire en
+         * plein milieu ne laisse pas une phrase à moitié écrite dans sa bulle.
+         */
+        private fun updateTaunt(f: VilleFight, b: VilleNpc, dt: Double) {
+            if (f.tauntText == null && !f.over && f.hp > 0 && f.hp <= BOSS_HP / 2) f.tauntText = HALF_LIFE_TAUNT
+            val text = f.tauntText ?: return
+            if (f.tauntDone) return
+            if (f.over) {
+                f.tauntDone = true
+                b.say = ""
+                return
+            }
+            f.tauntTimer += dt
+            if (f.tauntShown < text.length) {
+                while (f.tauntShown < text.length && f.tauntTimer >= TAUNT_LETTER_SECONDS) {
+                    f.tauntTimer -= TAUNT_LETTER_SECONDS
+                    f.tauntShown++
+                    if (text[f.tauntShown - 1] != ' ') e.beep(140.0 + f.tauntShown * 8, 0.05, Waveform.SQUARE, 0.05)
+                }
+                b.say = text.substring(0, f.tauntShown)
+            } else if (f.tauntTimer >= TAUNT_HOLD_SECONDS) {
+                f.tauntDone = true
+                b.say = ""
+            }
         }
 
         private fun defeat(): Sequence<VilleWait> = sequence {
@@ -776,6 +809,8 @@ class VilleLevels(private val e: VilleEngine) {
 
         private fun victory(): Sequence<VilleWait> = sequence {
             val b = st.boss ?: return@sequence
+            // Boss vaincu : sa musique s'éteint en fondu pendant qu'il tombe.
+            e.fadeOutBossMusic()
             p.frozen = true
             b.glow = DEFEATED_GLOW
             yield(until {
@@ -923,6 +958,10 @@ class VilleLevels(private val e: VilleEngine) {
         const val BOSS_GLOW = 0xF2FF2846L
         const val DEFEATED_GLOW = 0x99787882L
 
+        /** La réplique du boss à la moitié de sa vie (voir updateTaunt). */
+        const val HALF_LIFE_TAUNT = "JE NE ME LAISSERAI PAS FAIRE !"
+        const val TAUNT_LETTER_SECONDS = 0.1
+        const val TAUNT_HOLD_SECONDS = 1.4
         val FIRST_QUESTIONS = listOf("Qui es-tu ?", "Tu es... moi ?")
         val SECOND_QUESTIONS = listOf("Hein ? Réponds !", "Tu parles ?")
 

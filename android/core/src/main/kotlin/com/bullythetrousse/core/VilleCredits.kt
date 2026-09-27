@@ -4,18 +4,16 @@ import kotlin.math.roundToLong
 
 /**
  * Le générique de fin du mode histoire (`startCredits()` dans ville.js) :
- * quelques lignes d'adieu, toutes les statistiques de la partie, ce que le
- * joueur a dit à "l'autre lui", et le remerciement final.
+ * quelques lignes d'adieu, toutes les statistiques de la partie et le
+ * remerciement final.
  */
 data class VilleCredits(
     val intro: List<String>,
     val stats: List<Pair<String, String>>,
-    /** La 2e réponse de la première rencontre, répétée mot pour mot plus tard. */
-    val answer: String,
     val finalLine: String,
 ) {
     companion object {
-        fun build(save: GameSave, pseudo: String, answer: String): VilleCredits {
+        fun build(save: GameSave, pseudo: String): VilleCredits {
             fun yesNo(value: Boolean) = if (value) "oui" else "non"
             val skinsOwned = Skins.ALL.count { it.id in save.ownedSkins }
             val stats = listOf(
@@ -69,7 +67,6 @@ data class VilleCredits(
                     "tu y es parvenu avec l'aide d'amis peut-être, qui sait.....",
                 ),
                 stats = stats,
-                answer = answer,
                 finalLine = "Merci d'avoir joué à mon jeu, merci...",
             )
         }

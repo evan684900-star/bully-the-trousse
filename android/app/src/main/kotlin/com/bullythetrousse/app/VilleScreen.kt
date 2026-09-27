@@ -99,6 +99,8 @@ fun VilleScreen(
 
     var shopOpen by remember { mutableStateOf(false) }
     var skinShopClose by remember { mutableStateOf<(() -> Unit)?>(null) }
+    // Tutoriel du monde Ville en cours : ce qu'il faut rappeler à sa fermeture.
+    var villeTutorialDone by remember { mutableStateOf<(() -> Unit)?>(null) }
 
     val host = remember {
         object : VilleHost {
@@ -112,6 +114,7 @@ fun VilleScreen(
             override fun playTires() = tires.play()
             override fun openShop() { shopOpen = true }
             override fun openSkinShop(onClose: () -> Unit) { skinShopClose = onClose }
+            override fun startVilleTutorial(onDone: () -> Unit) { villeTutorialDone = onDone }
             override fun goRooftop() = callbacks.value.onGoRooftop()
             override fun exitToMenu() = callbacks.value.onExitToMenu()
             override fun leaveVille(destination: String) {
@@ -307,6 +310,15 @@ fun VilleScreen(
             TrousserieOverlay(save = save, onSaveChange = onSaveChange, onClose = {
                 skinShopClose = null
                 onClose()
+            })
+        }
+        // Le tutoriel de la Ville, par-dessus tout : la Ville reste figée
+        // jusqu'à sa fermeture (voir VilleEngine.maybeVilleTutorial).
+        villeTutorialDone?.let { done ->
+            TutorialOverlay(tutorial = Tutorial.VILLE, onDone = {
+                villeTutorialDone = null
+                host.updateSave { it.copy(villeTutorialSeen = true) }
+                done()
             })
         }
     }

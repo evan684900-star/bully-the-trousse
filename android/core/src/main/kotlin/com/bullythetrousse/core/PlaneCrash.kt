@@ -30,6 +30,8 @@ data class PlaneCrashState(
     val shake: Double = 0.0,
     val flight: FlightState,
     val rotationSpeed: Double,
+    /** Vitesse de l'avion (px/s), fixée au départ : voir [PlaneCrash.start]. */
+    val speed: Double = PlaneCrash.PLANE_SPEED,
 )
 
 object PlaneCrash {
@@ -39,6 +41,15 @@ object PlaneCrash {
 
     /** La trousse s'encastre un peu en avant du centre de l'avion. */
     const val STICK_X = 70.0
+
+    /**
+     * Une trousse très puissante file plus vite que [PLANE_SPEED] : l'avion
+     * accélère pour la rattraper en ~0,7 s quoi qu'il arrive, et elle ne peut
+     * pas passer sous le sable en l'attendant (sinon « ??? » restait affiché
+     * pour toujours, sans jamais arriver en Ville).
+     */
+    const val CATCH_SECONDS = 0.7
+    const val MIN_ALTITUDE = 40.0
 
     /** Secondes entre l'impact et le début du balayage des nuages. */
     const val SWEEP_DELAY = 3.0
@@ -53,12 +64,16 @@ object PlaneCrash {
         world == "plage" && isPerfect && !inSpaceMode && flight.vy > 0 && flight.vy < 170 && flight.worldY > 40
 
     /** L'avion part de derrière l'écran, à gauche, à la hauteur de la trousse. */
-    fun start(flight: FlightState, rotationSpeed: Double, screenWidth: Double): PlaneCrashState = PlaneCrashState(
-        px = flight.worldX - screenWidth * 0.3 - 520,
-        py = flight.worldY + 4,
-        flight = flight,
-        rotationSpeed = rotationSpeed,
-    )
+    fun start(flight: FlightState, rotationSpeed: Double, screenWidth: Double): PlaneCrashState {
+        val startGap = screenWidth * 0.3 + 520
+        return PlaneCrashState(
+            px = flight.worldX - startGap,
+            py = flight.worldY + 4,
+            flight = flight,
+            rotationSpeed = rotationSpeed,
+            speed = maxOf(PLANE_SPEED, flight.vx + startGap / CATCH_SECONDS),
+        )
+    }
 
     /** Ce qu'une image a déclenché, pour les bruitages et la suite. */
     data class Step(val state: PlaneCrashState, val impact: Boolean, val handOver: Boolean)
@@ -68,13 +83,14 @@ object PlaneCrash {
         val shake = maxOf(0.0, state.shake - dt * 30)
         if (!state.attached) {
             val f = state.flight
-            val flight = f.copy(
+            var flight = f.copy(
                 worldX = f.worldX + f.vx * dt,
                 worldY = f.worldY + f.vy * dt,
                 vy = f.vy - gravity * dt,
                 rotation = f.rotation + state.rotationSpeed * dt,
             )
-            val px = state.px + PLANE_SPEED * dt
+            if (flight.worldY < MIN_ALTITUDE) flight = flight.copy(worldY = MIN_ALTITUDE, vy = maxOf(flight.vy, 0.0))
+            val px = state.px + state.speed * dt
             val py = state.py + (flight.worldY + 4 - state.py) * minOf(1.0, dt * 4)
             val impact = px + STICK_X * PLANE_SCALE >= flight.worldX
             val next = state.copy(
@@ -89,7 +105,7 @@ object PlaneCrash {
             return Step(next, impact = impact, handOver = false)
         }
         val since = t - state.impactT
-        val px = state.px + PLANE_SPEED * dt
+        val px = state.px + state.speed * dt
         // L'avion reprend de l'altitude, plus franchement au début.
         val py = state.py + (if (since < 2.5) 110 else 40) * dt
         val flight = state.flight.copy(

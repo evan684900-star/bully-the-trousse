@@ -119,7 +119,7 @@ private fun BackButton(onBack: () -> Unit) {
 }
 
 /**
- * Les 47 succès du jeu, en grille d'émojis : débloqués en clair, verrouillés
+ * Tous les succès du jeu, en grille d'émojis : débloqués en clair, verrouillés
  * estompés comme `.achievement-row.locked`. Un appui ouvre la fiche du
  * succès (nom, description, part des joueurs qui l'ont), ce que la liste du
  * site affiche en permanence à côté de chaque icône.
@@ -423,7 +423,7 @@ fun SettingsScreen(
             }
         }
 
-        // 📖 Revoir le tutoriel : Volcans et Plage seulement une fois débloqués.
+        // 📖 Revoir le tutoriel : Volcans, Plage et Ville seulement une fois débloqués.
         SettingsSection(tr("settingsTutoTitle"))
         SettingsRow(tr("settingsTutoBasics")) {
             GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.BASICS) }
@@ -436,6 +436,11 @@ fun SettingsScreen(
         if (save.plageUnlocked) {
             SettingsRow(tr("settingsTutoPlage")) {
                 GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.PLAGE) }
+            }
+        }
+        if (save.villeUnlocked) {
+            SettingsRow(tr("settingsTutoVille")) {
+                GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.VILLE) }
             }
         }
 

@@ -2,17 +2,24 @@ package com.bullythetrousse.app
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,8 +30,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Lang
@@ -34,9 +41,9 @@ import com.bullythetrousse.core.Lang
  * icône, un titre, un texte, les pastilles de progression `.tutorial-dot`,
  * « Passer » en haut à droite et « Suivant » / « C'est parti ! » en bas.
  *
- * Trois jeux de diapos (voir [Tutorial], généré depuis le site) : les bases
- * au tout premier lancement, puis Volcans et Plage à leur déblocage — tous
- * rejouables depuis les Réglages.
+ * Quatre jeux de diapos (voir [Tutorial], généré depuis le site) : les bases
+ * au tout premier lancement, Volcans et Plage à leur déblocage, la Ville à
+ * la première entrée — tous rejouables depuis les Réglages.
  */
 @Composable
 fun TutorialOverlay(tutorial: Tutorial, onDone: () -> Unit) {
@@ -46,9 +53,15 @@ fun TutorialOverlay(tutorial: Tutorial, onDone: () -> Unit) {
     val isLast = step == slides.lastIndex
     val english = LocalLang.current == Lang.EN
 
-    // Voile sombre plein écran, puis la boîte du tutoriel au centre.
+    // Voile sombre plein écran, puis la boîte du tutoriel au centre. Le
+    // voile avale les taps (comme le `.modal-overlay` du site) : rien ne
+    // passe à l'écran du dessous, le jeu de la Ville compris.
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xCC060A16)),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xCC060A16))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
+            .windowInsetsPadding(WindowInsets.safeDrawing),
         contentAlignment = Alignment.Center,
     ) {
         Column(
@@ -58,6 +71,9 @@ fun TutorialOverlay(tutorial: Tutorial, onDone: () -> Unit) {
                 .clip(RoundedCornerShape(18.dp))
                 .background(PanelBg)
                 .border(2.dp, PanelBorder, RoundedCornerShape(18.dp))
+                // Téléphone en paysage (la Ville) : la boîte défile si elle
+                // dépasse la hauteur de l'écran.
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),

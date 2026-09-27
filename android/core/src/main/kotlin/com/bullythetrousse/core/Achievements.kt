@@ -63,6 +63,20 @@ object Achievements {
         Achievement("plage5000", "🐚") { it.plageBestDistance >= 5000 },
         Achievement("milleLancers", "🔥") { it.totalThrows >= 1000 },
         Achievement("niveau100", "👑") { it.puissanceLevel + it.vitesseLevel >= 100 },
+        // Monde Ville (mêmes identifiants et seuils que le site).
+        Achievement("villeDebloquee", "🏙️") { it.villeUnlocked },
+        Achievement("villeHistoire", "🎬") { it.villeStoryDone },
+        Achievement("villeToit100", "🏢") { it.villeThrows >= 100 },
+        Achievement("villeToit1000m", "🌇") { it.villeBestDistance >= 1000 },
+        Achievement("villeToit10000m", "🌆") { it.villeBestDistance >= 10000 },
+        Achievement("villeToit50000m", "🛫") { it.villeBestDistance >= 50000 },
+        Achievement("villeFlaques25", "💦") { it.villePuddles >= 25 },
+        Achievement("villeSalaire", "💼") { it.villeMoneyEarned >= 1_000_000 },
+        Achievement("villeFortune", "🏦") { it.villeMoneyEarned >= 25_000_000 },
+        Achievement("villePieton", "🚸") { it.villeCrosswalkDeaths >= 5 },
+        Achievement("villeEscaliers", "🪜") { it.villeStairs >= 10 },
+        Achievement("villeCosmetique", "🎩") { it.ownedCosmetics.isNotEmpty() },
+        Achievement("villeGardeRobe", "👗") { it.ownedCosmetics.size >= Cosmetics.ALL.size },
         Achievement("secretTrouve", "🔓") { it.ownedSkins.contains("secret") },
     )
 

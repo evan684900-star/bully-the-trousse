@@ -100,6 +100,8 @@ data class GameSave(
     val villeHeatRestUntil: Long = 0L,
     val villeArrivedAt: Long = 0L,
     val villeStoryDoneAt: Long = 0L,
+    /** Tutoriel du monde Ville déjà vu (`villeTutorialSeen` côté site). */
+    val villeTutorialSeen: Boolean = false,
     /** Cosmétiques de La Trousserie (purement décoratifs, voir [Cosmetics]). */
     val ownedCosmetics: List<String> = emptyList(),
     /** Un seul porté à la fois, "" = aucun. */

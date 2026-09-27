@@ -400,11 +400,6 @@ internal fun VilleCreditsRoll(credits: VilleCredits, onFinished: () -> Unit) {
                     Text(value, color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.End)
                 }
             }
-            if (credits.answer.isNotEmpty()) {
-                CreditsHeading("CE QUE TU AS DIT À L'AUTRE TOI")
-                Text("« ${credits.answer} »", color = Color.White, fontSize = 18.sp, textAlign = TextAlign.Center)
-                Spacer(Modifier.size(20.dp))
-            }
             Spacer(Modifier.size(70.dp))
             Text(
                 credits.finalLine,

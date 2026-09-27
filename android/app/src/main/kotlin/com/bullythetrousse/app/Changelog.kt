@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (97
+ * Le journal des changements du site, repris intégralement (106
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,51 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.2.7",
+        listOf(),
+        listOf(ChangelogLine("Générique de fin de la Ville : retire la partie « Ce que tu as dit à l'autre toi »", "City end credits: removed the \"What you said to the other you\" section")),
+    ),
+    ChangelogEntry(
+        "11.2.6",
+        listOf(),
+        listOf(ChangelogLine("Mode histoire de la Ville : la musique du boss s'arrête (en fondu) dès qu'il est vaincu, au lieu de continuer jusqu'au générique", "City story mode: the boss music now stops (with a fade) as soon as the boss is defeated, instead of playing on until the credits")),
+    ),
+    ChangelogEntry(
+        "11.2.5",
+        listOf(),
+        listOf(ChangelogLine("Mode histoire de la Ville : à la moitié de sa vie, le boss lance « JE NE ME LAISSERAI PAS FAIRE ! », lettre par lettre", "City story mode: at half health, the boss shouts \"I WON'T GO DOWN WITHOUT A FIGHT!\", letter by letter")),
+    ),
+    ChangelogEntry(
+        "11.2.4",
+        listOf(),
+        listOf(ChangelogLine("Mode histoire de la Ville : à la troisième rencontre, plus de choix de dialogue, tu ne dis rien ; l'autre trousse dit seulement « Et maintenant qui est qui ? »", "City story mode: no more dialogue choices at the third encounter, you say nothing; the other pencil case only says \"And now, who is who?\"")),
+    ),
+    ChangelogEntry(
+        "11.2.3",
+        listOf(),
+        listOf(ChangelogLine("Mode histoire de la Ville : les cercles d'attaque du boss sont environ un tiers plus petits", "City story mode: the boss's attack circles are about a third smaller")),
+    ),
+    ChangelogEntry(
+        "11.2.2",
+        listOf(),
+        listOf(ChangelogLine("Mode histoire de la Ville : à la troisième rencontre, l'autre trousse ne répète plus tes réponses mot pour mot, elle dit seulement « Et maintenant qui est qui ? »", "City story mode: at the third encounter, the other pencil case no longer repeats your answers word for word, it only says \"And now, who is who?\"")),
+    ),
+    ChangelogEntry(
+        "11.2.1",
+        listOf(),
+        listOf(ChangelogLine("Mode histoire de la Ville : à la deuxième rencontre, l'autre trousse répète maintenant tes deux réponses, dans l'ordre (elle ne répétait que la deuxième)", "City story mode: at the second encounter, the other pencil case now repeats both of your answers, in order (it only repeated the second one)")),
+    ),
+    ChangelogEntry(
+        "11.2.0",
+        listOf(),
+        listOf(ChangelogLine("Nouveau tutoriel pour le monde Ville : se déplacer à pied, le passage piéton, la Tour et son toit, les évènements, les flaques, La Trousserie et comment repartir. Il s'affiche à la première entrée dans la Ville et peut être revu dans les Réglages", "New tutorial for the City world: getting around on foot, the crosswalk, the Tower and its rooftop, events, puddles, La Trousserie and how to leave. It shows up the first time you enter the City and can be replayed from the Settings")),
+    ),
+    ChangelogEntry(
+        "11.1.0",
+        listOf(ChangelogLine("13 nouveaux succès liés à la Ville : arriver en Ville, finir l'histoire, 100 lancers sur le toit, records de 1000 m, 10 000 m et 50 000 m depuis le toit, 25 glissades sur une flaque, 1 000 000 \$ et 25 000 000 \$ gagnés en Ville, 5 accidents au passage piéton, 10 montées d'escaliers, et les cosmétiques de La Trousserie (un, puis les 8)", "13 new City achievements: reach the City, finish the story, 100 rooftop throws, 1000 m, 10,000 m and 50,000 m rooftop records, 25 puddle slides, \$1,000,000 and \$25,000,000 earned in the City, 5 crosswalk accidents, 10 stair climbs, and La Trousserie's cosmetics (one, then all 8)")),
+        listOf(ChangelogLine("Corrige le lancer parfait sur la Plage avec beaucoup de Puissance : l'avion ne rattrapait jamais la trousse, qui retombait sous le sable avec « ??? » affiché pour toujours", "Fixed the perfect Beach throw with high Power: the plane never caught up with the pencil case, which fell through the sand with \"???\" shown forever")),
+    ),
     ChangelogEntry(
         "11.0.0",
         listOf(ChangelogLine("Nouveau monde : la Ville ! Un lancer parfait sur la Plage, juste avant le sommet de la trajectoire, finit encastré sur le flanc d'un avion de ligne... direction la Ville. Là-bas, la trousse se déplace à pied : aéroport, rue (attention au passage piéton), La Trousserie et la Tour. On n'en repart qu'en reprenant un vol à l'aéroport", "New world: the City! A perfect throw on the Beach, right before the top of its arc, ends up stuck on the side of an airliner... bound for the City. There, the pencil case gets around on foot: airport, street (mind the crosswalk), La Trousserie and the Tower. The only way out is a flight from the airport"), ChangelogLine("Sur le toit de la Tour, un nouveau terrain de lancer : tout y coûte 20% plus cher, mais rapporte 20% de plus. Des évènements (coupure de courant, fuite d'eau, pluie, canicule) y tombent au même moment pour tous les joueurs, annoncés sur le tableau de la réception", "On the Tower's rooftop, a new throwing field: everything costs 20% more there, but earns 20% more. Events (power outage, water leak, rain, heatwave) hit it at the same time for every player, announced on the lobby's notice board"), ChangelogLine("Un mode histoire, jusqu'au générique", "A story mode, all the way to the credits"), ChangelogLine("La Trousserie : des cosmétiques purement décoratifs (nœud papillon, casquette, couronne...) à porter sur n'importe quel skin", "La Trousserie: purely decorative cosmetics (bow tie, cap, crown...) to wear on any skin")),
@@ -239,6 +284,10 @@ private fun changelogPart0(): List<ChangelogEntry> = listOf(
         listOf(),
         listOf(ChangelogLine("Rééquilibrage du monde Plage : trois évènements aléatoires par lancer (parasol, serviette, château de sable), tirés indépendamment au-delà de 100 m ; 11 succès liés à la plage", "Beach world rebalance: three random events per throw (parasol, towel, sandcastle), rolled independently past 100 m; 11 beach-related achievements")),
     ),
+)
+
+// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
+private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "8.1.3",
         listOf(),
@@ -264,10 +313,6 @@ private fun changelogPart0(): List<ChangelogEntry> = listOf(
         listOf(ChangelogLine("Le compte email/mot de passe est remplacé par un code de récupération : dans Réglages, affiche ton code de 16 chiffres et note-le. Sur un autre téléphone (ou après un nettoyage du navigateur), il suffit de le saisir pour récupérer ta partie — avec le choix de garder la partie actuelle ou celle du code si les deux ont de la progression", "The email/password account is replaced by a recovery code: in Settings, show your 16-digit code and write it down. On another phone (or after a browser cleanup), just enter it to restore your save — with a choice between keeping the current save or the code's one if both have progress")),
         listOf(),
     ),
-)
-
-// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
-private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "7.2.0",
         listOf(),

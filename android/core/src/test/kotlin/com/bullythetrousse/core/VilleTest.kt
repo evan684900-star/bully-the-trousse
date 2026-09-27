@@ -263,6 +263,30 @@ class VilleTest {
         assertTrue(state.sweepStart!! - state.impactT >= PlaneCrash.SWEEP_DELAY - 1e-9)
     }
 
+    @Test
+    fun `une trousse tres rapide est quand meme rattrapee, sans passer sous le sable`() {
+        // Niveau 80 : la trousse file bien plus vite que les 1500 px/s de base.
+        val flight = FlightState(worldX = 90_000.0, worldY = 50.0, vx = 3600.0, vy = 100.0)
+        var state = PlaneCrash.start(flight, rotationSpeed = 10.0, screenWidth = 1000.0)
+        assertTrue(state.speed > flight.vx)
+        var time = 0.0
+        var lowest = Double.MAX_VALUE
+        while (!state.attached && time < 3.0) {
+            state = PlaneCrash.step(state, 1 / 60.0, gravity = 950.0).state
+            time += 1 / 60.0
+            lowest = minOf(lowest, state.flight.worldY)
+        }
+        assertTrue(state.attached, "l'avion n'a jamais rattrapé la trousse")
+        assertTrue(time <= PlaneCrash.CATCH_SECONDS + 0.05, "rattrapée trop tard : $time s")
+        assertTrue(lowest >= PlaneCrash.MIN_ALTITUDE, "la trousse est descendue à $lowest")
+    }
+
+    @Test
+    fun `une trousse lente garde l'avion a sa vitesse de base`() {
+        val flight = FlightState(worldX = 2000.0, worldY = 300.0, vx = 300.0, vy = 150.0)
+        assertEquals(PlaneCrash.PLANE_SPEED, PlaneCrash.start(flight, rotationSpeed = 10.0, screenWidth = 400.0).speed)
+    }
+
     /* ---- La Trousserie ---- */
 
     @Test

@@ -475,6 +475,7 @@ private fun GameContent(
                         Tutorial.BASICS -> save.copy(tutorialSeen = true)
                         Tutorial.VOLCANO -> save.copy(volcanTutorialSeen = true)
                         Tutorial.PLAGE -> save.copy(plageTutorialSeen = true)
+                        Tutorial.VILLE -> save.copy(villeTutorialSeen = true)
                     },
                 )
             }

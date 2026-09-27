@@ -3,12 +3,12 @@ package com.bullythetrousse.core
 // FICHIER GÉNÉRÉ depuis la table STRINGS de index.html : ne pas éditer à la
 // main, relancer le générateur pour le mettre à jour.
 //
-// Découpé en plusieurs fonctions : une seule méthode contenant les 340
+// Découpé en plusieurs fonctions : une seule méthode contenant les 367
 // entrées frôlerait la limite de taille de méthode de la JVM (64 Ko).
 
 internal object I18nStrings {
     val TABLE: Map<String, Pair<String, String>> by lazy {
-        HashMap<String, Pair<String, String>>(680).apply {
+        HashMap<String, Pair<String, String>>(734).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -256,6 +256,35 @@ internal object I18nStrings {
         m["achv1000ThrowsDesc"] = "Effectue 1000 lancers au total." to "Make 1000 throws in total."
         m["achvLevel100Name"] = "Niveau 100" to "Level 100"
         m["achvLevel100Desc"] = "Atteins un total de 100 niveaux (Puissance + Vitesse)." to "Reach a combined total of 100 levels (Power + Speed)."
+        m["achvVilleName"] = "Atterrissage forcé" to "Crash landing"
+        m["achvVilleDesc"] = "Arrive en Ville en t'encastrant dans un avion depuis la Plage." to "Reach the City by crashing into a plane from the Beach."
+        m["achvVilleStoryName"] = "Fin de l'histoire" to "The end"
+        m["achvVilleStoryDesc"] = "Termine le mode histoire de la Ville, jusqu'au générique." to "Finish the City's story mode, all the way to the credits."
+        m["achvVilleThrowsName"] = "Habitué du toit" to "Rooftop regular"
+        m["achvVilleThrowsDesc"] = "Fais 100 lancers depuis le toit de la Tour." to "Make 100 throws from the Tower's rooftop."
+        m["achvVille1000Name"] = "Vue imprenable" to "Breathtaking view"
+        m["achvVille1000Desc"] = "Atteins un record de 1000 m depuis le toit de la Ville." to "Reach a record of 1000 m from the City rooftop."
+    }
+
+    private fun part3(m: MutableMap<String, Pair<String, String>>) {
+        m["achvVille10000Name"] = "Par-dessus les gratte-ciel" to "Over the skyscrapers"
+        m["achvVille10000Desc"] = "Atteins un record de 10 000 m depuis le toit de la Ville." to "Reach a record of 10,000 m from the City rooftop."
+        m["achvVille50000Name"] = "Plus loin que l'aéroport" to "Past the airport"
+        m["achvVille50000Desc"] = "Atteins un record de 50 000 m depuis le toit de la Ville." to "Reach a record of 50,000 m from the City rooftop."
+        m["achvVillePuddlesName"] = "Glisse urbaine" to "Urban surfer"
+        m["achvVillePuddlesDesc"] = "Glisse 25 fois sur une flaque du toit." to "Slide on a rooftop puddle 25 times."
+        m["achvVilleMoneyName"] = "Salaire de citadin" to "City salary"
+        m["achvVilleMoneyDesc"] = "Gagne 1 000 000 \$ en Ville." to "Earn \$1,000,000 in the City."
+        m["achvVilleFortuneName"] = "Magnat de l'immobilier" to "Real estate tycoon"
+        m["achvVilleFortuneDesc"] = "Gagne 25 000 000 \$ en Ville." to "Earn \$25,000,000 in the City."
+        m["achvVilleCrosswalkName"] = "Piéton distrait" to "Distracted pedestrian"
+        m["achvVilleCrosswalkDesc"] = "Fais-toi percuter 5 fois au passage piéton." to "Get hit at the crosswalk 5 times."
+        m["achvVilleStairsName"] = "Pas d'ascenseur pour moi" to "Stairs only"
+        m["achvVilleStairsDesc"] = "Monte 10 fois les escaliers de la Tour." to "Climb the Tower's stairs 10 times."
+        m["achvVilleCosmeticName"] = "Tiré à quatre épingles" to "Dressed to the nines"
+        m["achvVilleCosmeticDesc"] = "Achète un cosmétique à La Trousserie." to "Buy a cosmetic at La Trousserie."
+        m["achvVilleWardrobeName"] = "Garde-robe complète" to "Full wardrobe"
+        m["achvVilleWardrobeDesc"] = "Possède les 8 cosmétiques de La Trousserie." to "Own all 8 cosmetics from La Trousserie."
         m["achvSecretName"] = "..." to "..."
         m["achvSecretDesc"] = "Il n'y a rien à voir ici." to "There's nothing to see here."
         m["achvPctNotEnough"] = "Pas assez de joueurs actifs pour afficher des statistiques fiables (" to "Not enough active players yet for reliable stats ("
@@ -264,9 +293,6 @@ internal object I18nStrings {
         m["achvPctActivePlayers"] = " joueurs actifs." to " active players."
         m["achvPctOffline"] = "Statistiques indisponibles hors ligne." to "Stats unavailable offline."
         m["achvPctLoading"] = "Chargement des statistiques..." to "Loading stats..."
-    }
-
-    private fun part3(m: MutableMap<String, Pair<String, String>>) {
         m["jackpotTextX5"] = "t'as eu un fois 5 !?! prend une capture d'écran !! (prend en 5 du coup)" to "you got a five multiplier!?! take a screenshot!! (take 5 of them while you're at it)"
         m["jackpotTextX10"] = "UN FOIS 10 !?! PERSONNE VA TE CROIRE, PREND UNE CAPTURE D'ÉCRAN TOUT DE SUITE !!" to "A TEN MULTIPLIER!?! NOBODY WILL BELIEVE YOU, TAKE A SCREENSHOT RIGHT NOW!!"
         m["linksButton"] = "🔗 Mes liens" to "🔗 My links"
@@ -280,6 +306,7 @@ internal object I18nStrings {
         m["settingsTutoBasics"] = "Bases du jeu" to "Game basics"
         m["settingsTutoVolcan"] = "Monde Volcans" to "Volcans world"
         m["settingsTutoPlage"] = "Monde Plage" to "Beach world"
+        m["settingsTutoVille"] = "Monde Ville" to "City world"
         m["settingsTutoReplay"] = "🔁 Revoir" to "🔁 Replay"
         m["settingsThemeLabel"] = "Thème" to "Theme"
         m["settingsLangLabel"] = "Langue" to "Language"
@@ -320,6 +347,9 @@ internal object I18nStrings {
         m["recoverySelectToCopy"] = "Code sélectionné, il ne reste qu'à copier" to "Code selected, just copy it"
         m["recoveryDone"] = "✅ Partie récupérée" to "✅ Save restored"
         m["recoveryErrFormat"] = "Le code doit faire 16 chiffres." to "The code must be 16 digits."
+    }
+
+    private fun part4(m: MutableMap<String, Pair<String, String>>) {
         m["recoveryErrUnknown"] = "Aucune partie trouvée pour ce code." to "No save found for this code."
         m["recoveryErrSameAccount"] = "C'est déjà le code de cette partie." to "That's already this save's code."
         m["recoveryErrOffline"] = "Indisponible hors ligne." to "Unavailable offline."
@@ -347,9 +377,6 @@ internal object I18nStrings {
         m["profileFollow"] = "➕ Suivre" to "➕ Follow"
         m["profileUnfollow"] = "✅ Abonné(e)" to "✅ Following"
         m["profileFollowLoading"] = "..." to "..."
-    }
-
-    private fun part4(m: MutableMap<String, Pair<String, String>>) {
         m["profileFollowUnavailable"] = "Indisponible hors ligne" to "Unavailable offline"
         m["profileFollowError"] = "Action impossible, réessaie plus tard" to "Action failed, try again later"
         m["profileGiftButton"] = "🎁 Offrir de l'argent" to "🎁 Send money"

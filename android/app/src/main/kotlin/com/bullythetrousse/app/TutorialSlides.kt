@@ -1,7 +1,7 @@
 package com.bullythetrousse.app
 
-// FICHIER GÉNÉRÉ depuis TUTORIAL_SLIDES, VOLCANO_TUTORIAL et PLAGE_TUTORIAL
-// (index.html), textes du site mot pour mot dans les deux langues.
+// FICHIER GÉNÉRÉ depuis TUTORIAL_SLIDES, VOLCANO_TUTORIAL, PLAGE_TUTORIAL et
+// VILLE_TUTORIAL (index.html), textes du site mot pour mot dans les deux langues.
 
 /** Une diapo de tutoriel : une icône, un titre et un texte par langue. */
 data class TutorialSlide(
@@ -12,7 +12,7 @@ data class TutorialSlide(
     val textEn: String,
 )
 
-/** Les trois jeux de diapos du site. */
+/** Les quatre jeux de diapos du site. */
 enum class Tutorial(val slides: List<TutorialSlide>) {
     BASICS(
         listOf(
@@ -114,6 +114,59 @@ enum class Tutorial(val slides: List<TutorialSlide>) {
                 "Le sable est généré au hasard à chaque lancer : parasols (rebond), serviettes (juste pour le style) et châteaux de sable (fin du lancer) apparaissent chacun avec leur propre chance, mais seulement au-delà de 100 m.",
                 "⛱️ What's lying around on the sand",
                 "The sand is randomly generated on every throw: parasols (bounce), towels (just for style) and sandcastles (throw over) each show up with their own chance, but only past 100 m.",
+            ),
+        ),
+    ),
+    VILLE(
+        listOf(
+            TutorialSlide(
+                "🏙️",
+                "Bienvenue en Ville !",
+                "Ici, la trousse se déplace à pied. Au clavier : Q/D ou ←/→ pour marcher, Z/Espace pour sauter (maintiens pour sauter plus haut), X pour un dash, E pour parler ou entrer. Sur téléphone, utilise les boutons à l'écran.",
+                "Welcome to the City!",
+                "Here, the pencil case gets around on foot. On a keyboard: A/D or ←/→ to walk, W/Space to jump (hold to jump higher), X to dash, E to talk or enter. On a phone, use the on-screen buttons.",
+            ),
+            TutorialSlide(
+                "🚸",
+                "Traverse prudemment",
+                "Au passage piéton, attends que le bonhomme passe au vert : les voitures ne s'arrêtent pas pour une trousse.",
+                "Cross carefully",
+                "At the crosswalk, wait for the green walk signal: cars don't stop for a pencil case.",
+            ),
+            TutorialSlide(
+                "🏢",
+                "La Tour",
+                "Au bout de la rue, entre dans la Tour et passe à la réception : l'ascenseur mène au toit, un nouveau terrain de lancer où tout coûte 20 % plus cher... mais rapporte 20 % de plus.",
+                "The Tower",
+                "At the end of the street, enter the Tower and stop by the reception: the elevator takes you to the rooftop, a new throwing field where everything costs 20% more... but earns 20% more.",
+            ),
+            TutorialSlide(
+                "📌",
+                "Les évènements",
+                "Coupure de courant, fuite d'eau, pluie, canicule : les évènements tombent au même moment pour tous les joueurs. Le tableau de la réception annonce ceux des 5 prochains jours.",
+                "Events",
+                "Power outages, water leaks, rain, heatwaves: events hit every player at the same time. The board in the lobby lists those of the next 5 days.",
+            ),
+            TutorialSlide(
+                "💦",
+                "Flaques et canicule",
+                "Quand il y a des flaques sur le toit, la trousse glisse dessus, puis une barre de visée apparaît : vise bien pour repartir encore plus vite. En pleine canicule, elle doit se reposer 2 minutes tous les 5 lancers.",
+                "Puddles and heatwaves",
+                "When there are puddles on the roof, the pencil case slides on them, then an aiming bar appears: aim well to take off even faster. During a heatwave, it needs 2 minutes of rest every 5 throws.",
+            ),
+            TutorialSlide(
+                "👕",
+                "La Trousserie",
+                "Dans la rue, La Trousserie vend les skins au prix de la Ville et des cosmétiques purement décoratifs, à porter sur n'importe quel skin.",
+                "La Trousserie",
+                "On the street, La Trousserie sells skins at City prices, plus purely decorative cosmetics to wear on any skin.",
+            ),
+            TutorialSlide(
+                "✈️",
+                "Et ensuite ?",
+                "L'ascenseur propose aussi un mode histoire... à toi de découvrir ce qu'il cache. Pour quitter la Ville, prends un vol au comptoir des départs de l'aéroport.",
+                "What next?",
+                "The elevator also offers a story mode... up to you to find out what it hides. To leave the City, catch a flight at the airport departures desk.",
             ),
         ),
     ),
