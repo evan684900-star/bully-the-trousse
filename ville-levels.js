@@ -1274,6 +1274,33 @@
         }
         f.streakT -= dt;
         if (f.streakT <= 0) f.streak = 0;
+        // À la moitié de sa vie, le boss lâche une réplique lettre par lettre
+        // (même voix que son « ON VA VOIR ÇA »), sans arrêter le combat. Géré
+        // ici plutôt qu'en séquence : une défaite ou une victoire en plein
+        // milieu ne doit pas laisser une phrase à moitié écrite dans sa bulle.
+        if (!f.taunt && !f.over && f.hp > 0 && f.hp <= BOSS_HP / 2) {
+            f.taunt = { txt: L("JE NE ME LAISSERAI PAS FAIRE !", "I WON'T GO DOWN WITHOUT A FIGHT!"), n: 0, t: 0, done: false };
+        }
+        const tt = f.taunt;
+        if (tt && !tt.done) {
+            if (f.over) {
+                tt.done = true;
+                b.say = "";
+            } else {
+                tt.t += dt;
+                if (tt.n < tt.txt.length) {
+                    while (tt.n < tt.txt.length && tt.t >= 0.1) {
+                        tt.t -= 0.1;
+                        tt.n++;
+                        if (tt.txt[tt.n - 1] !== " ") B.beep(140 + tt.n * 8, 0.05, "square", 0.05);
+                    }
+                    b.say = tt.txt.slice(0, tt.n);
+                } else if (tt.t >= 1.4) {
+                    tt.done = true;
+                    b.say = "";
+                }
+            }
+        }
     }
     function* defeatSeq() {
         const st = V.story;
