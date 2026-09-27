@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.OutlinedTextField
@@ -30,6 +29,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,11 +42,30 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
+import com.bullythetrousse.core.description
+import com.bullythetrousse.core.name
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.GraphicsQuality
+import com.bullythetrousse.core.I18n
+import kotlin.math.roundToInt
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import com.bullythetrousse.core.SecretMath
+import com.bullythetrousse.core.Secrets
 import com.bullythetrousse.core.SkinStats
+import com.bullythetrousse.core.SfxCatalog
+import kotlinx.coroutines.delay
+import androidx.compose.foundation.layout.height
+import androidx.compose.ui.graphics.Brush
+import java.time.LocalDate
+import com.bullythetrousse.core.Lang
 
 /**
  * Écrans ouverts depuis le menu (Succès, Défis, Classement, Profil). Côté
@@ -95,33 +114,65 @@ private fun BackButton(onBack: () -> Unit) {
             .clickable(onClick = onBack)
             .padding(horizontal = 20.dp, vertical = 10.dp),
     ) {
-        Text("← Retour", color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+        Text(tr("app.back"), color = androidx.compose.ui.graphics.Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
     }
 }
 
 /**
- * Les 47 succès du jeu. `:core` ne porte que leur id et leur émoji (pas
- * encore les libellés traduits du web, voir les clés `achv*Name` dans
- * index.html), donc on affiche pour l'instant la grille des émojis :
- * débloqués en clair, verrouillés estompés comme `.achievement-row.locked`.
+ * Les 47 succès du jeu, en grille d'émojis : débloqués en clair, verrouillés
+ * estompés comme `.achievement-row.locked`. Un appui ouvre la fiche du
+ * succès (nom, description, part des joueurs qui l'ont), ce que la liste du
+ * site affiche en permanence à côté de chaque icône.
+ *
+ * Les pourcentages suivent `loadAchievementStats()` : rien en dessous de
+ * [ACHV_MIN_ACTIVE_PLAYERS] joueurs actifs, le panel serait trop petit pour
+ * un chiffre fiable.
  */
 @Composable
-fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
-    // Le succès dont on regarde la fiche (nom + description), ou null : la
-    // grille d'émojis seule ne dit pas ce que chacun récompense, alors que la
-    // liste du site affiche nom et description en clair (voir
-    // renderAchievements()). On garde la grille et on met le texte derrière
-    // un appui.
+fun AchievementsScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
     var detail by remember { mutableStateOf<com.bullythetrousse.core.Achievement?>(null) }
+    val lang = LocalLang.current
 
-    ModalScreen("🏆 Succès", onBack) {
+    // État du panel de joueurs (`#achv-pool-status`) et % par succès.
+    var poolStatus by remember { mutableStateOf<String?>(null) }
+    val percents = remember { mutableStateMapOf<String, Int>() }
+    LaunchedEffect(session.state) {
+        val online = session.state == CloudState.GUEST || session.state == CloudState.LINKED
+        if (!online) {
+            poolStatus = I18n.tr("achvPctOffline", lang)
+            return@LaunchedEffect
+        }
+        poolStatus = I18n.tr("achvPctLoading", lang)
+        val totalActive = try {
+            session.bridge.countActivePlayers()
+        } catch (e: Exception) {
+            poolStatus = I18n.tr("achvPctOffline", lang)
+            return@LaunchedEffect
+        }
+        if (totalActive < ACHV_MIN_ACTIVE_PLAYERS) {
+            poolStatus = I18n.tr("achvPctNotEnough", lang) + ACHV_MIN_ACTIVE_PLAYERS +
+                I18n.tr("achvPctNotEnoughMin", lang) + totalActive + I18n.tr("achvPctNotEnoughSuffix", lang)
+            return@LaunchedEffect
+        }
+        poolStatus = totalActive.toString() + I18n.tr("achvPctActivePlayers", lang)
+        for (achievement in Achievements.ALL) {
+            runCatching { session.bridge.countAchievementUnlocks(achievement.id) }.onSuccess { count ->
+                percents[achievement.id] = (count * 100.0 / totalActive).roundToInt()
+            }
+        }
+    }
+
+    ModalScreen(tr("achvModalTitle"), onBack) {
         Text(
-            "${save.unlockedAchievements.size} / ${Achievements.ALL.size} débloqués",
+            tr("app.achvCount", "n" to save.unlockedAchievements.size, "total" to Achievements.ALL.size),
             color = TextDim,
             fontSize = 13.sp,
         )
+        poolStatus?.let {
+            Text(it, color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+        }
         Text(
-            "Appuie sur un succès pour savoir ce qu'il récompense.",
+            tr("app.achvTapHint"),
             color = TextDim,
             fontSize = 11.5.sp,
             textAlign = TextAlign.Center,
@@ -150,16 +201,19 @@ fun AchievementsScreen(save: GameSave, onBack: () -> Unit) {
 
     detail?.let { achievement ->
         val unlocked = achievement.id in save.unlockedAchievements
-        val (name, description) = ACHIEVEMENT_LABELS[achievement.id] ?: (achievement.id to "")
         AchievementDetailDialog(
             emoji = if (unlocked) achievement.emoji else "🔒",
-            name = name,
-            description = description,
+            name = achievement.name(lang),
+            description = achievement.description(lang),
             unlocked = unlocked,
+            percent = percents[achievement.id],
             onDismiss = { detail = null },
         )
     }
 }
+
+/** `ACHV_MIN_ACTIVE_PLAYERS` : en dessous, le panel est jugé trop petit pour un % fiable. */
+private const val ACHV_MIN_ACTIVE_PLAYERS = 5
 
 /**
  * La fiche d'un succès : ce que la liste du site (`renderAchievements()`)
@@ -172,6 +226,7 @@ private fun AchievementDetailDialog(
     name: String,
     description: String,
     unlocked: Boolean,
+    percent: Int?,
     onDismiss: () -> Unit,
 ) {
     Box(
@@ -206,32 +261,60 @@ private fun AchievementDetailDialog(
             )
             Text(description, color = TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
             Text(
-                if (unlocked) "✅ Débloqué" else "🔒 Pas encore débloqué",
+                tr(if (unlocked) "app.achvUnlocked" else "app.achvLocked"),
                 color = if (unlocked) Money else TextDim,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
             )
+            percent?.let {
+                Text(tr("app.achvPlayersPct", "pct" to it), color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
 
-/** Les défis du jour (`#challenges-modal` côté web). */
+/**
+ * `#challenges-modal` / `renderDailyChallenges()` : les 3 défis du jour,
+ * générés dès l'ouverture s'ils ne le sont pas encore, avec leur
+ * description, une barre de progression, la récompense à réclamer et le
+ * compte à rebours jusqu'au renouvellement de minuit.
+ */
 @Composable
 fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: () -> Unit) {
-    ModalScreen("📅 Défis du jour", onBack) {
-        if (save.dailyChallenges.isEmpty()) {
-            Text(
-                "Les défis du jour apparaissent dès ton premier lancer ou premier achat de la journée.",
-                color = TextDim,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-            )
-            return@ModalScreen
+    val sfx = LocalSfx.current
+    val toaster = LocalToaster.current
+
+    // ensureDailyChallenges() : les défis du jour existent dès qu'on regarde.
+    LaunchedEffect(Unit) {
+        val ensured = DailyChallenges.ensure(save, LocalDate.now().toString(), SkinStats.totalPuissance(save), SkinStats.totalVitesse(save))
+        if (ensured != save) onSaveChange(ensured)
+    }
+
+    // Compte à rebours jusqu'à minuit, rafraîchi chaque seconde.
+    var countdown by remember { mutableStateOf(timeUntilMidnight()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            countdown = timeUntilMidnight()
+            delay(1000)
         }
+    }
+
+    ModalScreen(tr("challengesModalTitle"), onBack) {
+        Text(tr("challengesResetInfo", "time" to countdown), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
         save.dailyChallenges.forEachIndexed { index, challenge ->
+            val def = CHALLENGE_DISPLAY[challenge.kind]
+            val isDistance = challenge.kind == "distance" || challenge.kind == "distanceCumul"
+            val isMoney = challenge.kind == "earn" || challenge.kind == "gift" || challenge.kind == "spend"
+            val shownRaw = minOf(challenge.progress, challenge.target)
+            val shown = if (isDistance) "%.1f".format(shownRaw) else shownRaw.roundToInt().toString()
+            val target = if (challenge.target % 1.0 == 0.0) challenge.target.toLong().toString() else challenge.target.toString()
+            val unit = if (isDistance) " m" else if (isMoney) " $" else ""
+            val fraction = (challenge.progress / challenge.target).coerceIn(0.0, 1.0).toFloat()
+            val done = challenge.progress >= challenge.target
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .alpha(if (challenge.claimed) 0.55f else 1f)
                     .clip(RoundedCornerShape(12.dp))
                     .background(CardBg)
                     .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
@@ -239,39 +322,76 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Column(modifier = Modifier.fillMaxWidth(0.7f)) {
-                    Text(challenge.kind, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Text(def?.first ?: "🎯", fontSize = 26.sp)
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        "${challenge.progress.toInt()} / ${challenge.target.toInt()}   +${challenge.reward} $",
-                        color = TextDim,
-                        fontSize = 11.5.sp,
+                        def?.second?.let { tr(it, "target" to target) } ?: challenge.kind,
+                        color = TextColor,
+                        fontSize = 13.5.sp,
+                        fontWeight = FontWeight.SemiBold,
                     )
+                    // .challenge-bar : dégradé doré → orange.
+                    Box(
+                        modifier = Modifier
+                            .padding(top = 6.dp)
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(RoundedCornerShape(999.dp))
+                            .background(Color(0x4D000000)),
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(fraction)
+                                .height(10.dp)
+                                .background(Brush.horizontalGradient(listOf(Color(0xFFFFD23F), Color(0xFFFF9F43)))),
+                        )
+                    }
+                    Text("$shown / $target$unit", color = TextDim, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
                 }
                 when {
-                    challenge.claimed -> Text("✅", fontSize = 20.sp)
-                    challenge.progress >= challenge.target -> Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(Accent)
-                            .clickable {
-                                val result = DailyChallenges.claim(save, index)
-                                if (result is DailyChallenges.ClaimResult.Success) onSaveChange(result.save)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                    ) {
-                        Text("Réclamer", color = OnAccent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    challenge.claimed -> Text(tr("challengeClaimed"), color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    done -> GameButton("+${challenge.reward} $", small = true) {
+                        // claimDailyChallenge() : sfxBuy() et « 🎯 +X$ ! ».
+                        val result = DailyChallenges.claim(save, index)
+                        if (result is DailyChallenges.ClaimResult.Success) {
+                            onSaveChange(result.save)
+                            sfx.play(SfxCatalog.BUY)
+                            toaster("🎯 +${result.reward}$ !")
+                        }
                     }
-                    else -> Text("${(challenge.progress / challenge.target * 100).toInt()} %", color = Accent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                    else -> Text("+${challenge.reward} $", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
     }
 }
 
+/** L'icône et la clé de description de chaque défi (`CHALLENGE_POOL` côté site). */
+private val CHALLENGE_DISPLAY: Map<String, Pair<String, String>> = mapOf(
+    "throws" to ("🎒" to "challengeThrowsDesc"),
+    "distance" to ("📏" to "challengeDistanceDesc"),
+    "earn" to ("💰" to "challengeEarnDesc"),
+    "perfect" to ("✨" to "challengePerfectDesc"),
+    "distanceCumul" to ("🛣️" to "challengeDistanceCumulDesc"),
+    "gift" to ("🎁" to "challengeGiftDesc"),
+    "qte" to ("🎯" to "challengeQteDesc"),
+    "spend" to ("🛍️" to "challengeSpendDesc"),
+    "volcan" to ("🌋" to "challengeVolcanDesc"),
+    "skid" to ("💨" to "challengeSkidDesc"),
+)
+
+/** « HH:MM:SS » jusqu'au prochain minuit local (`updateChallengesCountdown()`). */
+private fun timeUntilMidnight(): String {
+    val now = java.time.LocalDateTime.now()
+    val midnight = now.toLocalDate().plusDays(1).atStartOfDay()
+    val remaining = java.time.Duration.between(now, midnight).seconds
+    return "%02d:%02d:%02d".format(remaining / 3600, (remaining % 3600) / 60, remaining % 60)
+}
+
 /**
- * `#settings-modal` : thème, langue, et le rappel du tutoriel. Le thème
- * clair et le bilingue ne sont pas encore portés, donc leurs boutons
- * affichent l'état courant sans le changer.
+ * `#settings-modal` : thème, langue, relecture des tutoriels, compte, musique,
+ * qualité graphique (propre au portage), téléchargement des musiques, et le
+ * point quasi invisible du bas qui ouvre le calcul mental secret.
  */
 @Composable
 fun SettingsScreen(
@@ -279,61 +399,195 @@ fun SettingsScreen(
     session: CloudSession,
     onSaveChange: (GameSave) -> Unit,
     onOpenAccount: () -> Unit,
+    onReplayTutorial: (Tutorial) -> Unit,
     onBack: () -> Unit,
 ) {
-    ModalScreen("⚙️ Réglages", onBack) {
-        SettingsRow("Compte") {
-            GameButton("☁️ Gérer", secondary = true, small = true, onClick = onOpenAccount)
-        }
-        Text(
-            session.statusText,
-            color = if (session.state == CloudState.LINKED) Money else TextDim,
-            fontSize = 11.5.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        )
-        SettingsRow("Musique") {
-            GameButton(
-                if (save.musicMuted) "🔇" else "🔊",
-                secondary = true,
-                small = true,
-            ) { onSaveChange(save.copy(musicMuted = !save.musicMuted)) }
-        }
-        // Qualité : un bouton qui fait défiler Basse → Normale → Élevée.
-        // Propre au portage Android — le site n'a pas ce réglage, mais un
-        // téléphone d'entrée de gamme en a besoin.
-        val quality = GraphicsQuality.fromId(save.graphicsQuality)
-        SettingsRow("Qualité graphique") {
-            GameButton(quality.label, secondary = true, small = true) {
-                onSaveChange(save.copy(graphicsQuality = GraphicsQuality.next(quality).id))
-            }
-        }
-        Text(
-            qualityHint(quality),
-            color = TextDim,
-            fontSize = 11.5.sp,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-        )
-        // Thème : la bascule jour/nuit du ciel (`applyTheme()` côté site).
-        // Le reste de l'interface reste sombre pour l'instant — seul le ciel
-        // suit, avec la même animation de lever/coucher que le site.
+    var secretMath by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    val toaster = LocalToaster.current
+    val saved = tr("app.musicSaved")
+    val saveError = tr("app.musicSaveError")
+
+    ModalScreen(tr("settingsTitle"), onBack) {
+        // Thème : bascule jour/nuit de toute l'interface (applyTheme()).
         val night = save.theme != "light"
-        SettingsRow("Thème") {
+        SettingsRow(tr("settingsThemeLabel")) {
             GameButton(if (night) "🌙" else "☀️", secondary = true, small = true) {
                 onSaveChange(save.copy(theme = if (night) "light" else "dark"))
             }
         }
-        SettingsRow("Langue") { GameButton("FR", secondary = true, small = true) {} }
+        // Langue : FR <-> EN, toute l'interface suit immédiatement (LocalLang).
+        SettingsRow(tr("settingsLangLabel")) {
+            GameButton(if (save.lang == "en") "EN" else "FR", secondary = true, small = true) {
+                onSaveChange(save.copy(lang = if (save.lang == "en") "fr" else "en"))
+            }
+        }
+
+        // 📖 Revoir le tutoriel : Volcans et Plage seulement une fois débloqués.
+        SettingsSection(tr("settingsTutoTitle"))
+        SettingsRow(tr("settingsTutoBasics")) {
+            GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.BASICS) }
+        }
+        if (save.volcanUnlocked) {
+            SettingsRow(tr("settingsTutoVolcan")) {
+                GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.VOLCANO) }
+            }
+        }
+        if (save.plageUnlocked) {
+            SettingsRow(tr("settingsTutoPlage")) {
+                GameButton(tr("settingsTutoReplay"), secondary = true, small = true) { onReplayTutorial(Tutorial.PLAGE) }
+            }
+        }
+
+        // Compte : code de récupération, compte privé, avatar, déconnexion —
+        // regroupés sur un écran à part (AccountScreen).
+        SettingsSection(tr("settingsAccountTitle"))
+        SettingsRow(tr("app.settingsAccount")) {
+            GameButton(tr("app.settingsManage"), secondary = true, small = true, onClick = onOpenAccount)
+        }
+        Text(
+            tr(session.statusKey),
+            color = if (session.state == CloudState.LINKED) Money else TextDim,
+            fontSize = 11.5.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+
+        SettingsRow(tr("app.settingsMusic")) {
+            GameButton(if (save.musicMuted) "🔇" else "🔊", secondary = true, small = true) {
+                onSaveChange(save.copy(musicMuted = !save.musicMuted))
+            }
+        }
+        // Qualité : Basse → Normale → Élevée. Propre au portage Android — le
+        // site n'a pas ce réglage, mais un téléphone d'entrée de gamme en a besoin.
+        val quality = GraphicsQuality.fromId(save.graphicsQuality)
+        SettingsRow(tr("app.settingsQuality")) {
+            GameButton(tr(qualityKey(quality)), secondary = true, small = true) {
+                onSaveChange(save.copy(graphicsQuality = GraphicsQuality.next(quality).id))
+            }
+        }
+        Text(
+            tr(qualityKey(quality) + "Hint"),
+            color = TextDim,
+            fontSize = 11.5.sp,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+        )
+
+        // 🎵 Musiques du jeu : chaque piste téléchargeable.
+        SettingsSection(tr("settingsMusicTitle"))
+        for ((labelKey, track) in listOf(
+            "settingsMusicNormal" to (R.raw.music_cour to "musique-fond.mp3"),
+            "settingsMusicPlage" to (R.raw.music_plage to "musique-plage.mp3"),
+            "settingsMusicVolcan" to (R.raw.music_volcan to "musique-volcan.mp3"),
+        )) {
+            SettingsRow(tr(labelKey)) {
+                GameButton(tr("btnMusicDownload"), secondary = true, small = true) {
+                    when (exportMusic(context, track.first, track.second)) {
+                        MusicExportResult.SAVED -> toaster(saved)
+                        MusicExportResult.SHARED -> Unit
+                        MusicExportResult.FAILED -> toaster(saveError)
+                    }
+                }
+            }
+        }
+
+        // .settings-secret-trigger : un point presque invisible.
+        Text(
+            "·",
+            color = TextColor.copy(alpha = 0.15f),
+            fontSize = 11.sp,
+            textAlign = TextAlign.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { secretMath = true }
+                .padding(top = 14.dp, bottom = 2.dp),
+        )
+    }
+
+    if (secretMath) {
+        SecretMathDialog(
+            onSolved = {
+                secretMath = false
+                onSaveChange(Secrets.unlock(save))
+            },
+            onDismiss = { secretMath = false },
+        )
     }
 }
 
-/** Ce que chaque niveau change, en une ligne : sans ça le bouton ne dit pas
- *  au joueur ce qu'il gagne ou perd en le touchant. */
-private fun qualityHint(quality: GraphicsQuality): String = when (quality) {
-    GraphicsQuality.LOW ->
-        "Effets d'ambiance coupés et particules réduites : à choisir si le jeu saccade."
-    GraphicsQuality.MEDIUM -> "Tous les effets, en quantité mesurée. Recommandé."
-    GraphicsQuality.HIGH ->
-        "Particules, nuages en profondeur et sillages au maximum. Pour les téléphones à l'aise."
+/** La clé de traduction du niveau de qualité (`app.qualityLow`...). */
+private fun qualityKey(quality: GraphicsQuality): String = when (quality) {
+    GraphicsQuality.LOW -> "app.qualityLow"
+    GraphicsQuality.MEDIUM -> "app.qualityMedium"
+    GraphicsQuality.HIGH -> "app.qualityHigh"
+}
+
+/** `.settings-section-title` */
+@Composable
+private fun SettingsSection(title: String) {
+    Text(
+        title,
+        color = Accent,
+        fontSize = 15.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
+    )
+}
+
+/**
+ * `#secret-math-modal` : 4 calculs, 5 s chacun. Une mauvaise réponse ou le
+ * temps écoulé referment tout sans un mot (échec silencieux, pas d'indice).
+ */
+@Composable
+private fun SecretMathDialog(onSolved: () -> Unit, onDismiss: () -> Unit) {
+    var index by remember { mutableIntStateOf(0) }
+    var typed by remember { mutableStateOf("") }
+    var remaining by remember { mutableLongStateOf(SecretMath.SECONDS_PER_QUESTION * 1000L) }
+    val sfx = LocalSfx.current
+    val toaster = LocalToaster.current
+    val unlocked = tr("secretUnlocked")
+
+    LaunchedEffect(index) {
+        val deadline = System.currentTimeMillis() + SecretMath.SECONDS_PER_QUESTION * 1000L
+        while (true) {
+            remaining = deadline - System.currentTimeMillis()
+            if (remaining <= 0) {
+                onDismiss()
+                return@LaunchedEffect
+            }
+            delay(100)
+        }
+    }
+
+    fun submit() {
+        if (!SecretMath.isCorrect(index, typed)) return onDismiss()
+        if (index == SecretMath.QUESTIONS.lastIndex) {
+            sfx.play(SfxCatalog.BUY)
+            toaster(unlocked)
+            onSolved()
+        } else {
+            typed = ""
+            index++
+        }
+    }
+
+    InfoDialog(
+        title = SecretMath.QUESTIONS[index].text,
+        onDismiss = onDismiss,
+        buttons = { GameButton(tr("secretMathSubmit"), modifier = Modifier.fillMaxWidth()) { submit() } },
+    ) {
+        DialogText("${SecretMath.secondsLeft(remaining)}s")
+        OutlinedTextField(
+            value = typed,
+            onValueChange = { typed = it.filter { c -> c.isDigit() || c == '-' }.take(6) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { submit() }),
+            modifier = Modifier.fillMaxWidth(),
+        )
+    }
 }
 
 /** `.settings-row` : libellé à gauche, contrôle à droite. */
@@ -361,7 +615,8 @@ private fun SettingsRow(label: String, control: @Composable () -> Unit) {
  */
 @Composable
 fun ChangelogScreen(onBack: () -> Unit) {
-    ModalScreen("📋 Journal des changements", onBack) {
+    val english = LocalLang.current == Lang.EN
+    ModalScreen(tr("changelogTitle"), onBack) {
         for (entry in CHANGELOG) {
             Column(
                 modifier = Modifier
@@ -373,34 +628,54 @@ fun ChangelogScreen(onBack: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Text("v${entry.version}", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
-                for (line in entry.major) {
-                    Text("• $line", color = TextColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                if (entry.major.isNotEmpty()) {
+                    Text(tr("changelogMajor"), color = TextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    for (line in entry.major) {
+                        Text("• ${if (english) line.en else line.fr}", color = TextColor, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+                    }
                 }
-                for (line in entry.minor) {
-                    Text("• $line", color = TextDim, fontSize = 12.sp)
+                if (entry.minor.isNotEmpty()) {
+                    Text(tr("changelogMinor"), color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    for (line in entry.minor) {
+                        Text("• ${if (english) line.en else line.fr}", color = TextDim, fontSize = 12.sp)
+                    }
                 }
             }
         }
     }
 }
 
-/** `#links-modal` : les deux liens du site, repris tels quels. */
+/** `#links-modal` : les deux liens du site, qui s'ouvrent dans le navigateur. */
 @Composable
 fun LinksScreen(onBack: () -> Unit) {
-    ModalScreen("🔗 Mes liens", onBack) {
-        LinkRow("🌐 evyverse.vercel.app", "Mon site")
-        LinkRow("💬 Chaîne WhatsApp", "Actus de ce jeu")
+    val context = LocalContext.current
+    ModalScreen(tr("linksTitle"), onBack) {
+        LinkRow("🌐 evyverse.vercel.app", tr("linksSiteDesc")) { openUrl(context, "https://evyverse.vercel.app") }
+        LinkRow("💬 ${tr("linksWhatsappLabel")}", tr("linksWhatsappDesc")) {
+            openUrl(context, "https://whatsapp.com/channel/0029VbDIKVI4IBh8MLKV2y25")
+        }
+    }
+}
+
+/** Ouvre une adresse dans le navigateur (ou l'app qui la gère, WhatsApp...). */
+private fun openUrl(context: android.content.Context, url: String) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
     }
 }
 
 @Composable
-private fun LinkRow(title: String, subtitle: String) {
+private fun LinkRow(title: String, subtitle: String, onClick: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(CardBg)
             .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 10.dp),
     ) {
         Text(title, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.Bold)
@@ -438,7 +713,7 @@ fun LeaderboardScreen(
 
     var editingPseudo by remember { mutableStateOf(false) }
 
-    ModalScreen(if (save.inPlage) "🏖️ Classement Plage" else "🏆 Classement", onBack, opaque = true) {
+    ModalScreen(tr(if (save.inPlage) "leaderboardTitlePlage" else "leaderboardTitle"), onBack, opaque = true) {
         // `#leaderboard-pseudo` + `btn-edit-pseudo` côté site : c'est d'ici
         // qu'on change le nom affiché aux autres joueurs.
         Row(
@@ -446,7 +721,7 @@ fun LeaderboardScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(
-                "Ton pseudo : ${save.pseudo.ifBlank { "-" }}",
+                "${tr("pseudoLabel")}${save.pseudo.ifBlank { "-" }}",
                 color = TextDim,
                 fontSize = 13.sp,
                 textAlign = TextAlign.Center,
@@ -454,21 +729,18 @@ fun LeaderboardScreen(
             GameButton("✏️", secondary = true, small = true) { editingPseudo = true }
         }
         Text(
-            "Touche une ligne pour voir le profil de ce joueur.",
+            tr("app.leaderboardTapHint"),
             color = TextDim,
             fontSize = 11.5.sp,
             textAlign = TextAlign.Center,
         )
         val rows = entries
         when {
-            session.state == CloudState.NOT_CONFIGURED -> LeaderboardNotice(
-                "Le classement a besoin du compte en ligne, pas encore configuré dans cette version.",
-            )
-            failed || session.state == CloudState.OFFLINE -> LeaderboardNotice(
-                "Classement indisponible : pas de connexion.",
-            )
-            rows == null -> LeaderboardNotice("Chargement du classement…")
-            rows.isEmpty() -> LeaderboardNotice("Personne n'a encore de record. À toi de jouer.")
+            session.state == CloudState.NOT_CONFIGURED || session.state == CloudState.OFFLINE ->
+                LeaderboardNotice(tr("leaderboardUnavailable"))
+            failed -> LeaderboardNotice(tr("leaderboardError"))
+            rows == null -> LeaderboardNotice(tr("leaderboardLoading"))
+            rows.isEmpty() -> LeaderboardNotice(tr("leaderboardEmpty"))
             else -> rows.forEachIndexed { index, entry ->
                 LeaderboardRow(
                     rank = index + 1,
@@ -518,9 +790,9 @@ private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("✏️ Ton pseudo", color = Accent, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+            Text(tr("pseudoPrompt"), color = Accent, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
             Text(
-                "C'est le nom que les autres voient au classement et sur ton profil.",
+                tr("app.pseudoHint"),
                 color = TextDim,
                 fontSize = 12.sp,
                 textAlign = TextAlign.Center,
@@ -529,13 +801,13 @@ private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
                 value = typed,
                 onValueChange = { typed = it.take(Pseudo.MAX_LENGTH) },
                 singleLine = true,
-                placeholder = { Text("Ton nom", color = TextDim, fontSize = 13.sp) },
+                placeholder = { Text(tr("app.pseudoPlaceholder"), color = TextDim, fontSize = 13.sp) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Text("${typed.length} / ${Pseudo.MAX_LENGTH}", color = TextDim, fontSize = 11.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                GameButton("Enregistrer", small = true) { onConfirm(typed) }
-                GameButton("Annuler", secondary = true, small = true, onClick = onDismiss)
+                GameButton(tr("app.save"), small = true) { onConfirm(typed) }
+                GameButton(tr("btnCancel"), secondary = true, small = true, onClick = onDismiss)
             }
         }
     }
@@ -584,142 +856,3 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean, on
     }
 }
 
-/**
- * Profil, porté de `#screen-profile` / `paintProfile()` : l'en-tête
- * (avatar rond bordé de doré, pseudo, statut), la rangée de trois cartes
- * `.profile-card` (trousse équipée + nombre de skins, abonnements,
- * abonnés), puis les statistiques détaillées.
- *
- * Abonnements/abonnés viennent de Firestore, comme sur le site.
- */
-@Composable
-fun ProfileScreen(save: GameSave, session: CloudSession, onBack: () -> Unit) {
-    // Abonnements/abonnés : deux comptages Firestore (`countFollowers()` /
-    // `countFollowing()` côté site). Tant qu'ils n'ont pas répondu — ou si le
-    // compte en ligne n'est pas disponible — on laisse le tiret du site.
-    var following by remember { mutableStateOf<Int?>(null) }
-    var followers by remember { mutableStateOf<Int?>(null) }
-    LaunchedEffect(session.uid) {
-        val id = session.uid ?: return@LaunchedEffect
-        try {
-            following = session.bridge.countFollowing(id)
-            followers = session.bridge.countFollowers(id)
-        } catch (e: Exception) {
-            // Hors ligne : on garde le tiret, ce n'est pas une erreur à montrer.
-        }
-    }
-
-    ModalScreen("👤 Profil", onBack, opaque = true) {
-        // .profile-header
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(84.dp)
-                    .clip(CircleShape)
-                    .background(CardBg)
-                    .border(3.dp, Accent, CircleShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(save.avatarEmoji.ifBlank { "🎒" }, fontSize = 40.sp)
-            }
-            Text(
-                save.pseudo.ifBlank { "?" },
-                color = TextColor,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            // .profile-status : toujours "En ligne" pour SON PROPRE profil côté
-            // site (profileOnline, sans vérifier de seuil — ce seuil ne sert
-            // qu'à afficher le profil d'un AUTRE joueur, pas encore porté ici).
-            val isOnline = session.state == CloudState.GUEST || session.state == CloudState.LINKED
-            Text(
-                if (isOnline) "🟢 En ligne" else "Hors ligne",
-                color = if (isOnline) Money else TextDim,
-                fontSize = 12.5.sp,
-                fontWeight = if (isOnline) FontWeight.Bold else FontWeight.Normal,
-            )
-        }
-
-        // .profile-top-row : trois cartes côte à côte.
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            ProfileCard(modifier = Modifier.weight(1f)) {
-                TrousseSprite(
-                    skinId = save.equippedSkin,
-                    contentDescription = "trousse équipée",
-                    modifier = Modifier.size(40.dp),
-                )
-                Text("+${save.ownedSkins.size}", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold)
-            }
-            ProfileCard(modifier = Modifier.weight(1f)) {
-                Text(
-                    following?.toString() ?: "—",
-                    color = TextColor,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text("Abonnements", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
-            }
-            ProfileCard(modifier = Modifier.weight(1f)) {
-                Text(
-                    followers?.toString() ?: "—",
-                    color = TextColor,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Black,
-                )
-                Text("Abonnés", color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
-            }
-        }
-
-        Column(
-            modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            ProfileRow("Lancers", save.totalThrows.toString())
-            ProfileRow("Record", "${"%.1f".format(save.bestDistance)} m")
-            ProfileRow("Record plage", "${"%.1f".format(save.plageBestDistance)} m")
-            ProfileRow("Argent gagné", "${save.totalMoneyEarned} $")
-            ProfileRow("Succès", "${save.unlockedAchievements.size} / ${Achievements.ALL.size}")
-            ProfileRow("Puissance", SkinStats.totalPuissance(save).toString())
-            ProfileRow("Vitesse", SkinStats.totalVitesse(save).toString())
-        }
-    }
-}
-
-/** `.profile-card` : carte carrée, contenu centré. */
-@Composable
-internal fun ProfileCard(modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Column(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBg)
-            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
-            .padding(vertical = 12.dp, horizontal = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        content()
-    }
-}
-
-@Composable
-internal fun ProfileRow(label: String, value: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .background(CardBg)
-            .border(2.dp, PanelBorder, RoundedCornerShape(12.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
-        Text(value, color = Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
-    }
-}

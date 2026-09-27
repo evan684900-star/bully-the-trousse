@@ -472,55 +472,64 @@ internal fun TrousserieOverlay(save: GameSave, onSaveChange: (GameSave) -> Unit,
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text("👕 La Trousserie", color = Accent, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-            Text(
-                "ici, tout est 20% plus cher mais vous gagnez 20% plus d'argent",
-                color = Money,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.ExtraBold,
-                textAlign = TextAlign.Center,
-            )
+            // Titre et bouton de fermeture : en dur (en français) côté site aussi.
+            Text("👕 La Trousserie", color = Accent, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text(tr("villeShopNote"), color = TextColor, fontSize = 13.sp, textAlign = TextAlign.Center)
             MoneyPill("💰 ${save.money} $", small = true)
+            val lang = LocalLang.current
+            // Résolus ici : tr() ne peut pas être appelé depuis un clic.
+            val noMoney = tr("notEnoughMoney")
+            val equipLabel = tr("equip")
+            val equippedLabel = tr("equipped")
             Text("🎨 Skins", color = TextColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
+            // buildSkinCard() : la même carte qu'en boutique, au prix de la Ville.
             for (skin in Skins.ALL) {
-                val (name, desc) = SKIN_LABELS[skin.id] ?: (skin.id to "")
+                val (name, desc) = skinLabel(skin.id)
+                val boughtMsg = tr("app.bought", "name" to name)
+                val equippedMsg = tr("app.equippedToast", "name" to name)
                 val owned = skin.id in save.ownedSkins
                 val equipped = save.equippedSkin == skin.id
                 ShopCard(
-                    title = name,
+                    title = name + if (equipped) " · ${equippedLabel.uppercase()}" else "",
                     description = desc,
                     leading = { TrousseSprite(skinId = skin.id, contentDescription = name, modifier = Modifier.size(46.dp)) },
                 ) {
                     when {
-                        equipped -> Text("✅ Équipée", color = Money, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                        owned -> GameButton("Équiper", secondary = true, small = true) {
+                        equipped -> GameButton(equippedLabel, secondary = true, small = true) {}
+                        owned -> GameButton(equipLabel, small = true) {
                             onSaveChange(SkinShop.equip(save, skin.id))
                             sfx.play(SfxCatalog.BUY)
+                            toast = equippedMsg
                         }
                         else -> GameButton("${SkinShop.price(save, skin.id)} $", small = true) {
                             when (val result = SkinShop.buy(save, skin.id)) {
                                 is SkinShop.PurchaseResult.Success -> {
                                     applyPurchase(result.save, SkinShop.price(save, skin.id), onSaveChange)
                                     sfx.play(SfxCatalog.BUY)
+                                    toast = boughtMsg
                                 }
-                                else -> { sfx.play(SfxCatalog.ERROR); toast = "💸 Pas assez d'argent !" }
+                                else -> { sfx.play(SfxCatalog.ERROR); toast = noMoney }
                             }
                         }
                     }
                 }
             }
-            Text("🎩 Cosmétiques", color = TextColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+            Text(tr("app.cosmeticsTitle"), color = TextColor, fontSize = 15.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
+            val cosmeticDesc = tr("app.cosmeticDesc")
+            val removeLabel = tr("app.cosmeticRemove")
             for (cosmetic in Cosmetics.ALL) {
+                val name = cosmetic.name(lang)
+                val boughtMsg = tr("app.bought", "name" to name)
                 val owned = cosmetic.id in save.ownedCosmetics
                 val worn = save.equippedCosmetic == cosmetic.id
                 ShopCard(
-                    title = cosmetic.name + if (worn) " · ÉQUIPÉE" else "",
-                    description = "Purement décoratif, se porte sur n'importe quel skin.",
+                    title = name + if (worn) " · ${equippedLabel.uppercase()}" else "",
+                    description = cosmeticDesc,
                     leading = { CosmeticPreview(cosmetic.id) },
                 ) {
                     val label = when {
-                        worn -> "Retirer"
-                        owned -> "Équiper"
+                        worn -> removeLabel
+                        owned -> equipLabel
                         else -> "${Cosmetics.price(cosmetic, save)} $"
                     }
                     GameButton(label, secondary = worn, small = true) {
@@ -528,13 +537,13 @@ internal fun TrousserieOverlay(save: GameSave, onSaveChange: (GameSave) -> Unit,
                             is Cosmetics.Result.Success -> {
                                 if (result.spent > 0) {
                                     applyPurchase(result.save, result.spent, onSaveChange)
-                                    toast = "✅ ${cosmetic.name} achetée !"
+                                    toast = boughtMsg
                                 } else {
                                     onSaveChange(result.save)
                                 }
                                 sfx.play(SfxCatalog.BUY)
                             }
-                            Cosmetics.Result.NotEnoughMoney -> { sfx.play(SfxCatalog.ERROR); toast = "💸 Pas assez d'argent !" }
+                            Cosmetics.Result.NotEnoughMoney -> { sfx.play(SfxCatalog.ERROR); toast = noMoney }
                         }
                     }
                 }

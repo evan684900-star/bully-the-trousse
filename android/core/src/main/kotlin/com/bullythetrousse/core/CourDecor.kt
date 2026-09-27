@@ -59,6 +59,24 @@ object CourDecor {
         return start until (start + count)
     }
 
+    /**
+     * Easter egg 💩 : caché derrière l'arbre n°1 de la cour (dessiné juste
+     * AVANT lui, donc recouvert par son feuillage opaque), visible seulement
+     * avant le décollage — la caméra ne bouge pas encore, sa position à
+     * l'écran est donc fixe (voir `poopEggScreenPos()` côté site).
+     */
+    const val POOP_EGG_TREE_INDEX = 1
+    const val POOP_EGG_OFFSET_Y = -55.0
+    const val POOP_EGG_SIZE = 15.0
+    const val POOP_EGG_HIT_RADIUS = 16.0
+
+    /** Position du 💩 à l'écran, par rapport à la ligne du sol. */
+    fun poopEggScreenX(cameraX: Double): Double = treeWorldX(POOP_EGG_TREE_INDEX) - cameraX
+
+    /** `hitsPoopEgg()` : le toucher tombe-t-il dans la zone du 💩 ? */
+    fun hitsPoopEgg(tapX: Double, tapY: Double, cameraX: Double, groundScreenY: Double, hitRadius: Double = POOP_EGG_HIT_RADIUS): Boolean =
+        kotlin.math.hypot(tapX - poopEggScreenX(cameraX), tapY - (groundScreenY + POOP_EGG_OFFSET_Y)) <= hitRadius
+
     /** `worldPos = i * treeSpacing + (seededRand(i + 0.7) - 0.5) * 80`. */
     fun treeWorldX(index: Int): Double =
         index * TREE_SPACING + (seededRand(index + 0.7) - 0.5) * 80.0

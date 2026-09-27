@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -395,7 +396,7 @@ fun BottomBar(
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text("🔗 Mes liens", color = TextDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(tr("linksButton"), color = TextDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
         // .corner-icons-right : deux ronds de 42px
         Row(
@@ -518,6 +519,13 @@ fun ShopCard(
 }
 
 /**
+ * `showToast()` à l'échelle de l'app : le toast global de MainActivity, par
+ * exemple pour annoncer un succès débloqué quel que soit l'écran affiché.
+ * Sans fournisseur (prévisualisation), le message est simplement ignoré.
+ */
+val LocalToaster = staticCompositionLocalOf<(String) -> Unit> { {} }
+
+/**
  * `.toast` : petit message temporaire en bas de l'écran ("Pas assez
  * d'argent !", etc.). Fond volontairement toujours sombre, quel que soit le
  * thème, et texte blanc en dur — comme le commente le CSS du site. Il
@@ -580,15 +588,23 @@ fun CoinPopup(multiplier: Double?, jackpot: Boolean, onDismiss: () -> Unit) {
                 fontSize = 54.sp,
                 fontWeight = FontWeight.Black,
             )
+            // #coin-popup-jackpot : le message du site pour x5 et pour x10.
             if (jackpot) {
-                Text("JACKPOT !", color = Accent2, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
+                Text(
+                    tr(if (multiplier >= 10) "jackpotTextX10" else "jackpotTextX5"),
+                    color = Accent2,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 24.dp),
+                )
             }
         }
     }
 }
 
 /** "x2" plutôt que "x2.0", mais "x1.6" garde sa décimale, comme le site. */
-private fun formatMultiplier(value: Double): String =
+internal fun formatMultiplier(value: Double): String =
     if (value % 1.0 == 0.0) value.toInt().toString() else value.toString()
 
 /** Positions des 6 `.star` du web, en fraction de la zone de ciel. */

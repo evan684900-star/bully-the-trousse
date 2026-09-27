@@ -11,22 +11,43 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
+import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.GraphicsQuality
+import com.bullythetrousse.core.HapticEvent
+import com.bullythetrousse.core.Lang
 import com.bullythetrousse.core.Ville
 import com.bullythetrousse.core.VilleEntry
 import com.bullythetrousse.core.VilleMusic
 import com.bullythetrousse.core.VolcanoCinematic
+import com.bullythetrousse.core.I18n
+import com.bullythetrousse.core.PlayTimeTracker
+import com.bullythetrousse.core.SfxCatalog
+import com.bullythetrousse.core.name
+import kotlinx.coroutines.delay
+import java.util.Locale
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.pointerInput
+import com.bullythetrousse.core.SecretSequence
+import com.bullythetrousse.core.Secrets
 
 /**
  * Treizième tranche du portage natif : écrans séparés (Menu / Jeu /
@@ -84,8 +105,9 @@ sealed interface Screen {
     /** La boutique ouverte depuis le résultat d'un lancer sur le toit de la Ville. */
     data object VilleShop : Screen
 
-    /** Le profil public d'un autre joueur, ouvert depuis le classement. */
-    data class PlayerProfile(val uid: String) : Screen
+    /** Le profil d'un autre joueur ; [from] est l'écran où revenir (le
+     *  classement, ou mon profil quand on l'ouvre depuis une liste d'abonnés). */
+    data class PlayerProfile(val uid: String, val from: Screen = Screen.Leaderboard) : Screen
 }
 
 /**
@@ -112,10 +134,19 @@ private fun Screen.isModal(): Boolean = this in MODAL_SCREENS
 fun GameRoot() {
     val context = LocalContext.current
     val repository = remember { SaveRepository(context) }
-    // On reste en Ville d'une session à l'autre tant qu'on n'a pas repris
-    // l'avion (voir Ville.normalizeOnLoad, l'initialisation du site).
-    var save by remember { mutableStateOf(Ville.normalizeOnLoad(repository.load())) }
+    // Le thème est appliqué dès le chargement, pour ne pas afficher une
+    // première image sombre avant de basculer en clair. On reste en Ville
+    // d'une session à l'autre tant qu'on n'a pas repris l'avion (voir
+    // Ville.normalizeOnLoad, l'initialisation du site).
+    var save by remember {
+        mutableStateOf(Ville.normalizeOnLoad(repository.load()).also { AppTheme.isLight = it.theme == "light" })
+    }
     var screen by remember { mutableStateOf<Screen>(Screen.Menu) }
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    // Puis suivi à chaque changement (bouton des Réglages, triche, cloud).
+    // Les cinématiques se jouent toujours en mode jour, comme sur le site
+    // (startVolcanoCinematic() force le thème clair le temps qu'elles durent).
+    SideEffect { AppTheme.isLight = save.theme == "light" || inCinematic }
     // Le mode histoire de la Ville fait taire la musique du monde.
     var villeMusic by remember { mutableStateOf(VilleMusic.WORLD) }
     var menuToast by remember { mutableStateOf<String?>(null) }
@@ -123,6 +154,29 @@ fun GameRoot() {
     // remplacer (voir isModal), donc il faut le retenir pour continuer à le
     // dessiner derrière le voile.
     var baseScreen by remember { mutableStateOf<Screen>(Screen.Menu) }
+
+    // Lecteurs partagés par toute l'app (voir SfxPlayer, HapticsPlayer),
+    // créés avant updateSave() qui s'en sert pour le succès débloqué.
+    val sfx = rememberSfxPlayer()
+    val haptics = rememberHapticsPlayer()
+
+    // Toasts de l'app entière, en file : plusieurs succès qui tombent d'un
+    // coup s'affichent l'un après l'autre au lieu de s'écraser (voir
+    // LocalToaster pour les écrans qui en émettent).
+    val toasts = remember { mutableStateListOf<String>() }
+
+    // La session en ligne, créée plus bas (elle a besoin d'updateSave pour
+    // créditer les cadeaux) mais utilisée par updateSave pour publier les
+    // succès : d'où cette référence renseignée juste après sa création.
+    var cloudRef: CloudSession? = null
+
+    // Cadeaux ramassés à la connexion, affichés dans une modale (voir
+    // checkIncomingGifts() côté site) : lignes fusionnées par expéditeur + total.
+    var receivedGifts by remember { mutableStateOf<Pair<List<Pair<String, Int>>, Int>?>(null) }
+
+    // Temps de jeu et série d'écoute musicale, accumulés en mémoire et
+    // reportés dans la sauvegarde toutes les 30 s (voir PlayTimeTracker).
+    val playClock = remember { PlayTimeTracker(save.musicListenSeconds) }
 
     // Point de passage UNIQUE pour toute modification de la sauvegarde locale
     // (portage de persist() côté web, qui appelle checkAchievements() à
@@ -132,17 +186,38 @@ fun GameRoot() {
     // seraient constatés qu'au prochain lancer ou achat, au lieu de l'instant
     // où ils sont vraiment obtenus.
     fun updateSave(updated: GameSave) {
-        val withAchievements = Achievements.apply(updated)
+        // Les secondes de jeu en attente partent avec chaque écriture : sans
+        // ça, une sauvegarde faite entre deux reports les écraserait.
+        val withTime = playClock.flushInto(updated)
+        val newlyUnlocked = Achievements.newlyUnlocked(withTime)
+        val withAchievements = Achievements.apply(withTime)
         save = withAchievements
         repository.save(withAchievements)
+        if (newlyUnlocked.isNotEmpty()) {
+            // checkAchievements() : un toast par succès, sfxBuy(), et la
+            // publication pour le pourcentage de joueurs.
+            val lang = Lang.fromId(withAchievements.lang)
+            newlyUnlocked.forEach { toasts += I18n.tr("achvUnlockedPrefix", lang) + it.name(lang) }
+            sfx.play(SfxCatalog.BUY)
+            haptics.play(HapticEvent.ACHIEVEMENT)
+            cloudRef?.publishUnlocks(newlyUnlocked.map { it.id }, withAchievements.totalThrows)
+        }
     }
 
-    // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()).
-    WorldMusic(
-        world = save.currentWorld,
-        muted = save.musicMuted,
-        paused = screen is Screen.Ville && villeMusic != VilleMusic.WORLD,
-    )
+    val inForeground by rememberAppInForeground()
+
+    // Partie reçue d'un autre appareil pendant un lancer ou une cinématique :
+    // mise de côté jusqu'à la fin (pendingRemoteSave côté site), avec l'heure
+    // de réception pour savoir si le lancer l'a rendue périmée.
+    var pendingRemote by remember { mutableStateOf<Pair<CloudSave, Long>?>(null) }
+
+    /** `applyRemoteSave()` : la partie de l'autre appareil, temps de jeu gardé au max. */
+    fun applyRemoteSave(remote: CloudSave) {
+        val merged = CloudSaveSync.mergeRemote(remote.save, save)
+        repository.saveFromCloud(merged, remote.updatedAtMillis)
+        save = merged
+        toasts += I18n.tr("cloudSyncPulled", Lang.fromId(merged.lang))
+    }
 
     // Compte, sauvegarde cloud et classement (voir CloudSession). Silencieux
     // et sans effet tant que app/google-services.json n'est pas là : le jeu
@@ -154,35 +229,138 @@ fun GameRoot() {
         // (avec l'horodatage du serveur) : la réécrire ici lui collerait
         // l'heure locale et ferait croire que ce téléphone vient de jouer.
         onSaveChange = { save = it },
+        onGifts = { gifts, atLogin ->
+            val total = Gifts.total(gifts)
+            if (total > 0) {
+                updateSave(save.copy(money = save.money + total))
+                if (atLogin) {
+                    receivedGifts = Gifts.mergeBySender(gifts) to total
+                } else {
+                    val lang = Lang.fromId(save.lang)
+                    gifts.forEach { gift ->
+                        toasts += I18n.tr("giftReceivedToast", lang, "pseudo" to gift.senderPseudo, "amount" to gift.amount)
+                    }
+                }
+            }
+        },
+        onRemoteSave = { remote ->
+            // Rien de neuf pour le joueur (juste le temps de jeu de l'autre
+            // appareil) : on ne touche à rien.
+            if (CloudSaveSync.differsMeaningfully(remote.save, save)) {
+                if (PlayState.throwInProgress || inCinematic) {
+                    pendingRemote = remote to System.currentTimeMillis()
+                } else {
+                    applyRemoteSave(remote)
+                }
+            }
+        },
+        inForeground = inForeground,
     )
+    cloudRef = cloud
+
+    // flushPendingRemoteSave() : une fois le lancer ou la cinématique finis.
+    // Le lancer a sauvegardé APRÈS l'arrivée de la copie ? Elle est périmée
+    // (sans les gains ni le record de la manche) : l'appliquer l'annulerait.
+    val busy = PlayState.throwInProgress || inCinematic
+    LaunchedEffect(busy, pendingRemote) {
+        val (remote, receivedAt) = pendingRemote ?: return@LaunchedEffect
+        if (busy) return@LaunchedEffect
+        pendingRemote = null
+        if (CloudSaveSync.shouldApplyRemoteSave(repository.lastPersistAtMillis, receivedAt)) applyRemoteSave(remote)
+    }
+
+    // Langue jamais choisie : on devine d'après celle du téléphone, une seule
+    // fois, comme l'initialisation du site (`navigator.language`).
+    LaunchedEffect(Unit) {
+        if (save.lang.isEmpty()) {
+            updateSave(save.copy(lang = Lang.forDeviceLanguage(Locale.getDefault().language).id))
+        }
+    }
+
+    // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()),
+    // en pause quand l'app n'est plus à l'écran — ou quand le mode histoire
+    // de la Ville la fait taire (pauseWorldMusic() côté site).
+    val musicPlaying = WorldMusic(
+        world = save.currentWorld,
+        muted = save.musicMuted,
+        inForeground = inForeground,
+        paused = screen is Screen.Ville && villeMusic != VilleMusic.WORLD,
+    )
+    val currentMusicPlaying by rememberUpdatedState(musicPlaying)
+    LaunchedEffect(inForeground) {
+        if (!inForeground) return@LaunchedEffect
+        while (true) {
+            delay(1000)
+            if (playClock.tick(currentMusicPlaying)) updateSave(save)
+        }
+    }
 
     // Le niveau de détail choisi dans les Réglages descend jusqu'aux écrans
     // qui dessinent, sans que les écrans intermédiaires aient à le porter
     // (voir LocalGraphicsQuality).
-    // Les bruitages sont synthétisés (voir SfxPlayer) : un seul lecteur pour
-    // toute l'app, pour que le cache PCM serve à tous les écrans.
-    val sfx = rememberSfxPlayer()
     CompositionLocalProvider(
         LocalGraphicsQuality provides GraphicsQuality.fromId(save.graphicsQuality),
         LocalSfx provides sfx,
+        LocalHaptics provides haptics,
+        LocalLang provides Lang.fromId(save.lang),
+        LocalToaster provides { message -> toasts += message },
     ) {
-        GameContent(
-            save = save,
-            screen = screen,
-            cloud = cloud,
-            repository = repository,
-            baseScreen = baseScreen,
-            updateSave = ::updateSave,
-            goTo = { destination ->
-                if (!destination.isModal()) baseScreen = destination
-                screen = destination
-            },
-            ville = VilleNav(
-                menuToast = menuToast,
-                onMenuToast = { menuToast = it },
-                onMusicChange = { villeMusic = it },
-            ),
-        )
+        // Séquence secrète au doigt (secretStep() côté site) : écoute passive
+        // de toute l'app, qui ne consomme rien — le jeu, les boutons et les
+        // glissés continuent de fonctionner normalement.
+        val secretFound by rememberUpdatedState {
+            sfx.play(SfxCatalog.BUY)
+            toasts += I18n.tr("secretUnlocked", Lang.fromId(save.lang))
+            updateSave(Secrets.unlock(save))
+        }
+        val secretSequence = remember { SecretSequence() }
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .pointerInput(Unit) {
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+                        var up: PointerInputChange? = null
+                        while (up == null) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            // Plusieurs doigts : ce n'est ni un glissé ni un tapoti.
+                            if (event.changes.size > 1) return@awaitEachGesture
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: return@awaitEachGesture
+                            if (!change.pressed) up = change
+                        }
+                        // Seuils du site en pixels CSS : on raisonne en dp.
+                        val finger = up ?: return@awaitEachGesture
+                        val gesture = SecretSequence.classify(
+                            dx = (finger.position.x - down.position.x) / density,
+                            dy = (finger.position.y - down.position.y) / density,
+                            elapsedMillis = finger.uptimeMillis - down.uptimeMillis,
+                        ) ?: return@awaitEachGesture
+                        if (secretSequence.step(gesture)) secretFound()
+                    }
+                },
+        ) {
+            GameContent(
+                save = save,
+                screen = screen,
+                cloud = cloud,
+                repository = repository,
+                baseScreen = baseScreen,
+                updateSave = ::updateSave,
+                goTo = { destination ->
+                    if (!destination.isModal()) baseScreen = destination
+                    screen = destination
+                },
+                ville = VilleNav(
+                    menuToast = menuToast,
+                    onMenuToast = { menuToast = it },
+                    onMusicChange = { villeMusic = it },
+                ),
+            )
+        }
+        receivedGifts?.let { (rows, total) ->
+            GiftsReceivedDialog(rows = rows, total = total, onDismiss = { receivedGifts = null })
+        }
+        Toast(message = toasts.firstOrNull(), onDismiss = { if (toasts.isNotEmpty()) toasts.removeAt(0) })
     }
 }
 
@@ -202,19 +380,49 @@ private fun GameContent(
     goTo: (Screen) -> Unit,
     ville: VilleNav,
 ) {
+    // Tutoriel relu depuis les Réglages (null = aucun).
+    var replayTutorial by remember { mutableStateOf<Tutorial?>(null) }
+    val onReplayTutorial: (Tutorial?) -> Unit = { replayTutorial = it }
+
+    // Panneau des triches (appui long sur la version) et ce qu'il déclenche.
+    var showCheats by remember { mutableStateOf(false) }
+    var menuDialogRequest by remember { mutableStateOf<MenuDialog?>(null) }
+    var cheatCoin by remember { mutableStateOf<Double?>(null) }
+    val cheats = CheatHooks(
+        open = { showCheats = true },
+        menuDialog = menuDialogRequest,
+        onMenuDialogShown = { menuDialogRequest = null },
+    )
+
+    // pauseGame() / resumeGame() : une fenêtre ouverte par-dessus l'écran de
+    // jeu pendant un lancer fige la partie jusqu'à sa fermeture.
+    val paused = screen.isModal() && baseScreen == Screen.Game && PlayState.throwInProgress
+    val toaster = LocalToaster.current
+    val pausedText = tr("gamePaused")
+    LaunchedEffect(paused) {
+        PlayState.paused = paused
+        if (paused) toaster(pausedText)
+    }
+
     // Une modale se pose par-dessus l'écran de fond, assombri à 50 % —
-    // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. Sans ça
-    // les Réglages remplaçaient le menu au lieu de le recouvrir.
-    if (screen.isModal() && baseScreen != screen) {
-        ScreenContent(
-            save = save,
-            screen = baseScreen,
-            cloud = cloud,
-            repository = repository,
-            updateSave = updateSave,
-            goTo = goTo,
-            ville = ville,
-        )
+    // `.modal-overlay { background: rgba(0,0,0,0.5) }` côté site. L'écran du
+    // dessous est TOUJOURS composé au même endroit, modale ouverte ou non :
+    // sinon il serait recréé à l'ouverture et perdrait son état (un lancer
+    // en cours repartirait de zéro au lieu d'être mis en pause).
+    val showModal = screen.isModal() && baseScreen != screen
+    ScreenContent(
+        save = save,
+        screen = if (showModal) baseScreen else screen,
+        baseScreen = baseScreen,
+        cloud = cloud,
+        repository = repository,
+        updateSave = updateSave,
+        goTo = goTo,
+        onReplayTutorial = onReplayTutorial,
+        cheats = cheats,
+        ville = ville,
+    )
+    if (showModal) {
         // Le voile avale les taps : sans ça, toucher une zone vide des
         // Réglages actionnerait le bouton du menu resté visible dessous.
         Box(
@@ -227,31 +435,57 @@ private fun GameContent(
                     onClick = {},
                 ),
         )
+        ScreenContent(
+            save = save,
+            screen = screen,
+            baseScreen = baseScreen,
+            cloud = cloud,
+            repository = repository,
+            updateSave = updateSave,
+            goTo = goTo,
+            onReplayTutorial = onReplayTutorial,
+            cheats = cheats,
+            ville = ville,
+        )
     }
 
-    ScreenContent(
-        save = save,
-        screen = screen,
-        cloud = cloud,
-        repository = repository,
-        updateSave = updateSave,
-        goTo = goTo,
-        ville = ville,
-    )
-
-    // Tutoriel du tout premier lancement (showTutorialIfNeeded() côté web) :
-    // il recouvre tout tant qu'il n'est pas terminé ou passé.
-    if (!save.tutorialSeen) {
-        TutorialOverlay(onDone = { updateSave(save.copy(tutorialSeen = true)) })
+    // Tutoriels (startTutorial() côté web) : les bases au tout premier
+    // lancement, Volcans et Plage à leur premier déblocage (jamais pendant
+    // la cinématique elle-même), ou celui qu'on relit depuis les Réglages.
+    // Il recouvre tout tant qu'il n'est pas terminé ou passé.
+    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic
+    // Le monde Ville occupe tout l'écran comme une cinématique : ni tutoriel
+    // par-dessus, ni barre du bas (`body.ville-active` côté site).
+    val fullScreen = inCinematic || screen is Screen.Ville
+    val tutorial = replayTutorial ?: when {
+        !save.tutorialSeen -> Tutorial.BASICS
+        fullScreen -> null
+        save.volcanUnlocked && !save.volcanTutorialSeen -> Tutorial.VOLCANO
+        save.plageUnlocked && !save.plageTutorialSeen -> Tutorial.PLAGE
+        else -> null
+    }
+    if (tutorial != null) {
+        TutorialOverlay(tutorial = tutorial, onDone = {
+            if (replayTutorial != null) {
+                // Relu depuis les Réglages : rien à retenir.
+                onReplayTutorial(null)
+            } else {
+                updateSave(
+                    when (tutorial) {
+                        Tutorial.BASICS -> save.copy(tutorialSeen = true)
+                        Tutorial.VOLCANO -> save.copy(volcanTutorialSeen = true)
+                        Tutorial.PLAGE -> save.copy(plageTutorialSeen = true)
+                    },
+                )
+            }
+        })
         return
     }
 
     // .links-btn + .corner-icons-right : en position:fixed côté web, donc
     // visibles par-dessus tous les écrans — sauf pendant les cinématiques,
     // qui occupent l'écran entier.
-    // Le monde Ville masque aussi la barre (`body.ville-active` côté site).
-    val inCinematic = screen == Screen.VolcanoCinematic || screen == Screen.BeachCinematic || screen is Screen.Ville
-    if (!inCinematic) {
+    if (!fullScreen) {
         BottomBar(
             musicMuted = save.musicMuted,
             onOpenLinks = { goTo(Screen.Links) },
@@ -259,6 +493,23 @@ private fun GameContent(
             onOpenSettings = { goTo(Screen.Settings) },
         )
     }
+
+    // Par-dessus tout le reste, barre du bas comprise.
+    if (showCheats) {
+        CheatsPanel(
+            save = save,
+            onSaveChange = updateSave,
+            onGoTo = { destination -> showCheats = false; goTo(destination) },
+            onMenuDialog = { dialog ->
+                // Les popups du menu s'affichent… sur le menu.
+                goTo(Screen.Menu)
+                menuDialogRequest = dialog
+            },
+            onCoinPopup = { cheatCoin = it },
+            onDismiss = { showCheats = false },
+        )
+    }
+    CoinPopup(multiplier = cheatCoin, jackpot = (cheatCoin ?: 0.0) >= 5.0, onDismiss = { cheatCoin = null })
 }
 
 /** Ce que le monde Ville partage avec le reste de l'app. */
@@ -273,12 +524,21 @@ private class VilleNav(
 private fun ScreenContent(
     save: GameSave,
     screen: Screen,
+    baseScreen: Screen,
     cloud: CloudSession,
     repository: SaveRepository,
     updateSave: (GameSave) -> Unit,
     goTo: (Screen) -> Unit,
+    onReplayTutorial: (Tutorial?) -> Unit,
+    cheats: CheatHooks,
     ville: VilleNav,
 ) {
+    // Fermer une modale rend la main à l'écran qu'elle recouvrait (le jeu,
+    // le profil...), pas systématiquement au menu — comme côté site, où la
+    // modale disparaît simplement de par-dessus l'écran actif.
+    val closeModal = { goTo(baseScreen) }
+    // Résolu ici : tr() ne peut pas être appelé depuis un rappel.
+    val goodFlight = tr("app.villeGoodFlight")
     when (screen) {
         Screen.Menu -> MenuScreen(
             save = save,
@@ -292,6 +552,9 @@ private fun ScreenContent(
             onStartVolcanoCinematic = { goTo(Screen.VolcanoCinematic) },
             onStartBeachCinematic = { goTo(Screen.BeachCinematic) },
             onOpenChangelog = { goTo(Screen.Changelog) },
+            onOpenCheats = cheats.open,
+            requestedDialog = cheats.menuDialog,
+            onRequestedDialogShown = cheats.onMenuDialogShown,
             onEnterVille = { goTo(Screen.Ville(it)) },
             initialToast = ville.menuToast,
             onInitialToastShown = { ville.onMenuToast(null) },
@@ -307,22 +570,32 @@ private fun ScreenContent(
 
         is Screen.PlayerProfile -> PlayerProfileScreen(
             uid = screen.uid,
+            save = save,
             session = cloud,
-            onBack = { goTo(Screen.Leaderboard) },
+            // Depuis une liste d'abonnés, on garde le même point de retour.
+            onOpenPlayer = { other ->
+                goTo(if (other == cloud.uid) Screen.Profile else Screen.PlayerProfile(other, screen.from))
+            },
+            onBack = { goTo(screen.from) },
         )
 
         Screen.Profile -> ProfileScreen(
             save = save,
             session = cloud,
+            onSaveChange = updateSave,
+            onOpenAchievements = { goTo(Screen.AchievementsList) },
+            onOpenPlayer = { other ->
+                goTo(if (other == cloud.uid) Screen.Profile else Screen.PlayerProfile(other, Screen.Profile))
+            },
             onBack = { goTo(Screen.Menu) },
         )
 
-        Screen.AchievementsList -> AchievementsScreen(save = save, onBack = { goTo(Screen.Menu) })
+        Screen.AchievementsList -> AchievementsScreen(save = save, session = cloud, onBack = closeModal)
 
         Screen.Challenges -> ChallengesScreen(
             save = save,
             onSaveChange = updateSave,
-            onBack = { goTo(Screen.Menu) },
+            onBack = closeModal,
         )
 
         Screen.Game -> GameScreen(
@@ -362,7 +635,7 @@ private fun ScreenContent(
             onExitToMenu = { goTo(Screen.Menu) },
             onGoRooftop = { goTo(Screen.Game) },
             onLeaveVille = {
-                ville.onMenuToast("✈️ Bon vol !")
+                ville.onMenuToast(goodFlight)
                 goTo(Screen.Menu)
             },
             )
@@ -373,7 +646,11 @@ private fun ScreenContent(
             session = cloud,
             onSaveChange = updateSave,
             onOpenAccount = { goTo(Screen.Account) },
-            onBack = { goTo(Screen.Menu) },
+            onReplayTutorial = { tutorial ->
+                closeModal()
+                onReplayTutorial(tutorial)
+            },
+            onBack = closeModal,
         )
 
         Screen.Account -> AccountScreen(
@@ -384,9 +661,9 @@ private fun ScreenContent(
             onBack = { goTo(Screen.Settings) },
         )
 
-        Screen.Links -> LinksScreen(onBack = { goTo(Screen.Menu) })
+        Screen.Links -> LinksScreen(onBack = closeModal)
 
-        Screen.Changelog -> ChangelogScreen(onBack = { goTo(Screen.Menu) })
+        Screen.Changelog -> ChangelogScreen(onBack = closeModal)
 
         Screen.VolcanoCinematic -> VolcanoCinematicScreen(equippedSkin = save.equippedSkin, equippedCosmetic = save.equippedCosmetic, onFinished = { outcome ->
             updateSave(VolcanoCinematic.applyOutcome(save, outcome, System.currentTimeMillis()))
@@ -399,3 +676,10 @@ private fun ScreenContent(
         })
     }
 }
+
+/** Ce que le panneau des triches doit pouvoir faire au menu. */
+internal class CheatHooks(
+    val open: () -> Unit,
+    val menuDialog: MenuDialog?,
+    val onMenuDialogShown: () -> Unit,
+)

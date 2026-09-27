@@ -21,22 +21,23 @@ private fun player(context: Context, resId: Int, looping: Boolean): MediaPlayer?
 /**
  * `boss-music` : repart du début à chaque (re)départ du combat
  * ([generation]), continue jusqu'au générique, suit le bouton 🔊 comme les
- * autres musiques (`aBoss.muted = save.musicMuted`).
+ * autres musiques (`aBoss.muted = save.musicMuted`). En pause tant que
+ * l'app n'est plus au premier plan ([inForeground]).
  */
 @Composable
-internal fun BossMusic(active: Boolean, generation: Int, volume: Float, muted: Boolean) {
+internal fun BossMusic(active: Boolean, generation: Int, volume: Float, muted: Boolean, inForeground: Boolean) {
     val context = LocalContext.current
     val player = remember { player(context, R.raw.music_boss, looping = true) }
     DisposableEffect(player) { onDispose { player?.release() } }
-    LaunchedEffect(active, generation) {
+    val lastGeneration = remember { intArrayOf(0) }
+    LaunchedEffect(active, generation, inForeground) {
         val p = player ?: return@LaunchedEffect
         runCatching {
-            if (active) {
-                if (generation > 0) p.seekTo(0)
-                p.start()
-            } else if (p.isPlaying) {
-                p.pause()
+            if (generation != lastGeneration[0]) {
+                lastGeneration[0] = generation
+                p.seekTo(0)
             }
+            if (active && inForeground) p.start() else if (p.isPlaying) p.pause()
         }
     }
     LaunchedEffect(volume, muted) {

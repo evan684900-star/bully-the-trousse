@@ -76,9 +76,22 @@ class VilleTest {
 
     @Test
     fun `un gain compte pour le monde ou il est fait`() {
-        assertEquals(50, Ville.recordWorldEarning(inCity, 50).villeMoneyEarned)
-        assertEquals(50, Ville.recordWorldEarning(GameSave(inPlage = true, currentWorld = "plage"), 50).plageMoneyEarned)
-        assertEquals(GameSave(), Ville.recordWorldEarning(GameSave(), 50))
+        val today = java.time.LocalDate.of(2026, 9, 27)
+        val city = DailyStats.recordEarning(inCity, 50, today)
+        assertEquals(50, city.villeMoneyEarned)
+        assertEquals(0, city.plageMoneyEarned)
+        val beach = DailyStats.recordEarning(GameSave(inPlage = true, currentWorld = "plage"), 50, today)
+        assertEquals(50, beach.plageMoneyEarned)
+        assertEquals(0, beach.villeMoneyEarned)
+        val cour = DailyStats.recordEarning(GameSave(), 50, today)
+        assertEquals(0, cour.villeMoneyEarned + cour.plageMoneyEarned)
+    }
+
+    @Test
+    fun `reclamer un defi sur la plage ne compte qu'une fois l'argent de la plage`() {
+        val save = GameSave(inPlage = true, currentWorld = "plage", dailyChallenges = listOf(DailyChallenge("throws", 1.0, 300, progress = 1.0)))
+        val claimed = assertIs<DailyChallenges.ClaimResult.Success>(DailyChallenges.claim(save, 0))
+        assertEquals(300, claimed.save.plageMoneyEarned)
     }
 
     @Test

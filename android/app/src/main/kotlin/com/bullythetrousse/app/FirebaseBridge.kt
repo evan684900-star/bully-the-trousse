@@ -2,6 +2,9 @@ package com.bullythetrousse.app
 
 import android.content.Context
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Gifts
+import com.bullythetrousse.core.IncomingGift
+import com.bullythetrousse.core.LegacySave
 import com.bullythetrousse.core.RecoveryCode
 import com.bullythetrousse.core.SaveCodec
 import com.bullythetrousse.core.SkinStats
@@ -9,8 +12,12 @@ import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.firestore.AggregateSource
+import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -52,6 +59,8 @@ import kotlin.coroutines.resumeWithException
  * plomberie réseau.
  */
 class FirebaseBridge(context: Context) {
+
+    private val appContext: Context = context.applicationContext
 
     /**
      * Firebase s'initialise tout seul au démarrage, MAIS seulement si le
@@ -120,6 +129,70 @@ class FirebaseBridge(context: Context) {
         }
     }
 
+    /**
+     * `lookupAccountByCode()` : regarde ce que désigne un code SANS toucher à
+     * la connexion en cours, grâce à une deuxième instance Firebase isolée
+     * (`getVerifyApp()` côté site). Si le code est faux ou que le joueur
+     * annule ensuite, rien n'a bougé.
+     *
+     * - un vrai compte : sa partie, lue dans `users/{uid}` ;
+     * - un ANCIEN code (copie de partie dans `recoveryCodes`, d'avant la
+     *   refonte des comptes) ;
+     * - `null` : code inconnu.
+     */
+    suspend fun lookupCode(code: String): CodeLookup? {
+        if (!isAvailable) return null
+        val app = FirebaseApp.getApps(appContext).firstOrNull { it.name == VERIFY_APP }
+            ?: FirebaseApp.initializeApp(appContext, FirebaseApp.getInstance().options, VERIFY_APP)
+        val verifyAuth = FirebaseAuth.getInstance(app)
+        try {
+            val user = try {
+                verifyAuth.signInWithEmailAndPassword(RecoveryCode.emailFor(code), RecoveryCode.passwordFor(code)).await().user
+            } catch (e: FirebaseAuthException) {
+                // Pas de compte pour ce code : soit il est faux, soit il date
+                // d'avant la refonte, soit la connexion e-mail est désactivée
+                // dans la console. Dans les trois cas, on essaie l'ancien
+                // mécanisme plutôt que d'échouer (la protection anti-
+                // énumération de Firebase masque « introuvable » derrière
+                // « identifiants invalides », d'où le traitement groupé).
+                null
+            }
+            if (user != null) {
+                val doc = FirebaseFirestore.getInstance(app).collection(USERS).document(user.uid).get().await()
+                val save = if (doc.exists()) SaveCodec.fromFieldMap(doc.data.orEmpty()) else GameSave()
+                return CodeLookup.Account(user.uid, save)
+            }
+            val legacy = firestore.collection(RECOVERY_CODES).document(code).get().await()
+            val raw = legacy.get("save") as? Map<*, *> ?: return null
+            val rawSave = raw.entries.associate { (k, v) -> k.toString() to v }
+            return CodeLookup.Legacy(
+                oldUid = legacy.getString("uid"),
+                retireToken = legacy.getString("retireToken"),
+                save = LegacySave.migrate(SaveCodec.fromFieldMap(rawSave), rawSave),
+            )
+        } finally {
+            // `closeVerifyApp()` : on ne garde jamais cette session ouverte.
+            runCatching { verifyAuth.signOut() }
+            runCatching { app.delete() }
+        }
+    }
+
+    /**
+     * `retireOldLeaderboardEntry()` : un ancien code restauré ailleurs laisse
+     * l'entrée de classement de l'ANCIEN compte. On la remet à zéro, le
+     * jeton de retrait prouvant aux règles Firestore qu'on en a le droit.
+     */
+    suspend fun retireOldLeaderboardEntry(oldUid: String?, retireToken: String?, pseudo: String) {
+        if (!isAvailable || oldUid.isNullOrBlank() || retireToken.isNullOrBlank() || oldUid == uid) return
+        for (collection in listOf(SCORES, SCORES_PLAGE)) {
+            runCatching {
+                firestore.collection(collection).document(oldUid).set(
+                    mapOf("pseudo" to pseudo, "bestDistance" to 0.0, "retireToken" to retireToken),
+                ).await()
+            }
+        }
+    }
+
     /** `firebase.auth().signOut()` : ferme la session en cours. */
     fun signOut() {
         if (isAvailable) auth.signOut()
@@ -140,7 +213,7 @@ class FirebaseBridge(context: Context) {
      */
     suspend fun cleanupAbandonedAnonymousAccount(uid: String, unlockedAchievements: List<String>) {
         if (!isAvailable) return
-        val docWipes = listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, "activePlayers", RECOVERY_TOKENS)
+        val docWipes = listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, ACTIVE_PLAYERS, RECOVERY_TOKENS)
         for (collection in docWipes) {
             runCatching { firestore.collection(collection).document(uid).delete().await() }
         }
@@ -150,7 +223,7 @@ class FirebaseBridge(context: Context) {
         // grimper les pourcentages au-dessus de 100 %.
         for (id in unlockedAchievements) {
             runCatching {
-                firestore.collection("achvUnlocks").document(id).collection("players").document(uid).delete().await()
+                firestore.collection(ACHV_UNLOCKS).document(id).collection("players").document(uid).delete().await()
             }
         }
         // Les abonnements de ce compte jetable, sinon ils gonflent le nombre
@@ -171,6 +244,43 @@ class FirebaseBridge(context: Context) {
         if (data.isEmpty()) return null
         val updatedAt = doc.getTimestamp(UPDATED_AT)?.toDate()?.time ?: 0L
         return CloudSave(SaveCodec.fromFieldMap(data), updatedAt)
+    }
+
+    /**
+     * `startCloudSaveListener()` : suit la partie en temps réel, pour qu'une
+     * partie jouée sur le site (ou un autre téléphone) arrive ici sans
+     * relancer l'app. Sont ignorés : le tout premier instantané (c'est ce que
+     * la connexion vient de charger), les écritures pas encore confirmées,
+     * et celles de CET appareil (même `sessionId`).
+     */
+    fun listenCloudSave(uid: String, sessionId: String, onRemote: (CloudSave) -> Unit): ListenerRegistration? {
+        if (!isAvailable) return null
+        var first = true
+        return firestore.collection(USERS).document(uid).addSnapshotListener { doc, error ->
+            if (error != null || doc == null) return@addSnapshotListener
+            if (first) {
+                first = false
+                return@addSnapshotListener
+            }
+            if (!doc.exists() || doc.metadata.hasPendingWrites()) return@addSnapshotListener
+            val data = doc.data ?: return@addSnapshotListener
+            if (data["sessionId"] == sessionId) return@addSnapshotListener
+            val updatedAt = doc.getTimestamp(UPDATED_AT)?.toDate()?.time ?: System.currentTimeMillis()
+            onRemote(CloudSave(SaveCodec.fromFieldMap(data), updatedAt))
+        }
+    }
+
+    /**
+     * `pingPresence()` : rafraîchit l'horodatage du profil public, que les
+     * autres joueurs lisent pour afficher « En ligne » ou « Vu il y a... ».
+     * Best-effort.
+     */
+    suspend fun pingPresence(uid: String) {
+        if (!isAvailable) return
+        runCatching {
+            firestore.collection(PROFILES).document(uid)
+                .set(mapOf(UPDATED_AT to FieldValue.serverTimestamp()), SetOptions.merge()).await()
+        }
     }
 
     /**
@@ -288,7 +398,11 @@ class FirebaseBridge(context: Context) {
             avatarEmoji = doc.getString("avatarEmoji").orEmpty(),
             isPrivate = doc.getBoolean("isPrivate") ?: false,
             equippedSkin = doc.getString("equippedSkin").orEmpty().ifBlank { "classique" },
-            ownedSkinsCount = (doc.get("ownedSkins") as? List<*>)?.size ?: 0,
+            // `safeOwnedSkins()` côté site : seuls des identifiants texte, le
+            // document n'étant pas validé côté serveur.
+            ownedSkins = (doc.get("ownedSkins") as? List<*>)?.filterIsInstance<String>().orEmpty(),
+            dailyEarnings = numberMap(doc.get("dailyEarnings")).mapValues { it.value.toLong() },
+            dailyBestDistance = numberMap(doc.get("dailyBestDistance")),
             bestDistance = doc.getDouble("bestDistance") ?: 0.0,
             totalMoneyEarned = (doc.getLong("totalMoneyEarned") ?: 0L),
             puissance = (doc.getLong("puissance") ?: 0L).toInt(),
@@ -298,6 +412,32 @@ class FirebaseBridge(context: Context) {
             // afficher "En ligne" ou "Vu il y a...".
             updatedAtMillis = doc.getTimestamp(UPDATED_AT)?.toDate()?.time,
         )
+    }
+
+    /** Une map `{ "AAAA-MM-JJ": nombre }` lue dans un document, sans faire
+     *  confiance à son contenu (`num()` côté site : tout ce qui n'est pas un
+     *  nombre fini est ignoré). */
+    private fun numberMap(raw: Any?): Map<String, Double> =
+        (raw as? Map<*, *>).orEmpty().mapNotNull { (k, v) ->
+            val key = k as? String ?: return@mapNotNull null
+            val value = (v as? Number)?.toDouble()?.takeIf { it.isFinite() } ?: return@mapNotNull null
+            key to value
+        }.toMap()
+
+    /**
+     * `openFollowListModal()` : les comptes que [uid] suit (FOLLOWING) ou qui
+     * le suivent (FOLLOWERS), 50 au plus, avec leur profil public pour le
+     * pseudo et l'avatar (null si ce joueur n'a jamais publié de profil).
+     */
+    suspend fun listFollows(uid: String, direction: FollowDirection): List<Pair<String, PublicProfile?>> {
+        if (!isAvailable) return emptyList()
+        val (matchField, otherField) = when (direction) {
+            FollowDirection.FOLLOWING -> "follower" to "following"
+            FollowDirection.FOLLOWERS -> "following" to "follower"
+        }
+        val others = firestore.collection(FOLLOWS).whereEqualTo(matchField, uid).limit(50).get().await()
+            .documents.mapNotNull { it.getString(otherField) }
+        return others.map { other -> other to runCatching { fetchPublicProfile(other) }.getOrNull() }
     }
 
     /** `isFollowing()` côté site : un `get()` direct sur l'identifiant de la
@@ -336,7 +476,133 @@ class FirebaseBridge(context: Context) {
 
     private suspend fun countFollows(field: String, uid: String): Int {
         if (!isAvailable) return 0
-        return firestore.collection(FOLLOWS).whereEqualTo(field, uid).get().await().size()
+        return countDocs(firestore.collection(FOLLOWS).whereEqualTo(field, uid))
+    }
+
+    /** `countDocs()` côté site : l'agrégation `count()` compte côté serveur
+     *  sans télécharger les documents — un seul document lu facturé, quel que
+     *  soit le nombre de résultats. */
+    private suspend fun countDocs(query: Query): Int =
+        query.count().get(AggregateSource.SERVER).await().count.toInt()
+
+    // ---- Cadeaux d'argent entre joueurs (collection "gifts") ----
+
+    /**
+     * `openGiftModal()` : à qui je peux offrir de l'argent. « Abonnés » couvre
+     * ici les deux sens du suivi — ceux qui me suivent ET ceux que je suis —
+     * car les règles Firestore autorisent le cadeau dans les deux cas.
+     */
+    suspend fun listGiftTargets(uid: String): List<Pair<String, PublicProfile?>> {
+        if (!isAvailable) return emptyList()
+        val followers = firestore.collection(FOLLOWS).whereEqualTo("following", uid).limit(50).get().await()
+            .documents.mapNotNull { it.getString("follower") }
+        val following = firestore.collection(FOLLOWS).whereEqualTo("follower", uid).limit(50).get().await()
+            .documents.mapNotNull { it.getString("following") }
+        return (followers + following).distinct().map { other ->
+            other to runCatching { fetchPublicProfile(other) }.getOrNull()
+        }
+    }
+
+    /** `sendGift()` : écrit le cadeau que le destinataire ramassera. */
+    suspend fun sendGift(fromUid: String, toUid: String, fromPseudo: String, amount: Int) {
+        check(isAvailable) { "Firebase indisponible" }
+        firestore.collection(GIFTS).add(
+            mapOf(
+                "from" to fromUid,
+                "to" to toUid,
+                "fromPseudo" to fromPseudo.ifBlank { "Anonyme" },
+                "amount" to amount.toLong(),
+                "seen" to false,
+                "createdAt" to FieldValue.serverTimestamp(),
+            ),
+        ).await()
+    }
+
+    /**
+     * `checkIncomingGifts()` : ramasse les cadeaux reçus depuis la dernière
+     * connexion et les marque « vus » d'un seul lot, pour ne jamais les
+     * créditer deux fois. Le marquage est best-effort, comme côté site.
+     */
+    suspend fun collectIncomingGifts(uid: String): List<IncomingGift> {
+        if (!isAvailable) return emptyList()
+        val snap = firestore.collection(GIFTS)
+            .whereEqualTo("to", uid).whereEqualTo("seen", false)
+            .limit(Gifts.PENDING_LIMIT).get().await()
+        if (snap.isEmpty) return emptyList()
+        val batch = firestore.batch()
+        val gifts = snap.documents.map { doc ->
+            batch.update(doc.reference, "seen", true)
+            giftFrom(doc.id, doc.data.orEmpty())
+        }
+        runCatching { batch.commit().await() }
+        return gifts
+    }
+
+    /**
+     * `startGiftsListener()` : pendant la session, crédite chaque nouveau
+     * cadeau dès son écriture par l'expéditeur. À démarrer seulement après
+     * [collectIncomingGifts], pour ne jamais créditer le même document deux
+     * fois. Renvoie de quoi arrêter l'écoute.
+     */
+    fun listenIncomingGifts(uid: String, onGift: (IncomingGift) -> Unit): ListenerRegistration? {
+        if (!isAvailable) return null
+        return firestore.collection(GIFTS)
+            .whereEqualTo("to", uid).whereEqualTo("seen", false)
+            .addSnapshotListener { snap, error ->
+                if (error != null || snap == null) return@addSnapshotListener
+                for (change in snap.documentChanges) {
+                    if (change.type != DocumentChange.Type.ADDED) continue
+                    val gift = giftFrom(change.document.id, change.document.data)
+                    if (gift.amount <= 0) continue
+                    change.document.reference.update("seen", true)
+                    onGift(gift)
+                }
+            }
+    }
+
+    /** Un document de `gifts`, sans faire confiance à son contenu. */
+    private fun giftFrom(docId: String, data: Map<String, Any?>): IncomingGift {
+        val amount = (data["amount"] as? Number)?.toDouble()?.takeIf { it.isFinite() } ?: 0.0
+        return IncomingGift(
+            senderUid = data["from"] as? String ?: docId,
+            senderPseudo = (data["fromPseudo"] as? String).orEmpty().ifBlank { "Anonyme" },
+            amount = kotlin.math.floor(amount).toInt().coerceAtLeast(0),
+        )
+    }
+
+    // ---- Statistiques publiques des succès (% de joueurs) ----
+
+    /** `markPlayerActive()` : un compte est « actif » dès son premier lancer.
+     *  Dénominateur des pourcentages, sans exposer la moindre sauvegarde. */
+    suspend fun markPlayerActive(uid: String, totalThrows: Int) {
+        if (!isAvailable || totalThrows < 1) return
+        firestore.collection(ACTIVE_PLAYERS).document(uid).set(mapOf("active" to true), SetOptions.merge()).await()
+    }
+
+    /** `pushAchvUnlock(id)` : signale que ce compte a débloqué ce succès. */
+    suspend fun pushAchvUnlock(uid: String, achievementId: String, totalThrows: Int) {
+        if (!isAvailable) return
+        markPlayerActive(uid, totalThrows)
+        firestore.collection(ACHV_UNLOCKS).document(achievementId).collection("players").document(uid)
+            .set(mapOf("unlocked" to true), SetOptions.merge()).await()
+    }
+
+    /** Nombre de joueurs actifs, dénominateur de `loadAchievementStats()`. */
+    suspend fun countActivePlayers(): Int {
+        if (!isAvailable) return 0
+        return countDocs(firestore.collection(ACTIVE_PLAYERS))
+    }
+
+    /** Nombre de joueurs ayant débloqué [achievementId]. */
+    suspend fun countAchievementUnlocks(achievementId: String): Int {
+        if (!isAvailable) return 0
+        return countDocs(firestore.collection(ACHV_UNLOCKS).document(achievementId).collection("players"))
+    }
+
+    /** `computeRank()` : nombre de joueurs avec un meilleur record, plus un. */
+    suspend fun computeRank(collection: String, bestDistance: Double): Int {
+        if (!isAvailable) return 0
+        return countDocs(firestore.collection(collection).whereGreaterThan("bestDistance", bestDistance)) + 1
     }
 
     companion object {
@@ -348,12 +614,31 @@ class FirebaseBridge(context: Context) {
         private const val RECOVERY_CODES = "recoveryCodes"
         private const val RECOVERY_TOKENS = "recoveryTokens"
         private const val UPDATED_AT = "updatedAt"
+        private const val GIFTS = "gifts"
+        private const val VERIFY_APP = "verify"
+        private const val ACTIVE_PLAYERS = "activePlayers"
+        private const val ACHV_UNLOCKS = "achvUnlocks"
     }
 }
 
 /** Sauvegarde reçue du cloud, avec l'horodatage serveur de sa dernière
  *  écriture (voir `CloudSaveSync` dans `:core`, qui décide si on l'applique). */
 data class CloudSave(val save: GameSave, val updatedAtMillis: Long)
+
+/** Ce que désigne un code de récupération (voir [FirebaseBridge.lookupCode]). */
+sealed interface CodeLookup {
+    val save: GameSave
+
+    /** Un vrai compte : on s'y connectera. */
+    data class Account(val uid: String, override val save: GameSave) : CodeLookup
+
+    /** Un ancien code : une simple copie de partie, qu'on restaure puis
+     *  qu'on rattache au compte de cet appareil. */
+    data class Legacy(val oldUid: String?, val retireToken: String?, override val save: GameSave) : CodeLookup
+}
+
+/** Sens d'une liste d'abonnements : ceux que je suis, ou ceux qui me suivent. */
+enum class FollowDirection { FOLLOWING, FOLLOWERS }
 
 /** Une ligne du classement (`.leaderboard-row` côté site). */
 data class LeaderboardEntry(val uid: String, val pseudo: String, val distanceMeters: Double)
@@ -369,7 +654,9 @@ data class PublicProfile(
     val avatarEmoji: String,
     val isPrivate: Boolean,
     val equippedSkin: String,
-    val ownedSkinsCount: Int,
+    val ownedSkins: List<String>,
+    val dailyEarnings: Map<String, Long>,
+    val dailyBestDistance: Map<String, Double>,
     val bestDistance: Double,
     val totalMoneyEarned: Long,
     val puissance: Int,

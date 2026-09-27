@@ -50,6 +50,9 @@ class SpaceFlight(
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+            // Partie en pause (fenêtre ouverte en plein lancer) : l'image
+            // défile mais ni la physique ni les chronos n'avancent.
+            if (PlayState.paused) continue
             // Un tap a pu faire avancer l'état entre deux frames : on repart
             // de celui-là, pas de notre copie locale devenue périmée.
             current = SpaceSequence.step(state ?: current, dt, skin)

@@ -1,7 +1,10 @@
 package com.bullythetrousse.core
 
 /** Un cosmétique de La Trousserie : purement décoratif, se porte sur n'importe quel skin. */
-data class Cosmetic(val id: String, val name: String, val cost: Int)
+data class Cosmetic(val id: String, val name: String, val nameEn: String, val cost: Int) {
+    /** `villeCosmeticName(cm)` côté site. */
+    fun name(lang: Lang): String = if (lang == Lang.EN) nameEn else name
+}
 
 /**
  * La Trousserie, la boutique de la rue du monde Ville : portage de
@@ -10,14 +13,14 @@ data class Cosmetic(val id: String, val name: String, val cost: Int)
  */
 object Cosmetics {
     val ALL: List<Cosmetic> = listOf(
-        Cosmetic("noeud", "Nœud papillon", 1200),
-        Cosmetic("casquette", "Casquette", 1800),
-        Cosmetic("lunettes", "Lunettes de soleil", 2500),
-        Cosmetic("chapeau", "Haut-de-forme", 4000),
-        Cosmetic("moustache", "Moustache distinguée", 5000),
-        Cosmetic("antennes", "Antennes d'alien", 8000),
-        Cosmetic("aureole", "Auréole", 12000),
-        Cosmetic("couronne", "Couronne", 20000),
+        Cosmetic("noeud", "Nœud papillon", "Bow tie", 1200),
+        Cosmetic("casquette", "Casquette", "Cap", 1800),
+        Cosmetic("lunettes", "Lunettes de soleil", "Sunglasses", 2500),
+        Cosmetic("chapeau", "Haut-de-forme", "Top hat", 4000),
+        Cosmetic("moustache", "Moustache distinguée", "Fancy moustache", 5000),
+        Cosmetic("antennes", "Antennes d'alien", "Alien antennae", 8000),
+        Cosmetic("aureole", "Auréole", "Halo", 12000),
+        Cosmetic("couronne", "Couronne", "Crown", 20000),
     )
 
     fun find(id: String): Cosmetic? = ALL.firstOrNull { it.id == id }

@@ -1,18 +1,26 @@
 package com.bullythetrousse.app
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.IncomingGift
+import com.bullythetrousse.core.MergeChoice
 import com.bullythetrousse.core.Pseudo
 import com.bullythetrousse.core.RecoveryCode
+import com.google.firebase.firestore.ListenerRegistration
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 /** Ce que l'app sait de sa connexion au compte en ligne, pour l'afficher
@@ -50,7 +58,7 @@ enum class CloudState {
  * démarrage (voir [AUTO_RETRY_DELAYS_MS]) et à la demande depuis l'écran
  * Compte.
  */
-class CloudSession(val bridge: FirebaseBridge) {
+class CloudSession(val bridge: FirebaseBridge, private val scope: CoroutineScope) {
     var state by mutableStateOf(
         if (bridge.isAvailable) CloudState.CONNECTING else CloudState.NOT_CONFIGURED,
     )
@@ -60,6 +68,88 @@ class CloudSession(val bridge: FirebaseBridge) {
         internal set
 
     internal var retryTrigger by mutableIntStateOf(0)
+
+    /**
+     * Lance [block] pour la durée de vie de l'app, pas celle d'un écran.
+     *
+     * Pour les écritures qui ne doivent pas être abandonnées à mi-chemin : un
+     * cadeau, par exemple, part vers Firestore même si le joueur ferme la
+     * fenêtre, et l'annuler de notre côté ferait rembourser un cadeau bel et
+     * bien envoyé.
+     */
+    fun launchDetached(block: suspend () -> Unit) {
+        scope.launch { block() }
+    }
+
+    /** Heure du dernier cadeau envoyé (`lastGiftSentAt` côté site) : le délai
+     *  de [Gifts.COOLDOWN_MS] vaut pour toute la session, pas par écran. */
+    var lastGiftSentAtMillis: Long = 0L
+
+    /** Reçoit les cadeaux crédités : tous ceux en attente à la connexion
+     *  (`atLogin` = vrai, affichés dans une modale), puis un par un en temps
+     *  réel (toast). Branché par [rememberCloudSession]. */
+    internal var giftSink: ((gifts: List<IncomingGift>, atLogin: Boolean) -> Unit)? = null
+
+    private var giftsListener: ListenerRegistration? = null
+
+    /** Reçoit une partie arrivée d'un autre appareil pendant la session
+     *  (voir [startSaveListener]). Branché par [rememberCloudSession]. */
+    internal var remoteSaveSink: ((CloudSave) -> Unit)? = null
+
+    private var saveListener: ListenerRegistration? = null
+
+    /** `startCloudSaveListener()` : suit la partie de ce compte en temps réel. */
+    internal fun startSaveListener(uid: String) {
+        stopSaveListener()
+        saveListener = bridge.listenCloudSave(uid, sessionId) { remote -> remoteSaveSink?.invoke(remote) }
+    }
+
+    internal fun stopSaveListener() {
+        saveListener?.remove()
+        saveListener = null
+    }
+
+    /**
+     * `checkIncomingGifts()` puis `startGiftsListener()`, dans cet ordre : le
+     * ramassage marque d'abord « vus » les cadeaux en attente, pour que
+     * l'écoute ne les crédite pas une deuxième fois.
+     */
+    internal suspend fun startGifts(uid: String) {
+        stopGifts()
+        val pending = runCatching { bridge.collectIncomingGifts(uid) }.getOrDefault(emptyList())
+        if (pending.isNotEmpty()) giftSink?.invoke(pending, true)
+        giftsListener = bridge.listenIncomingGifts(uid) { gift -> giftSink?.invoke(listOf(gift), false) }
+    }
+
+    internal fun stopGifts() {
+        giftsListener?.remove()
+        giftsListener = null
+    }
+
+    /**
+     * `pushAchvUnlock()` pour chaque succès qui vient de tomber : alimente les
+     * pourcentages de la liste des succès. Best-effort, en arrière-plan — un
+     * échec réseau ne doit ni bloquer ni retarder la partie.
+     */
+    fun publishUnlocks(achievementIds: List<String>, totalThrows: Int) {
+        val id = uid ?: return
+        if (achievementIds.isEmpty()) return
+        scope.launch {
+            for (achievementId in achievementIds) {
+                runCatching { bridge.pushAchvUnlock(id, achievementId, totalThrows) }
+            }
+        }
+    }
+
+    /** `syncAchievementStats()` : à chaque connexion, renvoie tous les succès
+     *  déjà obtenus, au cas où ce compte date d'avant ce système. */
+    internal suspend fun syncAchievementStats(save: GameSave) {
+        val id = uid ?: return
+        runCatching { bridge.markPlayerActive(id, save.totalThrows) }
+        for (achievementId in save.unlockedAchievements) {
+            runCatching { bridge.pushAchvUnlock(id, achievementId, save.totalThrows) }
+        }
+    }
 
     /** Redemande une connexion (nouvelle tentative automatique épuisée, ou
      *  bouton "Réessayer" de l'écran Compte). Sans effet si déjà connecté. */
@@ -81,63 +171,109 @@ class CloudSession(val bridge: FirebaseBridge) {
         append(System.currentTimeMillis().toString(36))
     }
 
+    /** `lookupAccountByCode()` : ce que désigne ce code, sans quitter le compte actuel. */
+    suspend fun lookupCode(code: String): CodeLookup? = bridge.lookupCode(code)
+
     /**
-     * Rejoint le compte désigné par [code] : la partie, le profil et
-     * l'entrée de classement deviennent ceux de ce compte, sur cet appareil
-     * comme sur le site.
+     * `joinAccount(code, choice)` : connecte cet appareil au compte du code.
      *
-     * La sauvegarde du compte l'emporte sur celle du téléphone : c'est le
-     * sens de la démarche (« je veux retrouver MA partie ici »), et le site
-     * fait le même choix quand le joueur ne demande pas explicitement
-     * l'inverse. Renvoie `null` si tout s'est bien passé, sinon le message
-     * à montrer au joueur.
+     * [choice] vient de la question « quelle partie garder ? » : avec
+     * [MergeChoice.OTHER], la partie du compte remplace celle du téléphone ;
+     * avec [MergeChoice.CURRENT], c'est la partie du téléphone qui écrase
+     * celle du compte. Jamais de mélange champ par champ : l'une OU l'autre,
+     * en entier.
+     *
+     * Renvoie `null` si tout s'est bien passé, sinon la clé du message à
+     * montrer au joueur.
      */
     suspend fun joinAccount(
         code: String,
+        choice: MergeChoice,
         repository: SaveRepository,
         currentSave: GameSave,
         onSaveChange: (GameSave) -> Unit,
     ): String? {
-        if (!bridge.isAvailable) return "Le compte en ligne n'est pas configuré dans cette version."
-        if (!RecoveryCode.isValid(code)) return "Un code fait 16 chiffres."
+        if (!bridge.isAvailable) return "recoveryErrOffline"
 
         // Le compte invité de cet appareil ne sert plus à rien une fois qu'on
-        // bascule sur un vrai compte : le nettoyer maintenant évite un pseudo
-        // fantôme dans le classement (voir cleanupAbandonedAnonymousAccount()
-        // côté site — même geste que joinAccount() y fait avant de se
-        // connecter au nouveau compte).
+        // bascule sur un vrai compte : le nettoyer évite un pseudo fantôme au
+        // classement (cleanupAbandonedAnonymousAccount() côté site).
         if (bridge.isAnonymous) {
             uid?.let { oldUid ->
                 runCatching { bridge.cleanupAbandonedAnonymousAccount(oldUid, currentSave.unlockedAchievements) }
             }
         }
 
+        stopGifts()
+        // Une partie reçue de l'ANCIEN compte n'a plus rien à faire ici.
+        stopSaveListener()
         val joined = try {
             bridge.signInWithCode(code)
         } catch (e: Exception) {
             null
-        } ?: return "Aucun compte ne correspond à ce code."
+        } ?: return "recoveryErrWrongCode"
 
         uid = joined
         state = CloudState.LINKED
+        startSaveListener(joined)
+        scope.launch { startGifts(joined) }
         return try {
             val cloud = bridge.fetchCloudSave(joined)
-            if (cloud != null) {
+            if (choice == MergeChoice.OTHER && cloud != null) {
                 val restored = cloud.save.copy(recoveryCode = code)
                 repository.saveFromCloud(restored, cloud.updatedAtMillis)
                 onSaveChange(restored)
             } else {
-                // Compte existant mais sans sauvegarde (cas rare) : on y
-                // installe la partie de cet appareil plutôt que de repartir
-                // de zéro.
+                // Partie du téléphone gardée (ou compte sans partie) : elle
+                // devient celle du compte.
                 val adopted = currentSave.copy(recoveryCode = code)
                 onSaveChange(adopted)
                 bridge.pushCloudSave(joined, adopted, sessionId)
+                pushBothScores(joined, adopted)
             }
             null
         } catch (e: Exception) {
-            "Connecté, mais la partie du compte n'a pas pu être lue. Réessaie plus tard."
+            "leaderboardError"
         }
+    }
+
+    /**
+     * `restoreLegacyCode()` : un ancien code ne désigne pas un compte mais une
+     * COPIE de partie. On retire l'entrée de classement de l'ancien compte,
+     * on garde la partie choisie, puis on rattache le compte de cet appareil
+     * à ce code, pour que les prochains appareils s'y connectent vraiment.
+     */
+    suspend fun restoreLegacy(
+        code: String,
+        lookup: CodeLookup.Legacy,
+        choice: MergeChoice,
+        currentSave: GameSave,
+        onSaveChange: (GameSave) -> Unit,
+    ): String? {
+        if (!bridge.isAvailable) return "recoveryErrOffline"
+        return try {
+            bridge.retireOldLeaderboardEntry(lookup.oldUid, lookup.retireToken, lookup.save.pseudo)
+            val chosen = if (choice == MergeChoice.OTHER) lookup.save else currentSave
+            val restored = chosen.copy(
+                recoveryCode = code,
+                recoveryRetireToken = chosen.recoveryRetireToken.ifBlank { RecoveryCode.generate() },
+            )
+            onSaveChange(restored)
+            uid?.let { id ->
+                // Les deux classements tout de suite, sans attendre un record.
+                pushBothScores(id, restored)
+                runCatching { bridge.pushRecoverySnapshot(id, restored) }
+            }
+            if (bridge.linkToCode(code)) state = CloudState.LINKED
+            null
+        } catch (e: Exception) {
+            "recoveryErrWrongCode"
+        }
+    }
+
+    private suspend fun pushBothScores(id: String, save: GameSave) {
+        runCatching { bridge.pushScore("scores", id, save.pseudo, save.bestDistance) }
+        runCatching { bridge.pushScore("scoresPlage", id, save.pseudo, save.plageBestDistance) }
     }
 
     /**
@@ -189,6 +325,9 @@ class CloudSession(val bridge: FirebaseBridge) {
                 runCatching { bridge.cleanupAbandonedAnonymousAccount(id, currentSave.unlockedAchievements) }
             }
         }
+        // Les cadeaux et la partie de l'ancien compte ne doivent plus arriver ici.
+        stopGifts()
+        stopSaveListener()
         bridge.signOut()
         uid = null
         state = if (bridge.isAvailable) CloudState.CONNECTING else CloudState.NOT_CONFIGURED
@@ -196,13 +335,14 @@ class CloudSession(val bridge: FirebaseBridge) {
         return GameSave()
     }
 
-    val statusText: String
+    /** La clé de traduction de l'état du compte (`#account-status` côté site). */
+    val statusKey: String
         get() = when (state) {
-            CloudState.NOT_CONFIGURED -> "🔌 Compte en ligne non configuré dans cette version."
-            CloudState.CONNECTING -> "Connexion…"
-            CloudState.GUEST -> "📱 Partie locale à cet appareil. Crée ton code pour la retrouver ailleurs."
-            CloudState.LINKED -> "✅ Appareil connecté à ton compte — la partie se synchronise automatiquement."
-            CloudState.OFFLINE -> "🔌 Hors ligne : compte indisponible pour le moment."
+            CloudState.NOT_CONFIGURED -> "onlineOfflineNoConfig"
+            CloudState.CONNECTING -> "onlineConnecting"
+            CloudState.GUEST -> "accountStatusLocal"
+            CloudState.LINKED -> "accountStatusLinked"
+            CloudState.OFFLINE -> "accountStatusOffline"
         }
 }
 
@@ -232,9 +372,36 @@ fun rememberCloudSession(
     save: GameSave,
     repository: SaveRepository,
     onSaveChange: (GameSave) -> Unit,
+    onGifts: (gifts: List<IncomingGift>, atLogin: Boolean) -> Unit,
+    onRemoteSave: (CloudSave) -> Unit,
+    inForeground: Boolean,
 ): CloudSession {
     val context = LocalContext.current
-    val session = remember { CloudSession(FirebaseBridge(context)) }
+    val scope = rememberCoroutineScope()
+    val session = remember { CloudSession(FirebaseBridge(context), scope) }
+    val currentOnGifts by rememberUpdatedState(onGifts)
+    val currentOnRemoteSave by rememberUpdatedState(onRemoteSave)
+    DisposableEffect(session) {
+        session.giftSink = { gifts, atLogin -> currentOnGifts(gifts, atLogin) }
+        session.remoteSaveSink = { remote -> currentOnRemoteSave(remote) }
+        onDispose {
+            session.giftSink = null
+            session.remoteSaveSink = null
+            session.stopGifts()
+            session.stopSaveListener()
+        }
+    }
+
+    // pingPresence() : toutes les 60 s tant que l'app est à l'écran, et dès
+    // qu'elle y revient (le `visibilitychange` du site).
+    LaunchedEffect(session.uid, inForeground) {
+        val id = session.uid ?: return@LaunchedEffect
+        if (!inForeground) return@LaunchedEffect
+        while (true) {
+            session.bridge.pingPresence(id)
+            delay(PRESENCE_PING_INTERVAL_MS)
+        }
+    }
 
     LaunchedEffect(session.retryTrigger) {
         if (!session.bridge.isAvailable) return@LaunchedEffect
@@ -269,6 +436,12 @@ fun rememberCloudSession(
                 if (save.pseudo.isBlank()) onSaveChange(save.copy(pseudo = Pseudo.generateDefault()))
 
                 session.state = if (session.bridge.isAnonymous) CloudState.GUEST else CloudState.LINKED
+                // Rattrape les succès obtenus hors ligne ou avant ce système.
+                session.syncAchievementStats(save)
+                // Parties jouées ailleurs pendant la session, en temps réel.
+                session.startSaveListener(signedIn)
+                // Cadeaux reçus pendant l'absence, puis écoute temps réel.
+                session.startGifts(signedIn)
                 return@LaunchedEffect
             } catch (e: Exception) {
                 // Réseau coupé, règles Firestore, authentification désactivée
@@ -306,6 +479,9 @@ fun rememberCloudSession(
 
     return session
 }
+
+/** `PRESENCE_PING_INTERVAL_MS` côté site. */
+private const val PRESENCE_PING_INTERVAL_MS = 60_000L
 
 /** Le site écrit à chaque `persist()` ; ici on attend que la sauvegarde
  *  arrête de bouger, pour ne pas écrire dix fois pendant un seul lancer. */

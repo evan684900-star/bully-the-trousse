@@ -19,10 +19,9 @@ data class DailyChallenge(
  * exactement celle du web, dans le même ordre et avec les mêmes
  * commentaires quand ils expliquent un piège non-évident.
  *
- * Les migrations d'anciens noms de champs (`migrateLegacyVolcanFields`
- * côté web, pour d'anciennes parties web renommées depuis) ne sont PAS
- * portées ici : ce sont des sauvegardes web historiques, qui n'existent
- * pas côté Android (application neuve, aucun ancien format à migrer).
+ * Les anciens noms de champs (`migrateLegacyVolcanFields` côté web) sont
+ * repris par [LegacySave], pour les parties restaurées depuis un ancien
+ * code de récupération du site.
  */
 @Serializable
 data class GameSave(

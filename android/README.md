@@ -215,7 +215,7 @@ Android) avant d'être branché à l'affichage dans `:app`.
   le mettre en pause — un nouvel écran Jeu repart toujours de `Idle`.
 
 - **Monde Ville (v11.0.0)** : portage de `ville.js`, `ville-levels.js` et
-  `ville-art.js`. Côté `:core`, testé (257 tests au total) :
+  `ville-art.js`. Côté `:core`, testé (317 tests au total) :
   - `Ville` (arrivée/départ, prix ×1,2 et gains ×1,2, départs de
     l'aéroport, `normalizeOnLoad`), `VilleEvents` (calendrier coupure/fuite/
     pluie/canicule tiré par le même `mulberry32` que le site, vérifié
@@ -244,6 +244,13 @@ Android) avant d'être branché à l'affichage dans `:app`.
   citent sont adaptés ; la transition « flou » n'est floue qu'à partir
   d'Android 12 (en dessous, simple fondu au noir) ; les accessoires sont
   centrés sur toutes les trousses (le site les décale sur deux skins).
+
+  Langue : ce qui passe par les écrans communs (menu, boutique, toit de la
+  Ville, La Trousserie) suit le français/l'anglais comme le reste de l'app
+  (clés `ville*` de `STRINGS`, et `app.ville*`/`app.cosmetic*` pour les
+  textes que le site écrit avec `villeL(fr, en)`). L'intérieur du monde
+  Ville (dialogues, panneaux, popups, générique) n'est encore qu'en
+  français, alors que le site l'a aussi en anglais (`L(fr, en)`).
 
 - **Firebase (compte, sauvegarde cloud, classement)** : l'app rejoint le
   projet Firebase qui fait DÉJÀ tourner le site (`bully-the-trousse`) au
@@ -313,6 +320,9 @@ côté serveur, l'app écrit les mêmes collections avec la même forme.
 3. **Thème clair et bilingue FR/EN** — les deux boutons des Réglages sont
    encore inertes : ce sont des refontes transversales qui touchent chaque
    couleur et chaque texte.
+4. **Monde Ville en anglais** — reprendre les ~150 textes `L(fr, en)` de
+   `ville.js`/`ville-levels.js` dans `VilleEngine`/`VilleLevels`/
+   `VilleCredits` et les panneaux dessinés (voir la section Monde Ville).
 
 Chaque étape devrait suivre le même principe que celle-ci : porter la
 logique dans `:core` avec des tests dont les valeurs de référence viennent

@@ -143,8 +143,17 @@ fun VilleScreen(
         }
     }
 
-    BossMusic(active = ui.music == VilleMusic.BOSS, generation = ui.bossStarts, volume = ui.bossVolume, muted = save.musicMuted)
-    LoopingSound(R.raw.sfx_footsteps, playing = ui.footsteps && !shopOpen, volume = 0.55f)
+    // Musique du boss et pas : en pause dès que l'app quitte le premier plan
+    // (la boucle du moteur, elle, s'arrête d'elle-même avec les images).
+    val inForeground by rememberAppInForeground()
+    BossMusic(
+        active = ui.music == VilleMusic.BOSS,
+        generation = ui.bossStarts,
+        volume = ui.bossVolume,
+        muted = save.musicMuted,
+        inForeground = inForeground,
+    )
+    LoopingSound(R.raw.sfx_footsteps, playing = ui.footsteps && !shopOpen && inForeground, volume = 0.55f)
 
     val textMeasurer = rememberTextMeasurer(cacheSize = 256)
     val sprite = rememberTrousseSprite()

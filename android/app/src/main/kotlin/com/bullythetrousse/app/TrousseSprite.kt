@@ -75,13 +75,16 @@ fun TrousseSprite(
     skinId: String,
     modifier: Modifier = Modifier,
     contentDescription: String? = null,
+    locked: Boolean = false,
 ) {
+    val skinFilter = rememberSkinColorFilter(skinId)
     Image(
         bitmap = rememberTrousseSprite(),
         contentDescription = contentDescription,
         modifier = modifier,
         contentScale = ContentScale.Fit,
-        colorFilter = rememberSkinColorFilter(skinId),
+        // Verrouillée : grisée, quelle que soit sa couleur (liste des skins du profil).
+        colorFilter = if (locked) LockedSkinFilter else skinFilter,
         // Le sprite est affiché bien plus petit que ses 980 px : le
         // filtrage bilinéaire évite l'aspect crénelé, mais il se paie, d'où
         // le repli en qualité basse (voir LocalGraphicsQuality).

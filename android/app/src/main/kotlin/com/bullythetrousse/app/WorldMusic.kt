@@ -4,7 +4,10 @@ import android.media.MediaPlayer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 
 /**
@@ -13,14 +16,19 @@ import androidx.compose.ui.platform.LocalContext
  * `bg-music-ville`, tous en `loop`). Le bouton 🔊 de la barre du bas coupe
  * le son, comme `#btn-mute`.
  *
- * Changer de monde libère la piste précédente (sans ça, les musiques
- * s'empileraient). Couper le son ou mettre en [paused] — le mode histoire
- * de la Ville fait taire le monde, `pauseWorldMusic()` côté site — ne fait
- * que suspendre la lecture : elle reprend là où elle s'était arrêtée, comme
- * un `<audio>` qu'on remet en `play()`.
+ * Une piste par monde : elle est créée au changement de monde et libérée au
+ * suivant, sans quoi les musiques s'empileraient. Couper le son, passer
+ * l'app en arrière-plan ou la mettre en [paused] — le mode histoire de la
+ * Ville fait taire le monde, `pauseWorldMusic()` côté site — la met en PAUSE
+ * plutôt que de la détruire, pour qu'elle reprenne là où elle s'était
+ * arrêtée.
+ *
+ * @return vrai tant que la musique joue réellement — le compteur d'écoute
+ *   du succès « Adorateur de la musique » en dépend (comme sur le site, une
+ *   piste mise en pause par la Ville remet ce compteur à zéro).
  */
 @Composable
-fun WorldMusic(world: String, muted: Boolean, paused: Boolean = false) {
+fun WorldMusic(world: String, muted: Boolean, inForeground: Boolean, paused: Boolean = false): Boolean {
     val context = LocalContext.current
     val track = when (world) {
         "volcans" -> R.raw.music_volcan
@@ -28,28 +36,28 @@ fun WorldMusic(world: String, muted: Boolean, paused: Boolean = false) {
         "ville" -> R.raw.music_ville
         else -> R.raw.music_cour
     }
+    var player by remember { mutableStateOf<MediaPlayer?>(null) }
 
-    // create() renvoie null si le décodage échoue : dans ce cas le jeu
-    // continue simplement sans musique plutôt que de planter.
-    val player: MediaPlayer? = remember(track) {
-        runCatching { MediaPlayer.create(context, track)?.apply { isLooping = true } }.getOrNull()
-    }
-    DisposableEffect(player) {
+    DisposableEffect(track) {
+        // create() renvoie null si le décodage échoue : dans ce cas le jeu
+        // continue simplement sans musique plutôt que de planter.
+        val created = runCatching { MediaPlayer.create(context, track) }.getOrNull()?.apply { isLooping = true }
+        player = created
         onDispose {
-            player?.let {
-                runCatching { if (it.isPlaying) it.stop() }
-                it.release()
+            player = null
+            created?.let {
+                runCatching {
+                    if (it.isPlaying) it.stop()
+                    it.release()
+                }
             }
         }
     }
-    LaunchedEffect(player, muted, paused) {
+
+    val shouldPlay = !muted && inForeground && !paused
+    LaunchedEffect(player, shouldPlay) {
         val p = player ?: return@LaunchedEffect
-        runCatching {
-            if (muted || paused) {
-                if (p.isPlaying) p.pause()
-            } else if (!p.isPlaying) {
-                p.start()
-            }
-        }
+        runCatching { if (shouldPlay) p.start() else if (p.isPlaying) p.pause() }
     }
+    return shouldPlay && player != null
 }

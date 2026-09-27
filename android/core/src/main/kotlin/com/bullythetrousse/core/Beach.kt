@@ -89,10 +89,19 @@ object Beach {
         return PurchaseResult.Success(save.copy(money = save.money - CLAQUETTES_COST, hasClaquettes = true))
     }
 
-    /** Billet de bus du retour : débite puis renvoie au monde normal. */
+    /**
+     * Billet de bus du retour : renvoie au monde normal. Ne coûte les
+     * [BUS_TICKET_COST] $ que la toute première fois — comme les claquettes à
+     * l'entrée, c'est un déblocage permanent (`hasTakenBusBack`), pas un
+     * péage à chaque aller-retour.
+     */
     fun buyBusTicket(save: GameSave): PurchaseResult {
+        if (save.hasTakenBusBack) return PurchaseResult.Success(leave(save))
         if (save.money < BUS_TICKET_COST) return PurchaseResult.NotEnoughMoney
         val debited = save.copy(money = save.money - BUS_TICKET_COST, hasTakenBusBack = true)
         return PurchaseResult.Success(leave(debited))
     }
+
+    /** Ce que coûte le prochain trajet retour : 0 une fois payé. */
+    fun busTicketCost(save: GameSave): Int = if (save.hasTakenBusBack) 0 else BUS_TICKET_COST
 }

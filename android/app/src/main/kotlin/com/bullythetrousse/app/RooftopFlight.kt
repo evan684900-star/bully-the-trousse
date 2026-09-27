@@ -78,6 +78,11 @@ class RooftopFlight(
         phase = RooftopPhase.AIMING
     }
 
+    /** Partie en pause : la barre de relance (et son chrono de 6 s) reste figée. */
+    internal fun holdAim(elapsedMillis: Long) {
+        if (phase == RooftopPhase.AIMING) aimStartedAtMillis += elapsedMillis
+    }
+
     internal fun consumeRelaunch(): Boolean {
         val requested = relaunchRequested
         relaunchRequested = false
@@ -117,8 +122,14 @@ fun animateVilleFlight(
         while (true) {
             withFrameNanos { }
             val now = System.currentTimeMillis()
-            val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
+            val elapsedMillis = now - lastFrameMillis
+            val dt = elapsedMillis.coerceAtMost(50) / 1000.0
             lastFrameMillis = now
+            // Partie en pause (fenêtre ouverte en plein lancer) : rien n'avance.
+            if (PlayState.paused) {
+                rooftop.holdAim(elapsedMillis)
+                continue
+            }
             when (rooftop.phase) {
                 RooftopPhase.FLYING -> {
                     if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
@@ -181,6 +192,7 @@ class PlaneCrashFlight {
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
             lastFrameMillis = now
+            if (PlayState.paused) continue
             val step = PlaneCrash.step(current, dt, gravity)
             current = step.state
             state = current

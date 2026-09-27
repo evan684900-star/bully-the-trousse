@@ -73,17 +73,4 @@ object Ville {
         if (save.volcanUnlocked) add(Departure("volcans", "🌋 Volcans"))
         if (save.plageUnlocked) add(Departure("plage", "🏖️ Plage"))
     }
-
-    /**
-     * `recordDailyEarning()` : un gain compte aussi pour les compteurs du
-     * monde où il a été fait — la Plage quand on y est coincé, la Ville
-     * quand c'est le monde courant.
-     */
-    fun recordWorldEarning(save: GameSave, amount: Int): GameSave {
-        if (amount <= 0) return save
-        var updated = save
-        if (save.inPlage) updated = updated.copy(plageMoneyEarned = updated.plageMoneyEarned + amount)
-        if (save.currentWorld == WORLD_ID) updated = updated.copy(villeMoneyEarned = updated.villeMoneyEarned + amount)
-        return updated
-    }
 }
