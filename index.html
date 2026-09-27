@@ -1361,6 +1361,27 @@
             display: none;
         }
         #menu-help.show { display: block; }
+
+        /* ---------- MONDE VILLE (voir ville.js et section 9quater) ---------- */
+        /* Le ciel du toit suit l'heure réelle de l'appareil (voir ville.js),
+           pas le thème clair/sombre : le voile CSS habituel est donc masqué. */
+        [data-world="ville"] #screen-game .sky-anim { display: none; }
+        #btn-shop-close-ville {
+            display: none; position: absolute; z-index: 5;
+            top: calc(10px + env(safe-area-inset-top)); right: calc(10px + env(safe-area-inset-right));
+            width: 42px; height: 42px; border-radius: 50%;
+            border: 2px solid var(--panel-border); background: var(--panel-bg); color: var(--text);
+            font-size: 18px; font-weight: 800; cursor: pointer;
+        }
+        body.ville-shop #btn-shop-close-ville { display: block; }
+        body.ville-shop #btn-shop-back, body.ville-shop #btn-shop-play { display: none; }
+        /* À la réception, les skins ne se vendent plus : c'est "La Trousserie", dans la rue */
+        body.ville-shop #tab-skins { display: none; }
+        #ville-skinshop-modal .info-box { max-height: 92vh; overflow-y: auto; width: 96vw !important; max-width: 1100px !important; box-sizing: border-box; }
+        #ville-skinshop-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; margin-top: 10px; }
+        #ville-skinshop-list h3.vs-title { margin: 14px 0 0; font-size: 15px; grid-column: 1 / -1; }
+        .cosmo-icon { width: 46px; height: 46px; flex: none; }
+        .ville-shop-note { color: var(--money); font-size: 13px; font-weight: 800; text-align: center; margin: 0 0 2px; line-height: 1.4; }
     </style>
 </head>
 <body>
@@ -1382,7 +1403,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v10.2.2</div>
+                <div class="version-tag" id="version-tag">v11.0.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1493,6 +1514,8 @@
         <button class="btn secondary small back-btn" id="btn-shop-back" data-i18n="btnBackMenu">← Menu</button>
         <!-- Permet de reprendre directement le jeu sans repasser par le menu -->
         <button class="btn small forward-btn" id="btn-shop-play" data-i18n="btnBackGame">🎮 Retour au jeu</button>
+        <!-- Boutique ouverte depuis la réception du monde Ville : une croix remplace les deux boutons -->
+        <button id="btn-shop-close-ville" aria-label="Fermer">✕</button>
         <div class="shop-header" style="justify-content:center; padding-top:calc(54px + env(safe-area-inset-top)); flex-wrap: wrap; gap: 8px;">
             <div class="money-pill">💰 <span id="shop-money">0</span> $</div>
             <!-- Bonus cumulé des niveaux de Puissance/Vitesse sur l'argent gagné (voir UPGRADE_EARN_BONUS_PER_LEVEL) -->
@@ -1574,6 +1597,17 @@
                 <button class="btn" id="btn-plage-replay-yes" data-i18n="plageReplayYes">🔁 Refaire</button>
                 <button class="btn secondary" id="btn-plage-replay-no" data-i18n="plageReplayNo">🏖️ Juste y aller</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Monde Ville : boutique de skins + cosmétiques dans la rue (voir openVilleSkinShop) -->
+    <div class="modal-overlay" id="ville-skinshop-modal">
+        <div class="info-box">
+            <h2>👕 La Trousserie</h2>
+            <p id="ville-skinshop-sub" style="margin:0; font-size:13px;"></p>
+            <div class="money-pill" style="display:inline-block; margin-top:8px; font-size:14px; padding:6px 14px;">💰 <span id="ville-skinshop-money">0</span> $</div>
+            <div id="ville-skinshop-list"></div>
+            <button class="btn secondary" id="btn-ville-skinshop-close">✕ Fermer</button>
         </div>
     </div>
 
@@ -1702,6 +1736,12 @@
     <audio id="bg-music" src="musique-fond.mp3" loop preload="auto"></audio>
     <audio id="bg-music-plage" src="musique-plage.mp3" loop preload="auto"></audio>
     <audio id="bg-music-volcan" src="musique-volcan.mp3" loop preload="auto"></audio>
+    <audio id="bg-music-ville" src="musique-ville.mp3" loop preload="auto"></audio>
+    <!-- Monde Ville (voir ville.js) : pas de la trousse sur le béton, crissement
+         de pneus au passage piéton, musique du combat de boss -->
+    <audio id="sfx-footsteps" src="bruit-pas-beton.mp3" loop preload="auto"></audio>
+    <audio id="sfx-tires" src="crissement-pneus.mp3" preload="auto"></audio>
+    <audio id="boss-music" src="musique-boss.mp3" loop preload="auto"></audio>
     <div class="corner-icons-right">
         <button id="btn-mute" class="mute-btn" title="Couper / activer la musique">🔊</button>
         <button id="btn-settings" class="theme-btn" title="Réglages">⚙️</button>
@@ -1936,6 +1976,11 @@
         },
         busTicketFreeBtn: { fr: "🚌 Reprendre (gratuit)", en: "🚌 Take it (free)" },
         stuckOnBeach: { fr: "🚌 Pas assez d'argent pour le bus ! Il te faut un billet à 250 000 $ en boutique.", en: "🚌 Not enough money for the bus! You need a $250,000 ticket from the shop." },
+        villeShopNote: { fr: "ici, tout est 20% plus cher mais vous gagnez 20% plus d'argent", en: "here, everything costs 20% more but you earn 20% more money" },
+        villeStuck: { fr: "✈️ Pour quitter la Ville, prends un vol au comptoir des départs de l'aéroport.", en: "✈️ To leave the City, catch a flight at the airport departures desk." },
+        villeLockedHint: { fr: "🔒 Ville : un lancer parfait sur la Plage pourrait bien t'emmener très loin…", en: "🔒 City: a perfect throw on the Beach might just take you very far…" },
+        villeBackReception: { fr: "← Réception", en: "← Lobby" },
+        villeOutageShop: { fr: "⚡ Coupure de courant : la boutique est fermée.", en: "⚡ Power outage: the shop is closed." },
         plageReplayTitle: { fr: "🏖️ Reprendre le bus ?", en: "🏖️ Take the bus again?" },
         plageReplayText: { fr: "Tu peux revivre la cinématique du voyage, ou repartir directement à la Plage.", en: "You can relive the trip cutscene, or head straight back to the Beach." },
         plageReplayYes: { fr: "🔁 Refaire", en: "🔁 Replay" },
@@ -2370,6 +2415,10 @@
     // Chaque évènement du monde Plage est tiré au sort à chaque lancer.
     const BEACH_EVENT_CHANCE = { parasol: 0.65, towel: 0.7, castle: 0.55 };
 
+    /* ---- Monde Ville (voir section 9quater et ville.js) ---- */
+    const VILLE_PRICE_MULT = 1.2; // "ici, tout est 20% plus cher..."
+    const VILLE_EARN_MULT = 1.2;  // "...mais vous gagnez 20% plus d'argent"
+
     /* ============ 2. DONNÉES STATIQUES ============ */
     // Les mondes futurs sont déjà prévus dans la liste : il suffit de passer
     // "unlocked" à true et d'ajouter un décor pour en activer un nouveau.
@@ -2699,6 +2748,31 @@
             dailyChallengeDate: "",    // "AAAA-MM-JJ" du jour où dailyChallenges a été généré
             dailyChallenges: [],       // [{ kind, target, progress, reward, claimed }, ...]
             totalMoneyGifted: 0,       // argent envoyé en cadeaux depuis le début (voir sendGift), jamais décrémenté
+            // --- Monde Ville (voir ville.js) ---
+            villeUnlocked: false,      // arrivé une première fois par l'avion (crash depuis la Plage)
+            inVille: false,            // coincé en Ville tant qu'on ne reprend pas un vol à l'aéroport
+            villeReceptionDone: false, // a parlé à la réception : l'ascenseur devient utilisable
+            villeStoryDone: false,     // mode histoire terminé au moins une fois (générique vu)
+            villeStoryRuns: 0,
+            villeBestDistance: 0,      // record du toit-terrain de lancer
+            villeThrows: 0,
+            villeMoneyEarned: 0,
+            villeCrosswalkDeaths: 0,   // percuté au passage piéton
+            villeWalked: 0,            // pixels parcourus à pied (plateformes)
+            villeJumps: 0,
+            villeDashes: 0,
+            villeStairs: 0,
+            villeElevator: 0,
+            villePuddles: 0,           // glissades sur une flaque (fuite d'eau / pluie)
+            villeBossAttempts: 0,
+            villeHeartsLost: 0,
+            villeSwordHits: 0,
+            villeHeatThrows: 0,        // lancers pendant la canicule depuis la dernière pause
+            villeHeatRestUntil: 0,     // timestamp : la trousse se repose jusque-là
+            villeArrivedAt: 0,
+            villeStoryDoneAt: 0,
+            ownedCosmetics: [],        // cosmétiques de La Trousserie (purement décoratifs)
+            equippedCosmetic: "",      // un seul porté à la fois, "" = aucun
         };
     }
 
@@ -2786,6 +2860,7 @@
         // L'argent de la plage est compté à part : c'est lui qui mesure le
         // chemin parcouru vers le billet de bus (voir le succès correspondant).
         if (save.inPlage) save.plageMoneyEarned += amount;
+        if (save.currentWorld === "ville") save.villeMoneyEarned += amount;
         const key = todayKey();
         save.dailyEarnings[key] = (save.dailyEarnings[key] || 0) + amount;
         pruneDailyMap(save.dailyEarnings);
@@ -2893,7 +2968,10 @@
     // Toujours plus cher à mesure qu'on monte, mais sans exploser.
     const UPGRADE_COST_CAP_LEVEL = 25;
     const UPGRADE_COST_LINEAR_STEP = 15000;
-    function upgradeCost(level) {
+    // Monde Ville : tout est 20% plus cher (améliorations, skins, traînées).
+    function villePriceMult() { return save.currentWorld === "ville" ? VILLE_PRICE_MULT : 1; }
+    function upgradeCost(level) { return Math.round(baseUpgradeCost(level) * villePriceMult()); }
+    function baseUpgradeCost(level) {
         if (level <= UPGRADE_COST_CAP_LEVEL) return Math.round(25 * Math.pow(1.40, level));
         const capCost = Math.round(25 * Math.pow(1.40, UPGRADE_COST_CAP_LEVEL));
         return capCost + (level - UPGRADE_COST_CAP_LEVEL) * UPGRADE_COST_LINEAR_STEP;
@@ -2965,6 +3043,7 @@
         cour: document.getElementById("bg-music"),
         volcans: document.getElementById("bg-music-volcan"),
         plage: document.getElementById("bg-music-plage"),
+        ville: document.getElementById("bg-music-ville"),
     };
     const muteBtn = document.getElementById("btn-mute");
     Object.values(musicTracks).forEach((track) => { track.volume = 0.35; });
@@ -3055,7 +3134,7 @@
         document.getElementById("menu-puissance").textContent = totalPuissance();
         document.getElementById("menu-vitesse").textContent = totalVitesse();
         document.getElementById("menu-record").textContent =
-            (save.currentWorld === "plage" ? save.plageBestDistance : save.bestDistance).toFixed(1) + " m";
+            (save.currentWorld === "plage" ? save.plageBestDistance : save.currentWorld === "ville" ? save.villeBestDistance : save.bestDistance).toFixed(1) + " m";
         document.getElementById("trousse-preview-img").style.filter = rainbowOrFilter(getSkin(save.equippedSkin).filter, performance.now());
         // "tu veux de l'aide ?" n'apparaît qu'après un échec dans la cinématique
         document.getElementById("menu-help").classList.toggle("show", !!save.volcanHelpAvailable);
@@ -3081,13 +3160,27 @@
         WORLDS.forEach((w) => {
             const playable = w.unlocked
                 || (w.id === "volcans" && save.volcanUnlocked)
-                || (w.id === "plage" && save.plageUnlocked);
+                || (w.id === "plage" && save.plageUnlocked)
+                || (w.id === "ville" && save.villeUnlocked);
             const card = document.createElement("div");
             card.className = "world-card" + (playable ? "" : " locked") + (save.currentWorld === w.id && playable ? " selected" : "");
             card.innerHTML = '<div class="emoji">' + w.emoji + '</div><div class="name">' + w.name + '</div>';
             card.addEventListener("click", () => {
                 // Coincé sur la plage : tant que le billet de bus n'est pas
                 // payé, aucun autre monde n'est accessible (voir leaveBeachProfile).
+                // Coincé en Ville : seul un vol au départ de l'aéroport permet d'en sortir
+                if (save.inVille && w.id !== "ville") {
+                    showToast(tr("villeStuck"));
+                    sfxError();
+                    return;
+                }
+                if (w.id === "ville") {
+                    if (save.inVille) return;
+                    if (!save.villeUnlocked) { showToast(tr("villeLockedHint")); sfxError(); return; }
+                    if (save.inPlage) { showToast(tr("stuckOnBeach")); sfxError(); return; }
+                    if (window.VilleWorld) window.VilleWorld.flyIn();
+                    return;
+                }
                 if (save.inPlage && w.id !== "plage") {
                     showToast(tr("stuckOnBeach"));
                     sfxError();
@@ -3350,6 +3443,12 @@
         const body = document.getElementById("shop-body");
         body.innerHTML = "";
         if (currentTab === "upgrades") {
+            if (save.currentWorld === "ville") {
+                const note = document.createElement("div");
+                note.className = "ville-shop-note";
+                note.textContent = tr("villeShopNote");
+                body.appendChild(note);
+            }
             body.appendChild(buildUpgradeCard(
                 "💪", tr("upgradePuissanceName"), save.puissanceLevel,
                 tr("upgradePuissanceDesc"),
@@ -3619,13 +3718,14 @@
                 playPurchasePop();
             });
         } else {
-            btn.textContent = skin.cost + " $";
+            const price = Math.round(skin.cost * villePriceMult());
+            btn.textContent = price + " $";
             btn.addEventListener("click", () => {
-                if (save.money >= skin.cost) {
-                    save.money -= skin.cost;
+                if (save.money >= price) {
+                    save.money -= price;
                     save.ownedSkins.push(skin.id);
                     equipSkin(skin.id);
-                    bumpDailyChallenge("spend", skin.cost, "add");
+                    bumpDailyChallenge("spend", price, "add");
                     persist();
                     sfxBuy();
                     showToast("✅ " + skin.name + " achetée !");
@@ -3679,13 +3779,14 @@
                 playPurchasePop();
             });
         } else {
-            btn.textContent = trail.cost + " $";
+            const price = Math.round(trail.cost * villePriceMult());
+            btn.textContent = price + " $";
             btn.addEventListener("click", () => {
-                if (save.money >= trail.cost) {
-                    save.money -= trail.cost;
+                if (save.money >= price) {
+                    save.money -= price;
                     save.ownedTrails.push(trail.id);
                     save.equippedTrail = trail.id;
-                    bumpDailyChallenge("spend", trail.cost, "add");
+                    bumpDailyChallenge("spend", price, "add");
                     persist();
                     sfxBuy();
                     showToast("✅ " + trail.name + " achetée !");
@@ -4119,6 +4220,7 @@
         } else {
             beachProps = [];
         }
+        villeResetThrow();
         document.getElementById("result-beach").style.display = "none";
         document.getElementById("result-skid").style.display = "none";
         document.getElementById("result-coin").style.display = "none";
@@ -4135,6 +4237,7 @@
     // 1er clic : démarre la barre de charge de puissance (oscille automatiquement)
     function startChargingPower() {
         if (state !== "idle") return;
+        if (villeHeatResting()) { sfxError(); return; } // canicule : la trousse se repose
         state = "charging_power";
         t0 = performance.now();
         meterWrap.style.display = "block";
@@ -4185,6 +4288,7 @@
         // c'est la gravité (currentG, soustraite chaque frame) qui la ramènera au sol.
         vx = v0 * Math.cos(angleRad);
         vy = v0 * Math.sin(angleRad);
+        lastLaunchV0 = v0; // relance plus rapide après une glissade sur une flaque (monde Ville)
 
         rotSpeed = 6 + v0 / 55;
         state = "flying";
@@ -4395,6 +4499,7 @@
             const hit = Math.abs(currentQteRingRadius() - qteTargetRadius) <= QTE_RING_TOLERANCE;
             advanceQteRing(hit);
         }
+        else if (state === "puddle_aim") villePuddleRelaunch();
         else if (state === "landed") { /* rien à faire, les boutons du panneau de résultat gèrent la suite */ }
     }
 
@@ -4475,6 +4580,12 @@
             const pct = (value + 1) / 2 * 100;
             meterFill.style.width = "100%";
             meterMarker.style.left = pct + "%";
+        } else if (state === "puddle_aim") {
+            // Monde Ville : la barre tremble beaucoup après une glissade
+            const value = villePuddleAimValue();
+            meterFill.style.width = "100%";
+            meterMarker.style.left = ((value + 1) / 2 * 100) + "%";
+            meterWrap.style.translate = ((Math.random() - 0.5) * 22) + "px " + ((Math.random() - 0.5) * 14) + "px";
         }
     }
 
@@ -4484,6 +4595,7 @@
         state = "landed";
         const distanceMeters = worldX / SCALE;
         save.totalThrows++;
+        if (save.currentWorld === "ville") villeOnThrowCounted();
         // Monde Plage : serviette (déco) ou château (qui s'écroule) selon les
         // évènements tirés au lancer (voir beachOnLaunch).
         const beachEl = document.getElementById("result-beach");
@@ -4510,12 +4622,14 @@
         }
         // Record par monde : le monde normal et la plage ont chacun leur
         // propre record (et leur propre classement, voir scoresCollection).
-        const recordField = save.currentWorld === "plage" ? "plageBestDistance" : "bestDistance";
+        const recordField = save.currentWorld === "plage" ? "plageBestDistance"
+            : save.currentWorld === "ville" ? "villeBestDistance" : "bestDistance";
         if (distanceMeters > save[recordField]) {
             save[recordField] = distanceMeters;
             document.getElementById("result-record").style.display = "block";
             sfxRecord();
-            pushScoreIfRecord(distanceMeters);
+            // Pas de classement en ligne pour le toit de la Ville (record local)
+            if (save.currentWorld !== "ville") pushScoreIfRecord(distanceMeters);
         } else {
             document.getElementById("result-record").style.display = "none";
         }
@@ -4525,6 +4639,7 @@
         if (isPerfect) earn = Math.round(earn * 1.3); // bonus de 30% sur un lancer parfait
         // Bonus lié aux améliorations : voir UPGRADE_EARN_BONUS_PER_LEVEL plus haut
         earn = Math.round(earn * (1 + (totalPuissance() + totalVitesse()) * UPGRADE_EARN_BONUS_PER_LEVEL));
+        if (save.currentWorld === "ville") earn = Math.round(earn * VILLE_EARN_MULT); // +20% en Ville
         // Trousse Lunaire : +25% uniquement sur un atterrissage qui a suivi la
         // séquence spatiale (rien dans le monde normal ni au Volcan).
         if (getSkin(save.equippedSkin).isLunar && inSpaceMode) {
@@ -4669,11 +4784,23 @@
 
     // Boutons de navigation de l'écran de jeu et du panneau de résultat
     document.getElementById("btn-throw-again").addEventListener("click", () => resetThrow());
-    document.getElementById("btn-result-shop").addEventListener("click", () => showScreen("shop"));
-    document.getElementById("btn-game-back").addEventListener("click", () => showScreen("menu"));
+    document.getElementById("btn-result-shop").addEventListener("click", () => {
+        if (save.currentWorld === "ville") { openVilleShop("game"); return; }
+        showScreen("shop");
+    });
+    document.getElementById("btn-game-back").addEventListener("click", () => {
+        // Toit de la Ville : on redescend à la réception plutôt qu'au menu
+        if (save.currentWorld === "ville" && save.inVille && window.VilleWorld) { window.VilleWorld.enterHub("elevator"); return; }
+        showScreen("menu");
+    });
     document.getElementById("btn-shop-back").addEventListener("click", () => showScreen("menu"));
     document.getElementById("btn-shop-play").addEventListener("click", () => showScreen("game"));
     document.getElementById("btn-play").addEventListener("click", () => {
+        // Monde Ville : "Jouer" ramène à la réception de la tour (voir ville.js)
+        if (save.currentWorld === "ville" && save.inVille && window.VilleWorld) {
+            window.VilleWorld.enterHub("reception");
+            return;
+        }
         if (save.durability <= 0) {
             sfxError();
             document.getElementById("repair-broken-modal").classList.add("show");
@@ -5832,6 +5959,7 @@
             if (skin.isRocket) drawRocketFlame(ctx, size);
             if (skin.isPlane) drawPlaneWings(ctx, size);
         }
+        drawCosmetic(ctx, size);
         ctx.restore();
     }
 
@@ -5922,7 +6050,12 @@
             // gardant seulement les points assez récents pour rester visibles
             emitTrail(worldX, worldY, vx, vy, now, dt);
 
-            if (spaceEggTriggered && vy <= 0) {
+            if (save.currentWorld === "plage" && isPerfect && !inSpaceMode && !planeCrash
+                && vy > 0 && vy < 170 && worldY > 40 && window.VilleWorld) {
+                // Monde Plage : un lancer parfait, juste avant l'apogée, finit
+                // encastré sur le flanc d'un avion de ligne (voir section 9quater)
+                startPlaneCrash(w, h);
+            } else if (spaceEggTriggered && vy <= 0) {
                 // on vient d'atteindre l'apogée avec la combinaison easter egg :
                 // on gèle la position et on bascule vers la séquence spatiale
                 spaceEggTriggered = false; // ne se déclenche qu'une fois par lancer
@@ -5938,6 +6071,9 @@
                     // le rebond a déjà remis l'état à "charging_power", rien d'autre à faire
                 } else if (tryRocketMoonTraversal()) {
                     // la Fusée a traversé le sol lunaire : le lancer continue (voir plus bas)
+                } else if (save.currentWorld === "ville" && !inSpaceMode && villePuddleAt(worldX)) {
+                    // Monde Ville : fuite d'eau / pluie, la trousse glisse sur une flaque
+                    startVillePuddleSlide();
                 } else if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
                     // Monde Volcan : la poussière rouge rend le sol glissant
                     startSkid();
@@ -5997,6 +6133,10 @@
             if (phaseTimer >= QTE_DURATION) {
                 advanceQteRing(false); // cet anneau a fini de rétrécir sans qu'on ait cliqué = raté
             }
+        } else if (state === "plane_crash") {
+            updatePlaneCrash(dt, w, h);
+        } else if (state === "puddle_slide" || state === "puddle_aim") {
+            updateVillePuddle(dt, w, h);
         }
 
         updateMeterUI();
@@ -6010,6 +6150,8 @@
             drawVolcanoBackground(w, h);
         } else if (save.currentWorld === "plage") {
             drawBeachBackground(w, h);
+        } else if (save.currentWorld === "ville") {
+            drawVilleBackground(w, h);
         } else {
             drawBackground(w, h);
         }
@@ -6017,7 +6159,10 @@
         drawDust(ctx);
         updateTrail(dt);
         drawTrail();
+        if (state === "plane_crash") drawPlaneCrashPlane(w, h);
         drawTrousse();
+        if (save.currentWorld === "ville" && !inSpaceMode) drawVilleWeather(w, h);
+        if (state === "plane_crash") drawPlaneCrashClouds(w, h);
         if (state === "space_transition") {
             drawCloudSweep(w, h, phaseTimer / CLOUD_TRANSITION_DURATION);
         } else if (state === "qte") {
@@ -6922,6 +7067,7 @@
             if (skin.isRocket) drawRocketFlame(c, size);
             if (skin.isPlane) drawPlaneWings(c, size);
         }
+        drawCosmetic(c, size);
         c.restore();
     }
 
@@ -8096,6 +8242,286 @@
         if (bcPhase === "dialog") { bcDialogAdvance(); return; }
         if (bcPhase === "aim") bcLaunchFromAim(true);
     }
+
+    /* ============ 9quater. MONDE VILLE : TOIT, ÉVÈNEMENTS, CRASH D'AVION ============
+       Le gros du monde Ville (aéroport, rue, réception, mode histoire, décor)
+       vit dans ville.js, qui passe par window.__bt (voir plus bas). Ici,
+       seulement ce qui touche directement à la boucle de lancer :
+         - le crash sur l'avion depuis la Plage (lancer parfait juste avant l'apogée)
+         - les flaques (fuite d'eau / pluie) : glissade 3 s puis relance tremblante
+         - la canicule : repos forcé de 2 min tous les 5 lancers
+       Les évènements eux-mêmes (calendrier identique pour tous les joueurs)
+       sont calculés par ville.js (VilleWorld.activeEvent). */
+    function villeL(fr, en) { return save.lang === "en" ? en : fr; }
+    function villeEvent() { return window.VilleWorld ? window.VilleWorld.activeEvent() : null; }
+    function villeEventType() { const ev = villeEvent(); return ev ? ev.type : ""; }
+    function villeOutage() { return save.currentWorld === "ville" && villeEventType() === "coupure"; }
+    function villeHeatResting() { return save.currentWorld === "ville" && save.villeHeatRestUntil > Date.now(); }
+
+    let lastLaunchV0 = 0;    // vitesse initiale du dernier lancer (voir lockAccuracyAndLaunch)
+    let villePuddleSeed = 0; // flaques tirées au hasard à chaque lancer
+    let villeSlideV = 0;
+    let villeHintShown = "";
+    const VILLE_PUDDLE_MAX_M = 500000; // distance de génération des flaques
+    const VILLE_SLIDE_SECONDS = 3;
+
+    function villeResetThrow() {
+        villePuddleSeed = Math.random() * 1000;
+        meterWrap.style.translate = "";
+        villeHintShown = "";
+        const distEl = document.getElementById("game-distance");
+        distEl.style.opacity = "";
+        if (distEl.parentElement) distEl.parentElement.style.opacity = "";
+        const backBtn = document.getElementById("btn-game-back");
+        backBtn.textContent = save.currentWorld === "ville" && save.inVille ? tr("villeBackReception") : tr("btnBackMenu");
+        planeCrash = null;
+    }
+
+    // Compté à chaque atterrissage en Ville ; la canicule impose une pause
+    // de 2 minutes tous les 5 lancers.
+    function villeOnThrowCounted() {
+        save.villeThrows++;
+        if (villeEventType() === "canicule") {
+            save.villeHeatThrows = (save.villeHeatThrows || 0) + 1;
+            if (save.villeHeatThrows >= 5) {
+                save.villeHeatThrows = 0;
+                save.villeHeatRestUntil = Date.now() + 2 * 60 * 1000;
+                showToast(villeL("🥵 Canicule ! La trousse doit se reposer 2 minutes à l'ombre.", "🥵 Heatwave! The pencil case needs 2 minutes of rest in the shade."));
+            }
+        }
+    }
+
+    // Flaques : une "case" tous les N mètres, qui contient (ou non) une flaque.
+    // Calcul à la demande : aucune liste à stocker, même jusqu'à 500 000 m.
+    function villePuddleParams() {
+        const t = villeEventType();
+        if (t === "fuite") return { seg: 70 * SCALE, chance: 0.4, half: 55 };
+        if (t === "pluie") return { seg: 38 * SCALE, chance: 0.7, half: 70 };
+        return null;
+    }
+    function villePuddleInSeg(i, p) {
+        if (i < 0) return null;
+        if ((i * p.seg) / SCALE > VILLE_PUDDLE_MAX_M) return null;
+        if (seededRand(i * 7.13 + villePuddleSeed) > p.chance) return null;
+        const cx = i * p.seg + p.seg * (0.2 + 0.6 * seededRand(i * 3.71 + villePuddleSeed));
+        const hw = p.half + 45 * seededRand(i * 1.93 + villePuddleSeed);
+        if (cx - hw < 12 * SCALE) return null; // pas de flaque juste au pied du lanceur
+        return { cx, hw };
+    }
+    function villePuddlesInRange(x0, x1) {
+        const p = villePuddleParams();
+        if (!p) return [];
+        const out = [];
+        for (let i = Math.floor(x0 / p.seg) - 1; i <= Math.floor(x1 / p.seg) + 1; i++) {
+            const pd = villePuddleInSeg(i, p);
+            if (pd) out.push(pd);
+        }
+        return out;
+    }
+    function villePuddleAt(x) {
+        return villePuddlesInRange(x, x).some((pd) => Math.abs(x - pd.cx) <= pd.hw);
+    }
+
+    function startVillePuddleSlide() {
+        state = "puddle_slide";
+        phaseTimer = 0;
+        worldY = 0;
+        villeSlideV = Math.max(Math.abs(vx) * 1.2, 700);
+        save.villePuddles = (save.villePuddles || 0) + 1;
+        beep(420, 0.18, "sine", 0.08); beep(260, 0.3, "triangle", 0.06); // "splash"
+        spawnDust(worldX - cameraX, groundScreenY - 4, 18, { spread: 160, up: 150, size: 6, life: 0.6, color: "120,190,255" });
+    }
+    function villePuddleAimValue() {
+        const t = (performance.now() - t0) / 1000;
+        return Math.sin(t * 4.4);
+    }
+    function villePuddleRelaunch() {
+        if (state !== "puddle_aim") return;
+        const value = villePuddleAimValue();
+        const perfectWindow = getSkin(save.equippedSkin).isClaude ? 0.14 : 0.08;
+        if (Math.abs(value) < perfectWindow) isPerfect = true;
+        const v0 = Math.max(600, lastLaunchV0 * 1.3); // plus de vitesse qu'au départ
+        const angleRad = (45 - value * 16) * Math.PI / 180;
+        vx = v0 * Math.cos(angleRad);
+        vy = v0 * Math.sin(angleRad);
+        lastLaunchV0 = v0;
+        rotSpeed = 6 + v0 / 55;
+        state = "flying";
+        meterWrap.style.display = "none";
+        meterWrap.style.translate = "";
+        hintText.style.display = "none";
+        sfxLaunch();
+    }
+    function updateVillePuddle(dt, w, h) {
+        phaseTimer += dt;
+        if (state === "puddle_slide") {
+            worldX += villeSlideV * dt;
+            villeSlideV *= 1 - 0.18 * dt;
+            rotation += (Math.round(rotation / Math.PI) * Math.PI - rotation) * Math.min(1, dt * 8); // à plat, elle glisse
+            if (Math.random() < dt * 40) {
+                spawnDust(worldX - cameraX - 20, groundScreenY - 4, 1, { spread: 90, up: 120, size: 5, life: 0.45, color: "140,200,255" });
+            }
+            cameraX = Math.max(0, worldX - w * 0.3);
+            cameraY += (0 - cameraY) * Math.min(1, dt * 4);
+            document.getElementById("game-distance").textContent = (worldX / SCALE).toFixed(1);
+            if (phaseTimer >= VILLE_SLIDE_SECONDS) {
+                state = "puddle_aim";
+                phaseTimer = 0;
+                t0 = performance.now();
+                meterWrap.style.display = "block";
+                hintText.textContent = villeL("💦 Ça glisse ! Vise pour repartir encore plus vite !", "💦 Slippery! Aim to take off even faster!");
+                hintText.style.display = "block";
+            }
+        } else if (state === "puddle_aim") {
+            cameraX = Math.max(0, worldX - w * 0.3);
+            if (phaseTimer >= 6) villePuddleRelaunch(); // jamais bloqué
+        }
+    }
+
+    function drawVilleBackground(w, h) {
+        groundScreenY = h * 0.68 + cameraY;
+        if (window.VilleWorld) {
+            window.VilleWorld.drawRooftop(ctx, w, h, cameraX, groundScreenY, villePuddlesInRange);
+        } else {
+            ctx.fillStyle = "#6fa8dc"; ctx.fillRect(0, 0, w, h);
+            ctx.fillStyle = "#4a4d55"; ctx.fillRect(0, groundScreenY, w, h - groundScreenY);
+        }
+    }
+    function drawVilleWeather(w, h) {
+        if (window.VilleWorld) window.VilleWorld.drawWeather(ctx, w, h, groundScreenY);
+        // Canicule : compte à rebours du repos dans le texte d'aide
+        let hint = "";
+        if (state === "idle" && villeHeatResting()) {
+            const s = Math.ceil((save.villeHeatRestUntil - Date.now()) / 1000);
+            hint = villeL("🥵 Trop chaud ! La trousse se repose encore ", "🥵 Too hot! The pencil case rests for another ") + Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+        } else if (state === "idle" && villeHintShown) {
+            hint = tr("hintCharge");
+        }
+        if (hint && hint !== villeHintShown) {
+            villeHintShown = hint;
+            hintText.textContent = hint;
+            hintText.style.display = "block";
+        }
+    }
+
+    /* ---- Crash sur l'avion (depuis la Plage) ---- */
+    const PLANE_SPEED = 1500; // px/s, l'avion double la trousse par la gauche
+    const PLANE_SCALE = 0.9;
+    const PLANE_STICK_X = 70; // la trousse s'encastre un peu en avant du centre
+    let planeCrash = null;
+    function startPlaneCrash(w, h) {
+        state = "plane_crash";
+        planeCrash = { t: 0, attached: false, impactT: 0, px: worldX - w * 0.3 - 520, py: worldY + 4, sweepStart: 0, sweep: 0, handed: false, shake: 0 };
+        hintText.style.display = "none";
+        document.getElementById("game-distance").textContent = "???";
+    }
+    function updatePlaneCrash(dt, w, h) {
+        const pc = planeCrash;
+        if (!pc) return;
+        pc.t += dt;
+        pc.shake = Math.max(0, pc.shake - dt * 30);
+        if (!pc.attached) {
+            worldX += vx * dt;
+            worldY += vy * dt;
+            vy -= currentG * dt;
+            rotation += rotSpeed * dt;
+            pc.px += PLANE_SPEED * dt;
+            pc.py += (worldY + 4 - pc.py) * Math.min(1, dt * 4);
+            if (pc.px + PLANE_STICK_X * PLANE_SCALE >= worldX) {
+                pc.attached = true;
+                pc.impactT = pc.t;
+                pc.shake = 14;
+                rotation = 0.35;
+                sfxCrash();
+                spawnDust(worldX - cameraX, groundScreenY - worldY, 26, { spread: 260, up: 200, size: 7, life: 0.7, color: "235,235,240" });
+            }
+        } else {
+            const since = pc.t - pc.impactT;
+            pc.px += PLANE_SPEED * dt;
+            pc.py += (since < 2.5 ? 110 : 40) * dt; // l'avion reprend de l'altitude
+            worldX = pc.px + PLANE_STICK_X * PLANE_SCALE;
+            worldY = pc.py - 2;
+            rotation = -0.1 + 0.45 * Math.exp(-since * 3) * Math.cos(since * 18);
+            if (since >= 3 && !pc.sweepStart) pc.sweepStart = pc.t;
+            if (pc.sweepStart) {
+                pc.sweep = (pc.t - pc.sweepStart) / 0.75;
+                if (pc.sweep >= 1 && !pc.handed) {
+                    pc.handed = true;
+                    // Les nuages couvrent tout : la suite (traversée des nuages,
+                    // descente sur la Ville) est rendue par ville.js
+                    window.VilleWorld.startArrival();
+                }
+            }
+        }
+        cameraX = Math.max(0, worldX - w * 0.3);
+        cameraY = Math.max(0, VERTICAL_SAFE_TOP - h * 0.68 + worldY);
+        // "???" qui clignote, puis la vignette s'efface avec les nuages
+        const distEl = document.getElementById("game-distance");
+        const pill = distEl.parentElement;
+        if (pc.sweepStart) {
+            distEl.style.opacity = 1;
+            pill.style.opacity = Math.max(0, 1 - pc.sweep * 1.6);
+        } else {
+            distEl.style.opacity = Math.floor(pc.t * 3) % 2 ? 0.2 : 1;
+        }
+    }
+    function drawPlaneCrashPlane(w, h) {
+        const pc = planeCrash;
+        if (!pc || !window.VilleWorld) return;
+        const sx = pc.px - cameraX + (Math.random() - 0.5) * pc.shake;
+        const sy = groundScreenY - pc.py + (Math.random() - 0.5) * pc.shake;
+        // traits de vitesse derrière l'avion
+        ctx.save();
+        ctx.strokeStyle = "rgba(255,255,255,0.35)";
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 6; i++) {
+            const yy = sy - 40 + i * 16;
+            ctx.beginPath();
+            ctx.moveTo(sx - 300 * PLANE_SCALE - 40 - i * 13, yy);
+            ctx.lineTo(sx - 300 * PLANE_SCALE - 180 - i * 25, yy);
+            ctx.stroke();
+        }
+        ctx.restore();
+        window.VilleWorld.drawAirliner(ctx, sx, sy, PLANE_SCALE, { dir: 1 });
+    }
+    // Nuages qui balaient l'écran de droite à gauche au bout de 3 s
+    function drawPlaneCrashClouds(w, h) {
+        const pc = planeCrash;
+        if (!pc || !pc.sweepStart) return;
+        const p = Math.min(1, pc.sweep);
+        const edge = w * (1.08 - 1.5 * p * p);
+        ctx.save();
+        ctx.fillStyle = "#eef3f8";
+        ctx.fillRect(edge + 70, 0, w - edge + 80, h);
+        for (let i = 0; i < 9; i++) {
+            const cy = (i / 8) * h;
+            const r = 90 + seededRand(i * 5.1) * 70;
+            ctx.beginPath();
+            ctx.arc(edge + seededRand(i * 2.3) * 70, cy, r, 0, Math.PI * 2);
+            ctx.arc(edge + 90 + seededRand(i * 9.7) * 60, cy + 30, r * 0.9, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        if (p >= 0.92) { ctx.globalAlpha = (p - 0.92) / 0.08; ctx.fillRect(0, 0, w, h); }
+        ctx.restore();
+    }
+
+    /* ---- Boutique ouverte depuis la Ville (réception ou résultat du toit) ---- */
+    let villeShopReturn = "hub";
+    function openVilleShop(returnTo) {
+        if (villeOutage()) { showToast(tr("villeOutageShop")); sfxError(); return false; }
+        villeShopReturn = returnTo || "hub";
+        document.body.classList.add("ville-shop");
+        showScreen("shop");
+        selectShopTabContent("upgrades");
+        snapTabIndicator();
+        return true;
+    }
+    document.getElementById("btn-shop-close-ville").addEventListener("click", () => {
+        document.body.classList.remove("ville-shop");
+        if (villeShopReturn === "game") { showScreen("game"); return; }
+        screens.shop.classList.remove("active");
+        if (window.VilleWorld) window.VilleWorld.resumeFromShop();
+    });
 
     /* ============ 12. FIREBASE (SAUVEGARDE CLOUD + CLASSEMENT) ============ */
     const firebaseConfig = {
@@ -9827,7 +10253,7 @@
         document.getElementById("info-name").textContent = save.pseudo || "Trousse";
         document.getElementById("info-time").textContent = formatPlayTime(save.playTime);
         document.getElementById("info-best").textContent =
-            (save.currentWorld === "plage" ? save.plageBestDistance : save.bestDistance).toFixed(1) + " m";
+            (save.currentWorld === "plage" ? save.plageBestDistance : save.currentWorld === "ville" ? save.villeBestDistance : save.bestDistance).toFixed(1) + " m";
         document.getElementById("trousse-modal").classList.add("show");
     }
 
@@ -9882,8 +10308,18 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "10.2.2";
+    const VERSION_NUMBER = "11.0.0";
     const CHANGELOG = [
+        {
+            version: "11.0.0",
+            major: [
+                { fr: "Nouveau monde : la Ville ! Un lancer parfait sur la Plage, juste avant le sommet de la trajectoire, finit encastré sur le flanc d'un avion de ligne... direction la Ville. Là-bas, la trousse se déplace à pied : aéroport, rue (attention au passage piéton), La Trousserie et la Tour. On n'en repart qu'en reprenant un vol à l'aéroport", en: "New world: the City! A perfect throw on the Beach, right before the top of its arc, ends up stuck on the side of an airliner... bound for the City. There, the pencil case gets around on foot: airport, street (mind the crosswalk), La Trousserie and the Tower. The only way out is a flight from the airport" },
+                { fr: "Sur le toit de la Tour, un nouveau terrain de lancer : tout y coûte 20% plus cher, mais rapporte 20% de plus. Des évènements (coupure de courant, fuite d'eau, pluie, canicule) y tombent au même moment pour tous les joueurs, annoncés sur le tableau de la réception", en: "On the Tower's rooftop, a new throwing field: everything costs 20% more there, but earns 20% more. Events (power outage, water leak, rain, heatwave) hit it at the same time for every player, announced on the lobby's notice board" },
+                { fr: "Un mode histoire, jusqu'au générique", en: "A story mode, all the way to the credits" },
+                { fr: "La Trousserie : des cosmétiques purement décoratifs (nœud papillon, casquette, couronne...) à porter sur n'importe quel skin", en: "La Trousserie: purely decorative cosmetics (bow tie, cap, crown...) to wear on any skin" },
+            ],
+            minor: [],
+        },
         {
             version: "10.2.2",
             major: [],
@@ -10655,6 +11091,18 @@
     // visible : window.cheats reste invisible pour un joueur qui ne va pas
     // fouiller la console lui-même.
     window.cheats = {
+        // Monde Ville : force un évènement ("coupure", "fuite", "pluie",
+        // "canicule") pendant N minutes, ou débloque la Ville directement.
+        villeEvent(type, minutes) {
+            if (window.VilleWorld) window.VilleWorld.forceEvent(type || "pluie", minutes || 10);
+        },
+        villeUnlock() {
+            save.villeUnlocked = true;
+            const vw = WORLDS.find(w => w.id === "ville");
+            if (vw) vw.unlocked = true;
+            persist();
+            buildWorldsRow();
+        },
         addMoney(amount) {
             save.money += amount;
             persist();
@@ -10903,6 +11351,173 @@
         "color:#ffd23f; font-weight:bold;"
     );
 
+    /* ---- La Trousserie : skins + cosmétiques décoratifs (monde Ville) ---- */
+    const COSMETICS = [
+        { id: "noeud", name: "Nœud papillon", nameEn: "Bow tie", cost: 1200 },
+        { id: "casquette", name: "Casquette", nameEn: "Cap", cost: 1800 },
+        { id: "lunettes", name: "Lunettes de soleil", nameEn: "Sunglasses", cost: 2500 },
+        { id: "chapeau", name: "Haut-de-forme", nameEn: "Top hat", cost: 4000 },
+        { id: "moustache", name: "Moustache distinguée", nameEn: "Fancy moustache", cost: 5000 },
+        { id: "antennes", name: "Antennes d'alien", nameEn: "Alien antennae", cost: 8000 },
+        { id: "aureole", name: "Auréole", nameEn: "Halo", cost: 12000 },
+        { id: "couronne", name: "Couronne", nameEn: "Crown", cost: 20000 },
+    ];
+    // Dessiné par-dessus la trousse, repère centré sur son sprite (le boîtier
+    // occupe à peu près y de -0.19 à +0.2 et x de -0.25 à +0.36 de "size").
+    function drawCosmetic(c, s, forceId) {
+        const id = forceId || save.equippedCosmetic;
+        if (!id) return;
+        c.save();
+        const top = -0.19 * s, cx = 0.06 * s;
+        switch (id) {
+            case "chapeau":
+                c.fillStyle = "#15151a"; c.fillRect(cx - 0.24 * s, top - 0.04 * s, 0.48 * s, 0.05 * s);
+                c.fillRect(cx - 0.14 * s, top - 0.34 * s, 0.28 * s, 0.31 * s);
+                c.fillStyle = "#b3202a"; c.fillRect(cx - 0.14 * s, top - 0.1 * s, 0.28 * s, 0.05 * s);
+                break;
+            case "casquette":
+                c.fillStyle = "#2f6fb5";
+                c.beginPath(); c.arc(cx, top + 0.01 * s, 0.17 * s, Math.PI, 0); c.fill();
+                c.fillStyle = "#1f4f85"; c.fillRect(cx + 0.1 * s, top - 0.02 * s, 0.2 * s, 0.04 * s);
+                c.fillStyle = "#fff"; c.beginPath(); c.arc(cx, top - 0.16 * s, 0.025 * s, 0, Math.PI * 2); c.fill();
+                break;
+            case "couronne":
+                c.fillStyle = "#ffd23f";
+                c.beginPath(); c.moveTo(cx - 0.2 * s, top + 0.01 * s);
+                [-0.2, -0.1, 0, 0.1, 0.2].forEach((k, i) => { c.lineTo(cx + k * s, top - 0.2 * s); if (i < 4) c.lineTo(cx + (k + 0.05) * s, top - 0.08 * s); });
+                c.lineTo(cx + 0.2 * s, top + 0.01 * s); c.closePath(); c.fill();
+                c.fillStyle = "#e8503f"; c.beginPath(); c.arc(cx, top - 0.05 * s, 0.025 * s, 0, Math.PI * 2); c.fill();
+                break;
+            case "lunettes":
+                c.fillStyle = "#111";
+                c.fillRect(cx - 0.17 * s, -0.08 * s, 0.14 * s, 0.08 * s);
+                c.fillRect(cx + 0.03 * s, -0.08 * s, 0.14 * s, 0.08 * s);
+                c.fillRect(cx - 0.03 * s, -0.07 * s, 0.06 * s, 0.02 * s);
+                c.fillStyle = "rgba(255,255,255,0.35)"; c.fillRect(cx - 0.15 * s, -0.07 * s, 0.04 * s, 0.02 * s); c.fillRect(cx + 0.05 * s, -0.07 * s, 0.04 * s, 0.02 * s);
+                break;
+            case "noeud":
+                c.fillStyle = "#c0392b";
+                c.beginPath(); c.moveTo(cx, 0.16 * s); c.lineTo(cx - 0.1 * s, 0.11 * s); c.lineTo(cx - 0.1 * s, 0.21 * s); c.closePath(); c.fill();
+                c.beginPath(); c.moveTo(cx, 0.16 * s); c.lineTo(cx + 0.1 * s, 0.11 * s); c.lineTo(cx + 0.1 * s, 0.21 * s); c.closePath(); c.fill();
+                c.fillStyle = "#8e2418"; c.beginPath(); c.arc(cx, 0.16 * s, 0.025 * s, 0, Math.PI * 2); c.fill();
+                break;
+            case "moustache":
+                c.fillStyle = "#3b2414";
+                c.beginPath(); c.ellipse(cx - 0.06 * s, 0.06 * s, 0.07 * s, 0.03 * s, 0.3, 0, Math.PI * 2); c.fill();
+                c.beginPath(); c.ellipse(cx + 0.06 * s, 0.06 * s, 0.07 * s, 0.03 * s, -0.3, 0, Math.PI * 2); c.fill();
+                break;
+            case "aureole":
+                c.strokeStyle = "#ffe066"; c.lineWidth = 0.035 * s;
+                c.beginPath(); c.ellipse(cx, top - 0.14 * s, 0.17 * s, 0.05 * s, 0, 0, Math.PI * 2); c.stroke();
+                break;
+            case "antennes":
+                c.strokeStyle = "#2e7d32"; c.lineWidth = 0.025 * s;
+                [-1, 1].forEach((d) => {
+                    c.beginPath(); c.moveTo(cx + d * 0.07 * s, top); c.lineTo(cx + d * 0.13 * s, top - 0.22 * s); c.stroke();
+                    c.fillStyle = "#7CFC00"; c.beginPath(); c.arc(cx + d * 0.13 * s, top - 0.24 * s, 0.04 * s, 0, Math.PI * 2); c.fill();
+                });
+                break;
+        }
+        c.restore();
+    }
+    let villeSkinShopOnClose = null;
+    function villeCosmeticName(cm) { return save.lang === "en" ? cm.nameEn : cm.name; }
+    function buildCosmeticCard(cm) {
+        const owned = save.ownedCosmetics.includes(cm.id);
+        const worn = save.equippedCosmetic === cm.id;
+        const card = document.createElement("div");
+        card.className = "skin-card";
+        const icon = document.createElement("canvas");
+        icon.width = 92; icon.height = 92;
+        icon.className = "cosmo-icon";
+        const ic = icon.getContext("2d");
+        ic.translate(46, 56);
+        if (trousseImg.complete) ic.drawImage(trousseImg, -36, -36, 72, 72);
+        drawCosmetic(ic, 72, cm.id);
+        card.appendChild(icon);
+        const info = document.createElement("div");
+        info.className = "info";
+        info.innerHTML = "<h3>" + villeCosmeticName(cm) + (worn ? ' <span class="level-badge">' + tr("equipped").toUpperCase() + "</span>" : "") + "</h3><p>" +
+            villeL("Purement décoratif, se porte sur n'importe quel skin.", "Purely decorative, works with any skin.") + "</p>";
+        card.appendChild(info);
+        const btn = document.createElement("button");
+        btn.className = "btn small" + (worn ? " secondary" : "");
+        const price = Math.round(cm.cost * villePriceMult());
+        btn.textContent = worn ? villeL("Retirer", "Remove") : owned ? tr("equip") : price + " $";
+        btn.addEventListener("click", () => {
+            if (worn) { save.equippedCosmetic = ""; }
+            else if (owned) { save.equippedCosmetic = cm.id; }
+            else {
+                if (save.money < price) { sfxError(); showToast(tr("notEnoughMoney")); return; }
+                save.money -= price;
+                save.ownedCosmetics.push(cm.id);
+                save.equippedCosmetic = cm.id;
+                bumpDailyChallenge("spend", price, "add");
+                showToast("✅ " + villeCosmeticName(cm) + villeL(" achetée !", " bought!"));
+            }
+            persist();
+            sfxBuy();
+            renderVilleSkinShop();
+        });
+        card.appendChild(btn);
+        return card;
+    }
+    function renderVilleSkinShop() {
+        document.getElementById("ville-skinshop-money").textContent = save.money;
+        document.getElementById("ville-skinshop-sub").textContent = tr("villeShopNote");
+        const list = document.getElementById("ville-skinshop-list");
+        list.innerHTML = "";
+        const t1 = document.createElement("h3"); t1.className = "vs-title"; t1.textContent = "🎨 Skins"; list.appendChild(t1);
+        SKINS.forEach((skin) => list.appendChild(buildSkinCard(skin)));
+        const t2 = document.createElement("h3"); t2.className = "vs-title"; t2.textContent = villeL("🎩 Cosmétiques", "🎩 Cosmetics"); list.appendChild(t2);
+        COSMETICS.forEach((cm) => list.appendChild(buildCosmeticCard(cm)));
+    }
+    function openVilleSkinShop(onClose) {
+        villeSkinShopOnClose = onClose || null;
+        renderVilleSkinShop();
+        document.getElementById("ville-skinshop-modal").classList.add("show");
+    }
+    function closeVilleSkinShop() {
+        document.getElementById("ville-skinshop-modal").classList.remove("show");
+        const cb = villeSkinShopOnClose;
+        villeSkinShopOnClose = null;
+        if (cb) cb();
+    }
+    // Les cartes de skins réutilisées (buildSkinCard) rafraîchissent la boutique
+    // classique après un achat : on redessine aussi celle-ci juste après.
+    document.getElementById("ville-skinshop-list").addEventListener("click", (e) => {
+        if (e.target.closest(".skin-card") && !e.target.closest("canvas")) setTimeout(() => {
+            if (document.getElementById("ville-skinshop-modal").classList.contains("show")) renderVilleSkinShop();
+        }, 0);
+    });
+    document.getElementById("btn-ville-skinshop-close").addEventListener("click", closeVilleSkinShop);
+    document.getElementById("ville-skinshop-modal").addEventListener("click", (e) => { if (e.target === e.currentTarget) closeVilleSkinShop(); });
+
+    /* ---- Pont vers ville.js (monde Ville) ----
+       Tout le jeu vit dans cette IIFE : ville.js n'y a accès que par ce petit
+       objet (lecture de la sauvegarde, dessin de la trousse/du crabe, sons...). */
+    window.__bt = {
+        get save() { return save; },
+        persist, tr, showToast, showScreen, screens, buildWorldsRow, refreshMenu, applyWorldTheme, applyMuteState,
+        paintTrousse, drawCrab, getSkin, trousseImg, wrapCanvasText, spawnDust,
+        sfxBuy, sfxError, sfxCrash, sfxCharge, sfxRecord, sfxLand, sfxLaunch, beep,
+        musicTracks, currentMusicTrack, applyWorldMusic,
+        WORLDS, ACHIEVEMENTS, SKINS, TRAILS, totalPuissance, totalVitesse,
+        openVilleShop, openVilleSkinShop, getFilteredSkinCanvas,
+        hideAllScreens() { Object.values(screens).forEach((s) => s.classList.remove("active")); },
+        startRooftop() {
+            document.body.classList.remove("ville-shop");
+            save.currentWorld = "ville";
+            applyWorldTheme();
+            showScreen("game");
+        },
+        endPlaneCrashScreen() {
+            screens.game.classList.remove("active");
+            planeCrash = null;
+            state = "idle";
+        },
+    };
+
     /* ============ 15. INITIALISATION ============ */
     // Si le joueur n'a jamais choisi de langue, on devine à partir de celle du
     // navigateur (anglais par défaut sauf si le navigateur est en français).
@@ -10926,6 +11541,14 @@
     }
     if (save.inPlage) save.currentWorld = "plage";
     else if (save.currentWorld === "plage") save.currentWorld = "cour";
+    // Monde Ville : débloqué d'une session à l'autre, et on y reste tant
+    // qu'on n'a pas repris un vol à l'aéroport (voir ville.js)
+    if (save.villeUnlocked) {
+        const villeWorld = WORLDS.find(w => w.id === "ville");
+        if (villeWorld) villeWorld.unlocked = true;
+    }
+    if (save.inVille) { save.inPlage = false; save.currentWorld = "ville"; }
+    else if (save.currentWorld === "ville") save.currentWorld = "cour";
     // Compteur de temps de jeu (écrit sur le disque toutes les 30 s seulement)
     setInterval(() => {
         save.playTime++;
@@ -10954,5 +11577,9 @@
     }
 })();
 </script>
+<!-- Monde Ville : aéroport, rue, réception, toit, mode histoire (utilise window.__bt) -->
+<script src="ville-art.js"></script>
+<script src="ville.js"></script>
+<script src="ville-levels.js"></script>
 </body>
 </html>
