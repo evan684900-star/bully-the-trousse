@@ -1095,7 +1095,12 @@
         V.glitch = 0.7;
         yield* fadeNpc(n, 1);
         yield 0.5;
-        n.say = st.answer2; // mot pour mot ce que le joueur a dit
+        // mot pour mot ce que le joueur lui a dit : ses deux réponses, dans l'ordre
+        n.say = st.answer1;
+        yield 2.6;
+        n.say = "";
+        yield 0.4;
+        n.say = st.answer2;
         yield 2.6;
         n.say = "";
         yield 1.1; // le joueur ne répond rien
