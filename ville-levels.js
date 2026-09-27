@@ -1117,7 +1117,8 @@
         V.npcs = [n];
         yield* fadeNpc(n, 1);
         yield 0.5;
-        // mêmes 4 choix qu'à la première rencontre, mais l'autre répète mot pour mot
+        // mêmes 4 choix qu'à la première rencontre ; l'autre ne répond rien,
+        // puis lâche seulement : « Et maintenant qui est qui ? »
         const rounds = [
             [L("Qui es-tu ?", "Who are you?"), L("Tu es... moi ?", "Are you... me?")],
             [L("Hein ? Réponds !", "Huh? Answer me!"), L("Tu parles ?", "Can you even talk?")],
@@ -1128,10 +1129,6 @@
             yield () => pick >= 0;
             P.say = opts[pick]; P.sayT = 2;
             yield 2.2;
-            n.say = opts[pick];
-            yield 2.2;
-            n.say = "";
-            yield 0.4;
         }
         n.say = L("Et maintenant qui est qui ?", "And now, who is who?");
         yield 2.8;
