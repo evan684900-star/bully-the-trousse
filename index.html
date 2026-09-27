@@ -1403,7 +1403,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.0.0</div>
+                <div class="version-tag" id="version-tag">v11.1.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2133,6 +2133,32 @@
         achv1000ThrowsDesc: { fr: "Effectue 1000 lancers au total.", en: "Make 1000 throws in total." },
         achvLevel100Name: { fr: "Niveau 100", en: "Level 100" },
         achvLevel100Desc: { fr: "Atteins un total de 100 niveaux (Puissance + Vitesse).", en: "Reach a combined total of 100 levels (Power + Speed)." },
+        achvVilleName: { fr: "Atterrissage forcé", en: "Crash landing" },
+        achvVilleDesc: { fr: "Arrive en Ville en t'encastrant dans un avion depuis la Plage.", en: "Reach the City by crashing into a plane from the Beach." },
+        achvVilleStoryName: { fr: "Fin de l'histoire", en: "The end" },
+        achvVilleStoryDesc: { fr: "Termine le mode histoire de la Ville, jusqu'au générique.", en: "Finish the City's story mode, all the way to the credits." },
+        achvVilleThrowsName: { fr: "Habitué du toit", en: "Rooftop regular" },
+        achvVilleThrowsDesc: { fr: "Fais 100 lancers depuis le toit de la Tour.", en: "Make 100 throws from the Tower's rooftop." },
+        achvVille1000Name: { fr: "Vue imprenable", en: "Breathtaking view" },
+        achvVille1000Desc: { fr: "Atteins un record de 1000 m depuis le toit de la Ville.", en: "Reach a record of 1000 m from the City rooftop." },
+        achvVille10000Name: { fr: "Par-dessus les gratte-ciel", en: "Over the skyscrapers" },
+        achvVille10000Desc: { fr: "Atteins un record de 10 000 m depuis le toit de la Ville.", en: "Reach a record of 10,000 m from the City rooftop." },
+        achvVille50000Name: { fr: "Plus loin que l'aéroport", en: "Past the airport" },
+        achvVille50000Desc: { fr: "Atteins un record de 50 000 m depuis le toit de la Ville.", en: "Reach a record of 50,000 m from the City rooftop." },
+        achvVillePuddlesName: { fr: "Glisse urbaine", en: "Urban surfer" },
+        achvVillePuddlesDesc: { fr: "Glisse 25 fois sur une flaque du toit.", en: "Slide on a rooftop puddle 25 times." },
+        achvVilleMoneyName: { fr: "Salaire de citadin", en: "City salary" },
+        achvVilleMoneyDesc: { fr: "Gagne 1 000 000 $ en Ville.", en: "Earn $1,000,000 in the City." },
+        achvVilleFortuneName: { fr: "Magnat de l'immobilier", en: "Real estate tycoon" },
+        achvVilleFortuneDesc: { fr: "Gagne 25 000 000 $ en Ville.", en: "Earn $25,000,000 in the City." },
+        achvVilleCrosswalkName: { fr: "Piéton distrait", en: "Distracted pedestrian" },
+        achvVilleCrosswalkDesc: { fr: "Fais-toi percuter 5 fois au passage piéton.", en: "Get hit at the crosswalk 5 times." },
+        achvVilleStairsName: { fr: "Pas d'ascenseur pour moi", en: "Stairs only" },
+        achvVilleStairsDesc: { fr: "Monte 10 fois les escaliers de la Tour.", en: "Climb the Tower's stairs 10 times." },
+        achvVilleCosmeticName: { fr: "Tiré à quatre épingles", en: "Dressed to the nines" },
+        achvVilleCosmeticDesc: { fr: "Achète un cosmétique à La Trousserie.", en: "Buy a cosmetic at La Trousserie." },
+        achvVilleWardrobeName: { fr: "Garde-robe complète", en: "Full wardrobe" },
+        achvVilleWardrobeDesc: { fr: "Possède les 8 cosmétiques de La Trousserie.", en: "Own all 8 cosmetics from La Trousserie." },
         achvSecretName: { fr: "...", en: "..." },
         achvSecretDesc: { fr: "Il n'y a rien à voir ici.", en: "There's nothing to see here." },
         achvPctNotEnough: {
@@ -2483,6 +2509,21 @@
         { id: "plage5000", emoji: "🐚", nameKey: "achvPlage5000Name", descKey: "achvPlage5000Desc", check: (s) => s.plageBestDistance >= 5000 },
         { id: "milleLancers", emoji: "🔥", nameKey: "achv1000ThrowsName", descKey: "achv1000ThrowsDesc", check: (s) => s.totalThrows >= 1000 },
         { id: "niveau100", emoji: "👑", nameKey: "achvLevel100Name", descKey: "achvLevel100Desc", check: (s) => s.puissanceLevel + s.vitesseLevel >= 100 },
+        // Monde Ville. Pas de COSMETICS ici : checkAchievements() peut tourner
+        // au chargement, avant que ce tableau (déclaré plus bas) n'existe.
+        { id: "villeDebloquee", emoji: "🏙️", nameKey: "achvVilleName", descKey: "achvVilleDesc", check: (s) => s.villeUnlocked },
+        { id: "villeHistoire", emoji: "🎬", nameKey: "achvVilleStoryName", descKey: "achvVilleStoryDesc", check: (s) => s.villeStoryDone },
+        { id: "villeToit100", emoji: "🏢", nameKey: "achvVilleThrowsName", descKey: "achvVilleThrowsDesc", check: (s) => (s.villeThrows || 0) >= 100 },
+        { id: "villeToit1000m", emoji: "🌇", nameKey: "achvVille1000Name", descKey: "achvVille1000Desc", check: (s) => (s.villeBestDistance || 0) >= 1000 },
+        { id: "villeToit10000m", emoji: "🌆", nameKey: "achvVille10000Name", descKey: "achvVille10000Desc", check: (s) => (s.villeBestDistance || 0) >= 10000 },
+        { id: "villeToit50000m", emoji: "🛫", nameKey: "achvVille50000Name", descKey: "achvVille50000Desc", check: (s) => (s.villeBestDistance || 0) >= 50000 },
+        { id: "villeFlaques25", emoji: "💦", nameKey: "achvVillePuddlesName", descKey: "achvVillePuddlesDesc", check: (s) => (s.villePuddles || 0) >= 25 },
+        { id: "villeSalaire", emoji: "💼", nameKey: "achvVilleMoneyName", descKey: "achvVilleMoneyDesc", check: (s) => (s.villeMoneyEarned || 0) >= 1000000 },
+        { id: "villeFortune", emoji: "🏦", nameKey: "achvVilleFortuneName", descKey: "achvVilleFortuneDesc", check: (s) => (s.villeMoneyEarned || 0) >= 25000000 },
+        { id: "villePieton", emoji: "🚸", nameKey: "achvVilleCrosswalkName", descKey: "achvVilleCrosswalkDesc", check: (s) => (s.villeCrosswalkDeaths || 0) >= 5 },
+        { id: "villeEscaliers", emoji: "🪜", nameKey: "achvVilleStairsName", descKey: "achvVilleStairsDesc", check: (s) => (s.villeStairs || 0) >= 10 },
+        { id: "villeCosmetique", emoji: "🎩", nameKey: "achvVilleCosmeticName", descKey: "achvVilleCosmeticDesc", check: (s) => (s.ownedCosmetics || []).length >= 1 },
+        { id: "villeGardeRobe", emoji: "👗", nameKey: "achvVilleWardrobeName", descKey: "achvVilleWardrobeDesc", check: (s) => (s.ownedCosmetics || []).length >= 8 },
         { id: "secretTrouve", emoji: "🔓", nameKey: "achvSecretName", descKey: "achvSecretDesc", check: (s) => s.ownedSkins.includes("secret") },
     ];
 
@@ -10316,8 +10357,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.0.0";
+    const VERSION_NUMBER = "11.1.0";
     const CHANGELOG = [
+        {
+            version: "11.1.0",
+            major: [
+                { fr: "13 nouveaux succès liés à la Ville : arriver en Ville, finir l'histoire, 100 lancers sur le toit, records de 1000 m, 10 000 m et 50 000 m depuis le toit, 25 glissades sur une flaque, 1 000 000 $ et 25 000 000 $ gagnés en Ville, 5 accidents au passage piéton, 10 montées d'escaliers, et les cosmétiques de La Trousserie (un, puis les 8)", en: "13 new City achievements: reach the City, finish the story, 100 rooftop throws, 1000 m, 10,000 m and 50,000 m rooftop records, 25 puddle slides, $1,000,000 and $25,000,000 earned in the City, 5 crosswalk accidents, 10 stair climbs, and La Trousserie's cosmetics (one, then all 8)" },
+            ],
+            minor: [
+                { fr: "Corrige le lancer parfait sur la Plage avec beaucoup de Puissance : l'avion ne rattrapait jamais la trousse, qui retombait sous le sable avec « ??? » affiché pour toujours", en: "Fixed the perfect Beach throw with high Power: the plane never caught up with the pencil case, which fell through the sand with \"???\" shown forever" },
+            ],
+        },
         {
             version: "11.0.0",
             major: [
