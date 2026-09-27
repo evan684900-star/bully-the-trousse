@@ -1315,8 +1315,23 @@
         startFight();
         P.frozen = false;
     }
+    // Boss vaincu : sa musique s'éteint en fondu (~1 s) pendant qu'il tombe,
+    // puis retrouve son volume d'origine pour un prochain combat.
+    function fadeOutBossMusic() {
+        const a = C.aBoss;
+        if (!a || a.paused) return;
+        const v0 = a.volume, t0 = performance.now();
+        const step = () => {
+            const k = Math.min(1, (performance.now() - t0) / 1000);
+            a.volume = v0 * (1 - k);
+            if (k < 1) requestAnimationFrame(step);
+            else { C.pauseA(a); a.volume = 0.5; }
+        };
+        requestAnimationFrame(step);
+    }
     function* victorySeq() {
         const st = V.story, b = st.boss;
+        fadeOutBossMusic();
         P.frozen = true;
         b.glow = "rgba(120,120,130,0.6)";
         yield () => {
