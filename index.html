@@ -8408,10 +8408,17 @@
     const PLANE_SPEED = 1500; // px/s, l'avion double la trousse par la gauche
     const PLANE_SCALE = 0.9;
     const PLANE_STICK_X = 70; // la trousse s'encastre un peu en avant du centre
+    // Une trousse très puissante file plus vite que 1500 px/s : l'avion accélère
+    // pour la rattraper en ~0,7 s quoi qu'il arrive, et elle ne peut pas passer
+    // sous le sable en l'attendant (sinon "???" restait affiché pour toujours).
+    const PLANE_CATCH_SECONDS = 0.7;
+    const PLANE_MIN_ALTITUDE = 40;
     let planeCrash = null;
     function startPlaneCrash(w, h) {
         state = "plane_crash";
-        planeCrash = { t: 0, attached: false, impactT: 0, px: worldX - w * 0.3 - 520, py: worldY + 4, sweepStart: 0, sweep: 0, handed: false, shake: 0 };
+        const startGap = w * 0.3 + 520;
+        planeCrash = { t: 0, attached: false, impactT: 0, px: worldX - startGap, py: worldY + 4, sweepStart: 0, sweep: 0, handed: false, shake: 0,
+            speed: Math.max(PLANE_SPEED, vx + startGap / PLANE_CATCH_SECONDS) };
         hintText.style.display = "none";
         document.getElementById("game-distance").textContent = "???";
     }
@@ -8424,8 +8431,9 @@
             worldX += vx * dt;
             worldY += vy * dt;
             vy -= currentG * dt;
+            if (worldY < PLANE_MIN_ALTITUDE) { worldY = PLANE_MIN_ALTITUDE; vy = Math.max(vy, 0); }
             rotation += rotSpeed * dt;
-            pc.px += PLANE_SPEED * dt;
+            pc.px += pc.speed * dt;
             pc.py += (worldY + 4 - pc.py) * Math.min(1, dt * 4);
             if (pc.px + PLANE_STICK_X * PLANE_SCALE >= worldX) {
                 pc.attached = true;
@@ -8437,7 +8445,7 @@
             }
         } else {
             const since = pc.t - pc.impactT;
-            pc.px += PLANE_SPEED * dt;
+            pc.px += pc.speed * dt;
             pc.py += (since < 2.5 ? 110 : 40) * dt; // l'avion reprend de l'altitude
             worldX = pc.px + PLANE_STICK_X * PLANE_SCALE;
             worldY = pc.py - 2;
