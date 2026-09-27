@@ -1403,7 +1403,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.1.0</div>
+                <div class="version-tag" id="version-tag">v11.2.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1775,6 +1775,10 @@
             <div class="settings-row" id="settings-row-tuto-plage" style="display:none;">
                 <span data-i18n="settingsTutoPlage">Monde Plage</span>
                 <button class="btn small secondary" id="btn-replay-tuto-plage" data-i18n="settingsTutoReplay">🔁 Revoir</button>
+            </div>
+            <div class="settings-row" id="settings-row-tuto-ville" style="display:none;">
+                <span data-i18n="settingsTutoVille">Monde Ville</span>
+                <button class="btn small secondary" id="btn-replay-tuto-ville" data-i18n="settingsTutoReplay">🔁 Revoir</button>
             </div>
 
             <h3 class="settings-section-title" data-i18n="settingsAccountTitle">👤 Paramètres du compte</h3>
@@ -2183,6 +2187,7 @@
         settingsTutoBasics: { fr: "Bases du jeu", en: "Game basics" },
         settingsTutoVolcan: { fr: "Monde Volcans", en: "Volcans world" },
         settingsTutoPlage: { fr: "Monde Plage", en: "Beach world" },
+        settingsTutoVille: { fr: "Monde Ville", en: "City world" },
         settingsTutoReplay: { fr: "🔁 Revoir", en: "🔁 Replay" },
         settingsThemeLabel: { fr: "Thème", en: "Theme" },
         settingsLangLabel: { fr: "Langue", en: "Language" },
@@ -2812,6 +2817,7 @@
             villeHeatRestUntil: 0,     // timestamp : la trousse se repose jusque-là
             villeArrivedAt: 0,
             villeStoryDoneAt: 0,
+            villeTutorialSeen: false,  // tutoriel du monde Ville (voir VILLE_TUTORIAL)
             ownedCosmetics: [],        // cosmétiques de La Trousserie (purement décoratifs)
             equippedCosmetic: "",      // un seul porté à la fois, "" = aucun
         };
@@ -10069,6 +10075,46 @@
         { icon: "⛱️", fr: { title: "", text: "" }, en: { title: "", text: "" }, keys: ["plageTutoTitle3", "plageTutoText3"] },
     ];
 
+    // Tutoriel spécifique au monde Ville, joué une seule fois à la première
+    // entrée dans la Ville (voir maybeVilleTutorial dans ville.js).
+    const VILLE_TUTORIAL = [
+        {
+            icon: "🏙️",
+            fr: { title: "Bienvenue en Ville !", text: "Ici, la trousse se déplace à pied. Au clavier : Q/D ou ←/→ pour marcher, Z/Espace pour sauter (maintiens pour sauter plus haut), X pour un dash, E pour parler ou entrer. Sur téléphone, utilise les boutons à l'écran." },
+            en: { title: "Welcome to the City!", text: "Here, the pencil case gets around on foot. On a keyboard: A/D or ←/→ to walk, W/Space to jump (hold to jump higher), X to dash, E to talk or enter. On a phone, use the on-screen buttons." },
+        },
+        {
+            icon: "🚸",
+            fr: { title: "Traverse prudemment", text: "Au passage piéton, attends que le bonhomme passe au vert : les voitures ne s'arrêtent pas pour une trousse." },
+            en: { title: "Cross carefully", text: "At the crosswalk, wait for the green walk signal: cars don't stop for a pencil case." },
+        },
+        {
+            icon: "🏢",
+            fr: { title: "La Tour", text: "Au bout de la rue, entre dans la Tour et passe à la réception : l'ascenseur mène au toit, un nouveau terrain de lancer où tout coûte 20 % plus cher... mais rapporte 20 % de plus." },
+            en: { title: "The Tower", text: "At the end of the street, enter the Tower and stop by the reception: the elevator takes you to the rooftop, a new throwing field where everything costs 20% more... but earns 20% more." },
+        },
+        {
+            icon: "📌",
+            fr: { title: "Les évènements", text: "Coupure de courant, fuite d'eau, pluie, canicule : les évènements tombent au même moment pour tous les joueurs. Le tableau de la réception annonce ceux des 5 prochains jours." },
+            en: { title: "Events", text: "Power outages, water leaks, rain, heatwaves: events hit every player at the same time. The board in the lobby lists those of the next 5 days." },
+        },
+        {
+            icon: "💦",
+            fr: { title: "Flaques et canicule", text: "Quand il y a des flaques sur le toit, la trousse glisse dessus, puis une barre de visée apparaît : vise bien pour repartir encore plus vite. En pleine canicule, elle doit se reposer 2 minutes tous les 5 lancers." },
+            en: { title: "Puddles and heatwaves", text: "When there are puddles on the roof, the pencil case slides on them, then an aiming bar appears: aim well to take off even faster. During a heatwave, it needs 2 minutes of rest every 5 throws." },
+        },
+        {
+            icon: "👕",
+            fr: { title: "La Trousserie", text: "Dans la rue, La Trousserie vend les skins au prix de la Ville et des cosmétiques purement décoratifs, à porter sur n'importe quel skin." },
+            en: { title: "La Trousserie", text: "On the street, La Trousserie sells skins at City prices, plus purely decorative cosmetics to wear on any skin." },
+        },
+        {
+            icon: "✈️",
+            fr: { title: "Et ensuite ?", text: "L'ascenseur propose aussi un mode histoire... à toi de découvrir ce qu'il cache. Pour quitter la Ville, prends un vol au comptoir des départs de l'aéroport." },
+            en: { title: "What next?", text: "The elevator also offers a story mode... up to you to find out what it hides. To leave the City, catch a flight at the airport departures desk." },
+        },
+    ];
+
     let tutorialStep = 0;
     let tutorialSlides = TUTORIAL_SLIDES; // jeu de diapos actuellement affiché
     let tutorialDoneCb = null;            // appelé à la fermeture, si défini
@@ -10152,6 +10198,7 @@
         // Le tutoriel de chaque monde ne peut être revu qu'une fois ce monde débloqué.
         document.getElementById("settings-row-tuto-volcan").style.display = save.volcanUnlocked ? "" : "none";
         document.getElementById("settings-row-tuto-plage").style.display = save.plageUnlocked ? "" : "none";
+        document.getElementById("settings-row-tuto-ville").style.display = save.villeUnlocked ? "" : "none";
     }
 
     // Boutons "Revoir" des réglages : referment la modale et rejouent le jeu
@@ -10174,6 +10221,10 @@
     document.getElementById("btn-replay-tuto-plage").addEventListener("click", () => {
         document.getElementById("settings-modal").classList.remove("show");
         startTutorial(PLAGE_TUTORIAL, () => {});
+    });
+    document.getElementById("btn-replay-tuto-ville").addEventListener("click", () => {
+        document.getElementById("settings-modal").classList.remove("show");
+        startTutorial(VILLE_TUTORIAL, () => {});
     });
 
     // Construit la grille d'icônes au choix (voir AVATAR_EMOJIS) ; celle
@@ -10357,8 +10408,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.1.0";
+    const VERSION_NUMBER = "11.2.0";
     const CHANGELOG = [
+        {
+            version: "11.2.0",
+            major: [],
+            minor: [
+                { fr: "Nouveau tutoriel pour le monde Ville : se déplacer à pied, le passage piéton, la Tour et son toit, les évènements, les flaques, La Trousserie et comment repartir. Il s'affiche à la première entrée dans la Ville et peut être revu dans les Réglages", en: "New tutorial for the City world: getting around on foot, the crosswalk, the Tower and its rooftop, events, puddles, La Trousserie and how to leave. It shows up the first time you enter the City and can be replayed from the Settings" },
+            ],
+        },
         {
             version: "11.1.0",
             major: [
@@ -11562,6 +11620,14 @@
         musicTracks, currentMusicTrack, applyWorldMusic,
         WORLDS, ACHIEVEMENTS, SKINS, TRAILS, totalPuissance, totalVitesse,
         openVilleShop, openVilleSkinShop, getFilteredSkinCanvas,
+        // Tutoriel du monde Ville (voir maybeVilleTutorial dans ville.js).
+        startVilleTutorial(onDone) {
+            startTutorial(VILLE_TUTORIAL, () => {
+                save.villeTutorialSeen = true;
+                persist();
+                if (onDone) onDone();
+            });
+        },
         hideAllScreens() { Object.values(screens).forEach((s) => s.classList.remove("active")); },
         startRooftop() {
             document.body.classList.remove("ville-shop");

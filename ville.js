@@ -959,6 +959,16 @@ body.ville-active .corner-icons-right, body.ville-active #btn-links{display:none
         } else if (first) {
             showMsg(L("✈️ Atterrissage... mouvementé.", "✈️ A... bumpy landing."), 3);
         }
+        maybeVilleTutorial();
+    }
+
+    // Tutoriel du monde Ville (VILLE_TUTORIAL dans index.html) : une seule
+    // fois, à la première entrée dans la Ville — y compris pour ceux qui y
+    // étaient déjà avant qu'il existe. La Ville reste figée tant qu'il s'affiche.
+    function maybeVilleTutorial() {
+        if (S().villeTutorialSeen || !B.startVilleTutorial) return;
+        V.lock = true;
+        B.startVilleTutorial(() => { V.lock = false; });
     }
 
     /* ============ ESCALIERS (coupure de courant) : "Gère ton souffle" x7 ============ */
@@ -1220,6 +1230,7 @@ body.ville-active .corner-icons-right, body.ville-active #btn-links{display:none
         startTrans("iris", 1.2, null);
         trans.t = 0.6; trans.midDone = true;
         startLoop();
+        maybeVilleTutorial();
     }
     function flyIn() {
         showRoot();
