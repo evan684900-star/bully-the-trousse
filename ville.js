@@ -1134,7 +1134,6 @@ body.ville-active .corner-icons-right, body.ville-active #btn-links{display:none
             [L("Coups d'épée donnés", "Sword hits landed"), s.villeSwordHits],
             [L("Mode histoire terminé", "Story mode completed"), (s.villeStoryRuns + 1) + L(" fois", " times")],
         ];
-        const ans = V.story && V.story.answer2 ? V.story.answer2 : "";
         const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[ch]));
         const intro = [
             L("oh ", "oh ") + pseudo() + L(" tu as fini mon jeu ?", ", you finished my game?"),
@@ -1146,7 +1145,6 @@ body.ville-active .corner-icons-right, body.ville-active #btn-links{display:none
             intro.map((l) => "<p>" + esc(l) + "</p>").join("") +
             "<h4>" + L("STATISTIQUES", "STATISTICS") + "</h4>" +
             rows.map((r) => '<div class="vl-stat"><span>' + esc(r[0]) + "</span><span>" + esc(r[1]) + "</span></div>").join("") +
-            (ans ? "<h4>" + L("CE QUE TU AS DIT À L'AUTRE TOI", "WHAT YOU SAID TO THE OTHER YOU") + "</h4><p>« " + esc(ans) + " »</p>" : "") +
             '<p class="vl-final">' + L("Merci d'avoir joué à mon jeu, merci...", "Thank you for playing my game, thank you...") + "</p>";
         CR.finalEl = rollEl.querySelector(".vl-final");
         CR.y = root.clientHeight + 20;
