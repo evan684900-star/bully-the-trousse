@@ -232,7 +232,10 @@ Android) avant d'être branché à l'affichage dans `:app`.
     joue toute l'histoire du début à la fin.
 
   Côté `:app` : `VilleScreen.kt` (boucle `withFrameNanos`, canvas virtuel
-  à la même échelle que le site, transitions iris/fondu/glitch/flou),
+  à la même échelle que le site, transitions iris/fondu/glitch/flou ; la
+  Ville se joue en paysage alors que le reste de l'app reste en portrait,
+  voir `VilleLandscapeLock` — l'activité déclare `configChanges` pour ne pas
+  être recréée en pivotant, et la partie attend que l'écran ait tourné),
   `Ctx2D.kt` (une petite API façon canvas 2D au-dessus de `DrawScope`, pour
   porter les fonctions de dessin ligne à ligne), `VilleArt.kt`/
   `VilleCityArt.kt`/`VilleIndoorArt.kt`/`VilleRenderer.kt` (le dessin),

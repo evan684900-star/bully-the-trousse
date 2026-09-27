@@ -55,6 +55,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -132,7 +133,9 @@ internal fun VillePopupView(
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
             .padding(horizontal = 18.dp, vertical = 16.dp),
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        // Défile si elle dépasse l'écran (téléphone en paysage) : la croix,
+        // posée par-dessus, reste toujours accessible.
+        Column(modifier = Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(
                 popup.title,
                 color = TextColor,
@@ -184,8 +187,10 @@ private fun NoticeBoard(events: List<VilleEvent>, nowMillis: Long) {
         PopupText("Rien de prévu pour l'instant.")
         return
     }
+    // `.vl-board { max-height: 50vh; overflow: auto }`
+    val maxHeight = (LocalConfiguration.current.screenHeightDp / 2).dp
     Column(
-        modifier = Modifier.heightIn(max = 300.dp).verticalScroll(rememberScrollState()),
+        modifier = Modifier.heightIn(max = maxHeight).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         for (ev in events) {

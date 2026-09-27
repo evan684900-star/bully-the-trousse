@@ -74,7 +74,10 @@ fun GameButton(
     // .btn : 14px de rayon, 14/30 de padding, 18px ; .btn.small : 10px, 10/18, 14px
     val shape = RoundedCornerShape(if (small) 10.dp else 14.dp)
 
-    Box(modifier = modifier) {
+    // propagateMinConstraints : un bouton étiré (fillMaxWidth, weight) étire
+    // aussi sa face, pas seulement son ombre, et centre son libellé comme le
+    // `.btn` du site. Sans taille imposée, rien ne change.
+    Box(modifier = modifier, propagateMinConstraints = true) {
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -91,6 +94,7 @@ fun GameButton(
                     horizontal = if (small) 18.dp else 30.dp,
                     vertical = if (small) 10.dp else 14.dp,
                 ),
+            contentAlignment = Alignment.Center,
         ) {
             Text(
                 label,

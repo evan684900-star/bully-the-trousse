@@ -625,20 +625,25 @@ private fun ScreenContent(
             onCloseVille = { goTo(Screen.Game) },
         )
 
-        // Une entrée différente = une partie de Ville repartie de zéro.
-        is Screen.Ville -> key(screen) {
-            VilleScreen(
-            entry = screen.entry,
-            save = save,
-            onSaveChange = updateSave,
-            onMusicChange = ville.onMusicChange,
-            onExitToMenu = { goTo(Screen.Menu) },
-            onGoRooftop = { goTo(Screen.Game) },
-            onLeaveVille = {
-                ville.onMenuToast(goodFlight)
-                goTo(Screen.Menu)
-            },
-            )
+        is Screen.Ville -> {
+            // En paysage le temps de la Ville : posé hors du key() pour que
+            // l'écran ne repivote pas entre deux entrées dans la Ville.
+            VilleLandscapeLock()
+            // Une entrée différente = une partie de Ville repartie de zéro.
+            key(screen) {
+                VilleScreen(
+                    entry = screen.entry,
+                    save = save,
+                    onSaveChange = updateSave,
+                    onMusicChange = ville.onMusicChange,
+                    onExitToMenu = { goTo(Screen.Menu) },
+                    onGoRooftop = { goTo(Screen.Game) },
+                    onLeaveVille = {
+                        ville.onMenuToast(goodFlight)
+                        goTo(Screen.Menu)
+                    },
+                )
+            }
         }
 
         Screen.Settings -> SettingsScreen(

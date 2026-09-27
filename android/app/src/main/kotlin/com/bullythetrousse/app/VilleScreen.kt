@@ -1,5 +1,9 @@
 package com.bullythetrousse.app
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -21,6 +25,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +41,7 @@ import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.IntOffset
@@ -55,6 +61,8 @@ import kotlin.math.ceil
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.random.Random
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Le monde Ville en mode plateforme (aéroport, rue, réception, mode
@@ -117,8 +125,19 @@ fun VilleScreen(
     var tick by remember { mutableLongStateOf(0L) }
     var blur by remember { mutableFloatStateOf(0f) }
 
+    // La Ville se joue en paysage (voir VilleLandscapeLock) : la partie ne
+    // démarre qu'une fois l'écran pivoté, pour ne pas jouer ses premières
+    // images en portrait. Un appareil qui refuse de pivoter (grand écran,
+    // multifenêtre...) la lance quand même au bout d'un instant.
+    var canvasSize by remember { mutableStateOf(IntSize.Zero) }
+    var started by remember { mutableStateOf(false) }
+
     LaunchedEffect(Unit) {
+        withTimeoutOrNull(LANDSCAPE_WAIT_MILLIS) {
+            snapshotFlow { canvasSize }.first { it.width > it.height }
+        }
         engine.enter(entry)
+        started = true
         var last = 0L
         while (true) {
             withFrameNanos { now ->
@@ -171,7 +190,10 @@ fun VilleScreen(
                 .graphicsLayer {
                     renderEffect = if (blur > 0.1f) BlurEffect(blur * density, blur * density) else null
                 }
-                .onSizeChanged { engine.resize(it.width.toDouble(), it.height.toDouble()) }
+                .onSizeChanged {
+                    canvasSize = it
+                    engine.resize(it.width.toDouble(), it.height.toDouble())
+                }
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         awaitFirstDown()
@@ -183,6 +205,12 @@ fun VilleScreen(
         ) {
             @Suppress("UNUSED_EXPRESSION")
             tick // redessine à chaque image de la boucle
+            if (!started) {
+                // Le temps que l'écran pivote : noir, ou le blanc des nuages
+                // quand on arrive du crash d'avion (l'arrivée commence en blanc).
+                drawRect(if (entry == VilleEntry.ARRIVAL) ARRIVAL_WHITE else Color.Black)
+                return@Canvas
+            }
             val sprites = VilleSprites(sprite, save.equippedSkin, skinFilter, save.equippedCosmetic, filterQuality)
             val sc = engine.scale.toFloat()
             val shakeX = (Random.nextFloat() - 0.5f) * engine.shake.toFloat() * density
@@ -215,7 +243,7 @@ fun VilleScreen(
             }
         }
 
-        if (ui.mode != VilleMode.CREDITS) {
+        if (started && ui.mode != VilleMode.CREDITS) {
             Box(modifier = Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 VilleHud(ui.money, ui.eventText, Modifier.align(Alignment.TopCenter).padding(top = 10.dp))
                 if (ui.showBack) {
@@ -283,6 +311,35 @@ fun VilleScreen(
         }
     }
 }
+
+/**
+ * Le monde Ville se joue en paysage, comme le site sur un écran d'ordinateur
+ * ou un téléphone tourné ; le reste de l'app reste en portrait (manifeste).
+ * Tant qu'il est affiché, l'écran suit le capteur entre les deux sens du
+ * paysage, puis on rend l'orientation d'avant. L'activité ne se recrée pas
+ * en pivotant (`configChanges` dans le manifeste) : la partie continue.
+ */
+@Composable
+internal fun VilleLandscapeLock() {
+    val activity = LocalContext.current.findActivity() ?: return
+    DisposableEffect(activity) {
+        val previous = activity.requestedOrientation
+        activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose { activity.requestedOrientation = previous }
+    }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
+}
+
+/** Au-delà, on démarre même si l'écran n'a pas pivoté. */
+private const val LANDSCAPE_WAIT_MILLIS = 1500L
+
+/** Le blanc des nuages (`#eef3f8`), celui de la fin du crash et du début de l'arrivée. */
+private val ARRIVAL_WHITE = Color(0xFFEEF3F8)
 
 private class VilleCallbacks(
     val onSaveChange: (GameSave) -> Unit,
