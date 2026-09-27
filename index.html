@@ -1403,7 +1403,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.2.3</div>
+                <div class="version-tag" id="version-tag">v11.2.4</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -10408,8 +10408,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.2.3";
+    const VERSION_NUMBER = "11.2.4";
     const CHANGELOG = [
+        {
+            version: "11.2.4",
+            major: [],
+            minor: [
+                { fr: "Mode histoire de la Ville : à la troisième rencontre, plus de choix de dialogue, tu ne dis rien ; l'autre trousse dit seulement « Et maintenant qui est qui ? »", en: "City story mode: no more dialogue choices at the third encounter, you say nothing; the other pencil case only says \"And now, who is who?\"" },
+            ],
+        },
         {
             version: "11.2.3",
             major: [],

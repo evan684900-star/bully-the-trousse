@@ -1116,20 +1116,9 @@
         const n = { x: AC + 70, alt: 0, dir: -1, variant: "player", alpha: 0, say: "", rot: 0, size: TS };
         V.npcs = [n];
         yield* fadeNpc(n, 1);
-        yield 0.5;
-        // mêmes 4 choix qu'à la première rencontre ; l'autre ne répond rien,
-        // puis lâche seulement : « Et maintenant qui est qui ? »
-        const rounds = [
-            [L("Qui es-tu ?", "Who are you?"), L("Tu es... moi ?", "Are you... me?")],
-            [L("Hein ? Réponds !", "Huh? Answer me!"), L("Tu parles ?", "Can you even talk?")],
-        ];
-        for (const opts of rounds) {
-            let pick = -1;
-            C.showChoices(opts, (i) => { pick = i; });
-            yield () => pick >= 0;
-            P.say = opts[pick]; P.sayT = 2;
-            yield 2.2;
-        }
+        // Troisième rencontre : pas de choix de dialogue, le joueur ne dit
+        // rien ; l'autre lâche seulement « Et maintenant qui est qui ? »
+        yield 0.8;
         n.say = L("Et maintenant qui est qui ?", "And now, who is who?");
         yield 2.8;
         n.say = "";
