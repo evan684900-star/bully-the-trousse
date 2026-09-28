@@ -1434,7 +1434,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.4.0</div>
+                <div class="version-tag" id="version-tag">v11.5.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -4758,8 +4758,9 @@
             save[recordField] = distanceMeters;
             document.getElementById("result-record").style.display = "block";
             sfxRecord();
-            // Pas de classement en ligne pour le toit de la Ville (record local)
-            if (save.currentWorld !== "ville") pushScoreIfRecord(distanceMeters);
+            // Le toit de la Ville compte dans le même classement que la Cour
+            // (voir mainLeaderboardRecord) ; la Plage garde le sien.
+            pushScoreIfRecord(save.inPlage ? save.plageBestDistance : mainLeaderboardRecord());
         } else {
             document.getElementById("result-record").style.display = "none";
         }
@@ -9811,7 +9812,7 @@
             totalMoneyEarned: save.totalMoneyEarned,
             dailyEarnings: save.dailyEarnings,
             dailyBestDistance: save.dailyBestDistance,
-            bestDistance: save.bestDistance,
+            bestDistance: mainLeaderboardRecord(), // record du classement mondial (voir computeRank)
             puissance: totalPuissance(),
             vitesse: totalVitesse(),
             achievementsCount: save.unlockedAchievements.length,
@@ -9868,10 +9869,17 @@
     function countFollowers(uid) { return countDocs(db.collection("follows").where("following", "==", uid)); }
     function countFollowing(uid) { return countDocs(db.collection("follows").where("follower", "==", uid)); }
 
+    // Record envoyé au classement mondial : la Cour d'école (Volcans compris)
+    // ET le toit de la Ville y comptent ensemble, avec le meilleur des deux.
+    // Chaque record reste gardé à part dans la sauvegarde (succès, fiche trousse).
+    function mainLeaderboardRecord() {
+        return Math.max(save.bestDistance || 0, save.villeBestDistance || 0);
+    }
+
     // Rang dans le classement mondial : nombre de joueurs avec un meilleur
     // record + 1. Simple requête d'inégalité sur un seul champ, pas besoin
-    // d'index composite. Toujours le classement du monde normal : c'est son
-    // record (bestDistance) que le profil affiche, même depuis la plage.
+    // d'index composite. Toujours le classement mondial : c'est son record
+    // (mainLeaderboardRecord) que porte le profil, même depuis la plage.
     function computeRank(bestDistance) {
         if (!db) return Promise.resolve(null);
         return countDocs(db.collection("scores").where("bestDistance", ">", bestDistance)).then((n) => n + 1);
@@ -9906,7 +9914,7 @@
     // vient de remplacer celle du compte n'a pas de record dans ce monde, donc
     // l'ancienne entrée du compte n'a plus lieu d'être.
     function pushAllScores(removeEmpty) {
-        [["scores", save.bestDistance], ["scoresPlage", save.plageBestDistance]].forEach(([col, dist]) => {
+        [["scores", mainLeaderboardRecord()], ["scoresPlage", save.plageBestDistance]].forEach(([col, dist]) => {
             if (dist > 0) pushScoreTo(col, dist);
             else if (removeEmpty && canWriteCloud()) db.collection(col).doc(currentUser.uid).delete().catch(() => { /* best-effort */ });
         });
@@ -9991,7 +9999,7 @@
             totalMoneyEarned: save.totalMoneyEarned,
             dailyEarnings: save.dailyEarnings,
             dailyBestDistance: save.dailyBestDistance,
-            bestDistance: save.bestDistance,
+            bestDistance: mainLeaderboardRecord(), // record du classement mondial (voir computeRank)
             puissance: totalPuissance(),
             vitesse: totalVitesse(),
             achievementsCount: save.unlockedAchievements.length,
@@ -10894,8 +10902,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.4.0";
+    const VERSION_NUMBER = "11.5.0";
     const CHANGELOG = [
+        {
+            version: "11.5.0",
+            major: [
+                { fr: "Les lancers depuis le toit de la Ville comptent maintenant dans le classement mondial, au même titre que la Cour d'école : ton entrée affiche le meilleur des deux records (avant, le record de la Ville n'apparaissait nulle part). Les records déjà faits en Ville y sont envoyés dès la prochaine ouverture du jeu", en: "Throws from the City rooftop now count on the global leaderboard, just like the Schoolyard: your entry shows the better of the two records (previously the City record showed up nowhere). City records you already set are sent there the next time you open the game" },
+            ],
+            minor: [
+                { fr: "Profil : le rang mondial tient compte du record de la Ville", en: "Profile: the global rank takes the City record into account" },
+            ],
+        },
         {
             version: "11.4.0",
             major: [
