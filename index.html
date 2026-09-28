@@ -492,6 +492,29 @@
             touch-action: none;
         }
         #btn-vampire-boost.show { display: block; }
+        /* Accélérer le vol (voir throwSpeed et gameLoop) : petit bouton en bas
+           à droite, au-dessus des icônes son/réglages, visible seulement quand
+           la trousse est en l'air ou dérape. */
+        #btn-throw-speed {
+            position: absolute;
+            right: calc(12px + env(safe-area-inset-right));
+            bottom: calc(66px + env(safe-area-inset-bottom));
+            min-width: 64px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 2px solid rgba(255,255,255,0.3);
+            background: rgba(20,24,38,0.75);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 800;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+            display: none;
+            z-index: 16;
+            cursor: pointer;
+        }
+        #btn-throw-speed.show { display: block; }
+        #btn-throw-speed.fast { border-color: var(--accent); color: var(--accent); }
+        #btn-throw-speed:active { transform: scale(0.92); }
         #btn-vampire-boost:active { transform: translateX(-50%) scale(0.9); }
         /* Vignette violette pulsante pendant le boost : retour visuel clair
            que l'accélération est bien active, en plus du chiffre de distance
@@ -1411,7 +1434,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.3.0</div>
+                <div class="version-tag" id="version-tag">v11.4.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -1462,6 +1485,8 @@
         <!-- Trousse Vampire : n'apparaît que pendant le vol tant qu'il n'a pas
              déjà servi ce lancer-ci (voir gameLoop et startVampireBoost) -->
         <button id="btn-vampire-boost" aria-label="Boost vampire">🦇</button>
+        <!-- Accélère le vol quand un lancer est trop long (voir throwSpeed) -->
+        <button id="btn-throw-speed" type="button" title="Accélérer le lancer">⏩ ×1</button>
         <div id="meter-wrap">
             <div id="meter-fill"></div>
             <div id="meter-center"></div>
@@ -1944,6 +1969,7 @@
         onlineConnected: { fr: "En ligne ✅", en: "Online ✅" },
         onlineOfflineNoConfig: { fr: "Hors ligne (Firebase non configuré)", en: "Offline (Firebase not configured)" },
         onlineOfflineFailed: { fr: "Hors ligne (connexion échouée)", en: "Offline (connection failed)" },
+        throwSpeedTitle: { fr: "Accélérer le lancer", en: "Speed up the throw" },
         onlineRevoked: { fr: "Déconnecté (code changé)", en: "Logged out (code changed)" },
         leaderboardUnavailable: { fr: "Classement indisponible hors ligne.", en: "Leaderboard unavailable offline." },
         leaderboardLoading: { fr: "Chargement...", en: "Loading..." },
@@ -6096,6 +6122,102 @@
         if (screens.game.classList.contains("active") && !cineActive) requestAnimationFrame(gameLoop);
     }
 
+    // Accélération du vol (bouton ⏩, pratique quand un lancer dure trop
+    // longtemps) : nombre de pas de physique joués par image pendant le vol et
+    // le dérapage. Réglage propre à cet appareil, gardé d'un lancer à l'autre.
+    const THROW_SPEEDS = [1, 2, 4];
+    const THROW_SPEED_KEY = "bullyTrousseThrowSpeed";
+    let throwSpeed = THROW_SPEEDS.includes(Number(lsGet(THROW_SPEED_KEY))) ? Number(lsGet(THROW_SPEED_KEY)) : 1;
+    let throwSpeedBtnShown = false;
+    const throwSpeedBtn = document.getElementById("btn-throw-speed");
+    function refreshThrowSpeedBtn() {
+        throwSpeedBtn.textContent = "⏩ ×" + throwSpeed;
+        throwSpeedBtn.title = tr("throwSpeedTitle");
+        if (throwSpeed > 1) throwSpeedBtn.classList.add("fast"); else throwSpeedBtn.classList.remove("fast");
+    }
+    throwSpeedBtn.addEventListener("click", () => {
+        throwSpeed = THROW_SPEEDS[(THROW_SPEEDS.indexOf(throwSpeed) + 1) % THROW_SPEEDS.length];
+        lsSet(THROW_SPEED_KEY, String(throwSpeed));
+        refreshThrowSpeedBtn();
+        throwSpeedBtn.blur(); // sinon Espace (qui fait avancer le jeu) recliquerait le bouton
+    });
+    refreshThrowSpeedBtn();
+
+    // Un pas de physique du vol (voir gameLoop).
+    function stepFlying(dt, w, h) {
+        // intégration physique simple (méthode d'Euler) :
+        // la trousse monte tant que vy > 0, la gravité la ralentit puis la fait redescendre
+        worldX += vx * dt;
+        worldY += vy * dt;
+        vy -= currentG * dt;
+        rotation += rotSpeed * dt;
+
+        // Maintenir le bouton 🦇 accélère vx (donc la portée) jusqu'au
+        // plafond de temps cumulé (voir startVampireBoost/endVampireBoost).
+        if (vampireBoosting && vampireBoostSecondsLeft > 0) {
+            const usedDt = Math.min(dt, vampireBoostSecondsLeft);
+            vx *= Math.pow(VAMPIRE_BOOST_GROWTH_PER_SEC, usedDt);
+            vampireBoostSecondsLeft -= usedDt;
+            if (vampireBoostSecondsLeft <= 0) endVampireBoost();
+        }
+
+        if (save.currentWorld === "plage" && isPerfect && !inSpaceMode && !planeCrash
+            && vy > 0 && vy < 170 && worldY > 40 && window.VilleWorld) {
+            // Monde Plage : un lancer parfait, juste avant l'apogée, finit
+            // encastré sur le flanc d'un avion de ligne (voir section 9quater)
+            startPlaneCrash(w, h);
+        } else if (spaceEggTriggered && vy <= 0) {
+            // on vient d'atteindre l'apogée avec la combinaison easter egg :
+            // on gèle la position et on bascule vers la séquence spatiale
+            spaceEggTriggered = false; // ne se déclenche qu'une fois par lancer
+            save.hasTriggeredSpaceEgg = true;
+            state = "space_transition";
+            phaseTimer = 0;
+        } else if (worldY <= 0 && vy < 0) {
+            // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
+            worldY = 0;
+            if (save.currentWorld === "plage" && tryBeachParasolBounce()) {
+                // rebond sur un parasol : le lancer continue (voir section 9ter)
+            } else if (tryBasketBounce()) {
+                // le rebond a déjà remis l'état à "charging_power", rien d'autre à faire
+            } else if (tryRocketMoonTraversal()) {
+                // la Fusée a traversé le sol lunaire : le lancer continue (voir plus bas)
+            } else if (save.currentWorld === "ville" && !inSpaceMode && villePuddleAt(worldX)) {
+                // Monde Ville : fuite d'eau / pluie, la trousse glisse sur une flaque
+                startVillePuddleSlide();
+            } else if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
+                // Monde Volcan : la poussière rouge rend le sol glissant
+                startSkid();
+            } else {
+                onLanded();
+            }
+        } else {
+            // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
+            const targetCamera = worldX - w * 0.3;
+            cameraX = Math.max(0, targetCamera);
+            // ...et pareil en hauteur : sans ça, un lancer assez puissant fait
+            // sortir la trousse par le haut de l'écran avant même l'apogée.
+            const groundY = h * 0.68;
+            cameraY = Math.max(0, VERTICAL_SAFE_TOP - groundY + worldY);
+            document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
+        }
+    }
+
+    // Un pas du dérapage (voir gameLoop).
+    function stepSkid(dt, w) {
+        // La trousse roule et râpe le sol : la vitesse décroît jusqu'à l'arrêt
+        const remaining = skidTargetX - worldX;
+        const speed = Math.max(40, remaining * 2.4);
+        worldX = Math.min(skidTargetX, worldX + speed * dt);
+        rotation += (speed / 90) * dt * 4;
+        if (Math.random() < dt * 45) {
+            spawnDust(worldX - cameraX, groundScreenY - 6, 1, { spread: 70, up: 90, size: 7, life: 0.55, color: "180,110,80" });
+        }
+        cameraX = Math.max(0, worldX - w * 0.3);
+        document.getElementById("game-distance").textContent = (worldX / SCALE).toFixed(1);
+        if (remaining <= 1) onLanded();
+    }
+
     // Boucle principale : appelée à chaque frame tant que l'écran de jeu est actif
     function gameLoop(now) {
         if (!screens.game.classList.contains("active")) return;
@@ -6126,6 +6248,12 @@
             const btn = document.getElementById("btn-vampire-boost");
             if (shouldShowVampireBtn) btn.classList.add("show"); else btn.classList.remove("show");
         }
+        // Bouton ⏩ : seulement quand il y a du vol (ou un dérapage) à accélérer.
+        const shouldShowSpeedBtn = state === "flying" || state === "skidding";
+        if (shouldShowSpeedBtn !== throwSpeedBtnShown) {
+            throwSpeedBtnShown = shouldShowSpeedBtn;
+            if (shouldShowSpeedBtn) throwSpeedBtn.classList.add("show"); else throwSpeedBtn.classList.remove("show");
+        }
         // Vignette violette pulsante tant que le boost est activement maintenu
         // (voir #screen-game.vampire-boosting) : retour visuel immédiat.
         if (vampireBoosting !== vampireScreenBoosting) {
@@ -6134,78 +6262,16 @@
         }
 
         if (state === "flying") {
-            // intégration physique simple (méthode d'Euler) :
-            // la trousse monte tant que vy > 0, la gravité la ralentit puis la fait redescendre
-            worldX += vx * dt;
-            worldY += vy * dt;
-            vy -= currentG * dt;
-            rotation += rotSpeed * dt;
-
-            // Maintenir le bouton 🦇 accélère vx (donc la portée) jusqu'au
-            // plafond de temps cumulé (voir startVampireBoost/endVampireBoost).
-            if (vampireBoosting && vampireBoostSecondsLeft > 0) {
-                const usedDt = Math.min(dt, vampireBoostSecondsLeft);
-                vx *= Math.pow(VAMPIRE_BOOST_GROWTH_PER_SEC, usedDt);
-                vampireBoostSecondsLeft -= usedDt;
-                if (vampireBoostSecondsLeft <= 0) endVampireBoost();
-            }
-
+            // Bouton ⏩ : plusieurs pas de physique par image au lieu d'un seul.
+            // Ce sont exactement les pas de la vitesse normale (même trajectoire,
+            // mêmes détections d'apogée, d'avion et d'atterrissage), simplement
+            // enchaînés plus vite.
+            for (let i = 0; i < throwSpeed && state === "flying"; i++) stepFlying(dt, w, h);
             // échantillonne la position pour la traînée (voir drawTrail), en
             // gardant seulement les points assez récents pour rester visibles
             emitTrail(worldX, worldY, vx, vy, now, dt);
-
-            if (save.currentWorld === "plage" && isPerfect && !inSpaceMode && !planeCrash
-                && vy > 0 && vy < 170 && worldY > 40 && window.VilleWorld) {
-                // Monde Plage : un lancer parfait, juste avant l'apogée, finit
-                // encastré sur le flanc d'un avion de ligne (voir section 9quater)
-                startPlaneCrash(w, h);
-            } else if (spaceEggTriggered && vy <= 0) {
-                // on vient d'atteindre l'apogée avec la combinaison easter egg :
-                // on gèle la position et on bascule vers la séquence spatiale
-                spaceEggTriggered = false; // ne se déclenche qu'une fois par lancer
-                save.hasTriggeredSpaceEgg = true;
-                state = "space_transition";
-                phaseTimer = 0;
-            } else if (worldY <= 0 && vy < 0) {
-                // atterrissage : on repasse sous le sol (worldY <= 0) en redescendant (vy < 0)
-                worldY = 0;
-                if (save.currentWorld === "plage" && tryBeachParasolBounce()) {
-                    // rebond sur un parasol : le lancer continue (voir section 9ter)
-                } else if (tryBasketBounce()) {
-                    // le rebond a déjà remis l'état à "charging_power", rien d'autre à faire
-                } else if (tryRocketMoonTraversal()) {
-                    // la Fusée a traversé le sol lunaire : le lancer continue (voir plus bas)
-                } else if (save.currentWorld === "ville" && !inSpaceMode && villePuddleAt(worldX)) {
-                    // Monde Ville : fuite d'eau / pluie, la trousse glisse sur une flaque
-                    startVillePuddleSlide();
-                } else if (save.currentWorld === "volcans" && !inSpaceMode && Math.random() < SKID_CHANCE) {
-                    // Monde Volcan : la poussière rouge rend le sol glissant
-                    startSkid();
-                } else {
-                    onLanded();
-                }
-            } else {
-                // la caméra suit la trousse en la gardant vers 30% de la largeur de l'écran
-                const targetCamera = worldX - w * 0.3;
-                cameraX = Math.max(0, targetCamera);
-                // ...et pareil en hauteur : sans ça, un lancer assez puissant fait
-                // sortir la trousse par le haut de l'écran avant même l'apogée.
-                const groundY = h * 0.68;
-                cameraY = Math.max(0, VERTICAL_SAFE_TOP - groundY + worldY);
-                document.getElementById("game-distance").textContent = Math.max(0, worldX / SCALE).toFixed(1);
-            }
         } else if (state === "skidding") {
-            // La trousse roule et râpe le sol : la vitesse décroît jusqu'à l'arrêt
-            const remaining = skidTargetX - worldX;
-            const speed = Math.max(40, remaining * 2.4);
-            worldX = Math.min(skidTargetX, worldX + speed * dt);
-            rotation += (speed / 90) * dt * 4;
-            if (Math.random() < dt * 45) {
-                spawnDust(worldX - cameraX, groundScreenY - 6, 1, { spread: 70, up: 90, size: 7, life: 0.55, color: "180,110,80" });
-            }
-            cameraX = Math.max(0, worldX - w * 0.3);
-            document.getElementById("game-distance").textContent = (worldX / SCALE).toFixed(1);
-            if (remaining <= 1) onLanded();
+            for (let i = 0; i < throwSpeed && state === "skidding"; i++) stepSkid(dt, w);
         } else if (state === "space_transition") {
             phaseTimer += dt;
             // le décor bascule à la moitié de la transition, pile quand les
@@ -10828,8 +10894,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.3.0";
+    const VERSION_NUMBER = "11.4.0";
     const CHANGELOG = [
+        {
+            version: "11.4.0",
+            major: [
+                { fr: "Nouveau bouton ⏩ pendant le lancer (en bas à droite) : accélère le vol ×2 ou ×4 quand un lancer dure trop longtemps. La trajectoire et la distance ne changent pas, ça va juste plus vite. Le réglage est gardé pour les lancers suivants", en: "New ⏩ button during the throw (bottom right): speeds up the flight ×2 or ×4 when a throw takes too long. The trajectory and distance don't change, it just goes faster. The setting is kept for the next throws" },
+            ],
+            minor: [],
+        },
         {
             version: "11.3.0",
             major: [
