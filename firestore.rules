@@ -13,7 +13,10 @@ service cloud.firestore {
 
     // Classement du monde normal : tout le monde peut lire (pour afficher le
     // classement), mais chacun ne peut écrire QUE sa propre entrée, avec des
-    // valeurs plausibles (pseudo court, distance positive et raisonnable).
+    // valeurs plausibles (pseudo court, distance positive et finie).
+    // Le plafond était de 100 000 m : les records au-delà (le meilleur joueur
+    // dépasse 300 km) étaient refusés, et son entrée restait figée à l'ancienne
+    // valeur. Il ne sert plus qu'à écarter les valeurs absurdes (infini...).
     // Limite : ça bloque les écritures grossières, mais un joueur qui ouvre
     // la console de son navigateur peut techniquement encore envoyer une
     // fausse distance dans les bornes autorisées — une validation complète
@@ -26,11 +29,12 @@ service cloud.firestore {
                    && request.resource.data.pseudo.size() <= 24
                    && request.resource.data.bestDistance is number
                    && request.resource.data.bestDistance >= 0
-                   && request.resource.data.bestDistance <= 100000;
+                   && request.resource.data.bestDistance <= 1000000000000;
       // Chacun peut supprimer SA propre entrée. Utilisé quand un appareil
-      // abandonne son compte anonyme pour rejoindre un vrai compte (voir
-      // cleanupAbandonedAnonymousAccount) : sans ça, l'entrée orpheline
-      // resterait affichée en double dans le classement.
+      // quitte son compte pour en rejoindre un autre, ou se déconnecte (voir
+      // abandonCurrentAccount) : sans ça, l'entrée resterait affichée en double
+      // dans le classement. Si le compte sert encore ailleurs, l'autre appareil
+      // la republie à sa prochaine connexion.
       // (Règle séparée : sur une suppression, "request.resource" est nul, donc
       // les conditions de "write" ci-dessus échoueraient toutes.)
       allow delete: if request.auth != null && request.auth.uid == uid;
@@ -61,7 +65,7 @@ service cloud.firestore {
                    && request.resource.data.pseudo.size() <= 24
                    && request.resource.data.bestDistance is number
                    && request.resource.data.bestDistance >= 0
-                   && request.resource.data.bestDistance <= 100000;
+                   && request.resource.data.bestDistance <= 1000000000000;
       // Même suppression de sa propre entrée que pour "scores" ci-dessus.
       allow delete: if request.auth != null && request.auth.uid == uid;
       allow update: if request.auth != null
@@ -72,19 +76,18 @@ service cloud.firestore {
                        == request.resource.data.retireToken;
     }
 
-    // Code de récupération. Depuis la refonte des comptes, le code de 16
-    // chiffres sert surtout d'IDENTIFIANT Firebase Auth (e-mail/mot de passe
-    // dérivés du code, voir linkAccountToCode) : tous les appareils d'un même
-    // joueur partagent alors le même uid, donc la même sauvegarde et une seule
-    // entrée de classement.
-    // Cette collection reste écrite comme filet de sécurité : elle contient une
-    // copie de la sauvegarde, utilisée pour les codes créés AVANT la refonte,
-    // et si l'authentification e-mail/mot de passe n'est pas activée dans la
-    // console Firebase (le jeu retombe alors sur l'ancien comportement).
+    // Anciens codes de récupération. Le code de 16 chiffres est l'IDENTIFIANT
+    // Firebase Auth du compte (e-mail/mot de passe dérivés du code, voir
+    // ensureAccountCode) : tous les appareils d'un même joueur partagent le même
+    // uid, donc la même sauvegarde et une seule entrée de classement.
+    // Cette collection n'est plus écrite depuis la 11.3.0 : elle garde les
+    // copies de sauvegarde des codes créés AVANT la refonte des comptes, encore
+    // récupérables (voir lookupAccountByCode). Un code régénéré y voit sa copie
+    // retirée (voir retireLegacyCodeCopy).
     // "get" est public mais "list" est refusé : sans connaître le code exact,
     // impossible de lire quoi que ce soit (et 10^16 combinaisons rendent la
-    // recherche au hasard sans espoir). Seul le propriétaire du compte pointé
-    // peut écrire/écraser le document.
+    // recherche au hasard sans espoir). Un document ne peut être écrit qu'avec
+    // son propre uid dedans.
     match /recoveryCodes/{code} {
       allow get: if true;
       allow list: if false;
