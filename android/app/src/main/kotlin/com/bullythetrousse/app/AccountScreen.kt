@@ -38,20 +38,22 @@ import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.RecoveryCode
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberUpdatedState
+import com.bullythetrousse.core.AccountRules
 import com.bullythetrousse.core.I18n
 import com.bullythetrousse.core.MergeChoice
 import com.bullythetrousse.core.SaveSummary
 
 /**
  * Écran Compte, porté de la section « Paramètres du compte » / « Mon compte »
- * des réglages du site (`#settings-modal`) : statut de connexion, code de
- * récupération (afficher/créer, rejoindre), compte privé, photo de profil,
- * déconnexion.
+ * des réglages du site (`#settings-modal`) : statut de connexion, code du
+ * compte (afficher, copier, régénérer), connexion à un autre compte avec un
+ * code, compte privé, photo de profil, déconnexion.
  *
  * L'idée à faire passer au joueur, et qui guide la mise en page : **le code
  * n'est pas un mot de passe, c'est son compte**. Le même code ouvre la même
  * partie sur le site et sur le téléphone — même argent, même classement,
- * même profil.
+ * même profil. Le code affiché est toujours celui du compte connecté (lu
+ * dans son e-mail), masqué tant qu'on ne demande pas à le voir.
  */
 @Composable
 fun AccountScreen(
@@ -65,22 +67,56 @@ fun AccountScreen(
     val clipboard = LocalClipboardManager.current
     val toaster = LocalToaster.current
     val lang = LocalLang.current
-    var revealedCode by remember { mutableStateOf(save.recoveryCode.takeIf { RecoveryCode.isValid(it) }) }
-    var typedCode by remember { mutableStateOf("") }
+    // Ancien code relié entre-temps à un autre compte : proposé tel quel.
+    val suggestion = session.joinSuggestion.takeIf { it.isNotEmpty() && it != session.accountCode }
+    var typedCode by remember { mutableStateOf(suggestion.orEmpty()) }
     var errorKey by remember { mutableStateOf<String?>(null) }
+    var codeErrorKey by remember { mutableStateOf<String?>(null) }
     var busy by remember { mutableStateOf(false) }
+    var codeVisible by remember { mutableStateOf(false) }
     var showLogoutConfirm by remember { mutableStateOf(false) }
+    var showRegenConfirm by remember { mutableStateOf(false) }
     var showAvatarPicker by remember { mutableStateOf(false) }
     // Code vérifié en attente du choix « quelle partie garder ? ».
     var pending by remember { mutableStateOf<Pair<String, CodeLookup>?>(null) }
     val currentSave by rememberUpdatedState(save)
+
+    // Messages résolus ici : tr() ne peut pas être appelé depuis une coroutine.
+    val msgConnected = I18n.tr("accountConnected", lang)
+    val msgRestored = I18n.tr("recoveryDone", lang)
+    val msgRegenDone = I18n.tr("regenDone", lang)
+    val msgLinked = I18n.tr("accountLinked", lang)
+    val msgCopied = tr("recoveryCopied")
+
+    /** Connecte l'appareil au code vérifié, avec la partie choisie. */
+    fun confirm(code: String, lookup: CodeLookup, choice: MergeChoice) {
+        busy = true
+        scope.launch {
+            val error = when (lookup) {
+                is CodeLookup.Account -> session.joinAccount(code, choice, repository, currentSave, onSaveChange)
+                is CodeLookup.Legacy -> session.restoreLegacy(code, lookup, choice, currentSave, onSaveChange)
+            }
+            if (error == null) {
+                typedCode = ""
+                codeVisible = false
+                toaster(if (lookup is CodeLookup.Account) msgConnected else msgRestored)
+            } else {
+                errorKey = error
+            }
+            busy = false
+        }
+    }
 
     ModalScreen(tr("settingsAccountTitle"), onBack) {
         // --- Statut : "account-status" côté site ---
         InfoCard {
             Text(
                 tr(session.statusKey),
-                color = if (session.state == CloudState.LINKED) Money else TextDim,
+                color = when (session.state) {
+                    CloudState.LINKED -> Money
+                    CloudState.REVOKED -> Accent
+                    else -> TextDim
+                },
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 textAlign = TextAlign.Center,
@@ -99,32 +135,57 @@ fun AccountScreen(
         InfoCard {
             Text(tr("settingsRecoveryTitle"), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
             Text(tr("settingsRecoveryHint"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
-            val code = revealedCode
-            if (code == null) {
-                GameButton(tr("btnRecoveryReveal"), small = true) {
-                    if (busy) return@GameButton
-                    busy = true
-                    scope.launch {
-                        revealedCode = session.revealOrCreateCode(currentSave, onSaveChange)
-                        busy = false
-                    }
-                }
-            } else {
+            val code = session.accountCode
+            if (code.isNotEmpty()) {
+                // #recovery-code-value : masqué tant qu'on ne demande pas à le voir.
                 Text(
-                    RecoveryCode.format(code),
+                    if (codeVisible) RecoveryCode.format(code) else MASKED_CODE,
                     color = TextColor,
                     fontSize = 20.sp,
                     fontWeight = FontWeight.Black,
                     letterSpacing = 2.sp,
                     textAlign = TextAlign.Center,
                 )
-                val copied = tr("recoveryCopied")
-                GameButton(tr("btnRecoveryCopy"), secondary = true, small = true) {
-                    clipboard.setText(AnnotatedString(code))
-                    toaster(copied)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    GameButton(
+                        tr(if (codeVisible) "btnRecoveryHide" else "btnRecoveryReveal"),
+                        secondary = true,
+                        small = true,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        codeVisible = !codeVisible
+                        if (codeVisible) session.markCodeShown(currentSave, onSaveChange)
+                    }
+                    GameButton(tr("btnRecoveryCopy"), secondary = true, small = true, modifier = Modifier.weight(1f)) {
+                        clipboard.setText(AnnotatedString(code))
+                        session.markCodeShown(currentSave, onSaveChange)
+                        toaster(msgCopied)
+                    }
+                    GameButton(tr("btnRecoveryRegen"), secondary = true, small = true, modifier = Modifier.weight(1f)) {
+                        codeErrorKey = null
+                        showRegenConfirm = true
+                    }
                 }
                 Text(tr("settingsRecoveryWarn"), color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
+            } else if (session.state == CloudState.GUEST || session.state == CloudState.LINKED) {
+                // Compte connecté mais encore sans code (liaison automatique
+                // échouée, ancien compte à vrai e-mail).
+                GameButton(if (busy) "…" else tr("btnRecoveryCreate"), small = true) {
+                    if (busy) return@GameButton
+                    busy = true
+                    codeErrorKey = null
+                    scope.launch {
+                        if (session.createCode({ currentSave }, onSaveChange)) {
+                            codeVisible = true
+                            toaster(msgLinked)
+                        } else {
+                            codeErrorKey = "codeCreateError"
+                        }
+                        busy = false
+                    }
+                }
             }
+            codeErrorKey?.let { Text(tr(it), color = Color(0xFFFF6B6B), fontSize = 12.sp, textAlign = TextAlign.Center) }
 
             // .account-form : j'ai déjà un code.
             OutlinedTextField(
@@ -135,6 +196,9 @@ fun AccountScreen(
                 placeholder = { Text(tr("settingsRecoveryPlaceholder"), color = TextDim, fontSize = 13.sp) },
                 modifier = Modifier.fillMaxWidth(),
             )
+            if (suggestion != null && typedCode == suggestion) {
+                Text(tr("settingsRecoverySuggest"), color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+            }
             errorKey?.let { Text(tr(it), color = Color(0xFFFF6B6B), fontSize = 12.sp, textAlign = TextAlign.Center) }
             GameButton(if (busy) "…" else tr("btnRecoverySubmit"), small = true) {
                 if (busy) return@GameButton
@@ -142,17 +206,26 @@ fun AccountScreen(
                 // recoverFromCode() : format, hors ligne, déjà ce compte-là.
                 when {
                     !RecoveryCode.isValid(typedCode) -> errorKey = "recoveryErrFormat"
-                    session.state != CloudState.GUEST && session.state != CloudState.LINKED -> errorKey = "recoveryErrOffline"
-                    typedCode == currentSave.recoveryCode && session.state == CloudState.LINKED -> errorKey = "recoveryErrSameAccount"
+                    session.state == CloudState.NOT_CONFIGURED -> errorKey = "recoveryErrOffline"
+                    typedCode == session.accountCode -> errorKey = "recoveryErrSameAccount"
                     else -> {
                         busy = true
                         val code = typedCode
                         scope.launch {
                             val found = runCatching { session.lookupCode(code) }
-                            found.onSuccess { lookup ->
-                                if (lookup == null) errorKey = "recoveryErrUnknown" else pending = code to lookup
-                            }.onFailure { errorKey = "recoveryErrWrongCode" }
                             busy = false
+                            found.onSuccess { lookup ->
+                                if (lookup == null) {
+                                    errorKey = "recoveryErrUnknown"
+                                } else if (!AccountRules.hasProgress(currentSave)) {
+                                    // Rien de joué sur cet appareil : inutile de demander.
+                                    confirm(code, lookup, MergeChoice.OTHER)
+                                } else {
+                                    pending = code to lookup
+                                }
+                            }.onFailure { e ->
+                                errorKey = if (FirebaseBridge.isRetryable(e)) "recoveryErrRetry" else "recoveryErrWrongCode"
+                            }
                         }
                     }
                 }
@@ -240,25 +313,38 @@ fun AccountScreen(
             other = SaveSummary.of(lookup.save),
             onChoose = { choice ->
                 pending = null
-                busy = true
-                val done = I18n.tr(if (lookup is CodeLookup.Account) "accountConnected" else "recoveryDone", lang)
-                scope.launch {
-                    val error = when (lookup) {
-                        is CodeLookup.Account -> session.joinAccount(code, choice, repository, currentSave, onSaveChange)
-                        is CodeLookup.Legacy -> session.restoreLegacy(code, lookup, choice, currentSave, onSaveChange)
-                    }
-                    if (error == null) {
-                        typedCode = ""
-                        revealedCode = code
-                        toaster(done)
-                    } else {
-                        errorKey = error
-                    }
-                    busy = false
-                }
+                confirm(code, lookup, choice)
             },
             onCancel = { pending = null },
         )
+    }
+
+    if (showRegenConfirm) {
+        InfoDialog(
+            title = tr("regenConfirmTitle"),
+            onDismiss = { showRegenConfirm = false },
+            buttons = {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    GameButton(tr("regenConfirmYes"), modifier = Modifier.weight(1f)) {
+                        showRegenConfirm = false
+                        if (busy) return@GameButton
+                        busy = true
+                        scope.launch {
+                            if (session.regenerateCode({ currentSave }, onSaveChange)) {
+                                codeVisible = true
+                                toaster(msgRegenDone)
+                            } else {
+                                codeErrorKey = "regenError"
+                            }
+                            busy = false
+                        }
+                    }
+                    GameButton(tr("btnCancel"), secondary = true, modifier = Modifier.weight(1f)) { showRegenConfirm = false }
+                }
+            },
+        ) {
+            DialogText(tr("regenConfirmText"), color = TextColor)
+        }
     }
 
     if (showLogoutConfirm) {
@@ -280,11 +366,15 @@ fun AccountScreen(
                 }
             },
         ) {
-            // Un compte lié n'est jamais perdu : seul l'appareil repart de zéro.
-            DialogText(tr(if (RecoveryCode.isValid(save.recoveryCode)) "logoutConfirmTextLinked" else "logoutConfirmText"), color = TextColor)
+            // Code déjà affiché : la partie reste sur le compte, seul l'appareil repart de zéro.
+            val linked = session.accountCode.isNotEmpty() && save.accountCodeShown
+            DialogText(tr(if (linked) "logoutConfirmTextLinked" else "logoutConfirmText"), color = TextColor)
         }
     }
 }
+
+/** `•••• •••• •••• ••••` : le code tant qu'on ne demande pas à le voir. */
+private const val MASKED_CODE = "•••• •••• •••• ••••"
 
 /**
  * `#merge-choice-modal` : deux cartes, la partie actuelle et celle du code ;

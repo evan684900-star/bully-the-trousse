@@ -24,4 +24,12 @@ class CloudSaveSyncTest {
     fun `aucun persist local encore (0) laisse toute copie distante s'appliquer`() {
         assertTrue(CloudSaveSync.shouldApplyRemoteSave(lastLocalPersistAtMillis = 0L, remoteReceivedAtMillis = 1L))
     }
+
+    @Test
+    fun `une partie recue d un autre appareil ne retire jamais l arc-en-ciel`() {
+        val merged = CloudSaveSync.mergeRemote(GameSave(money = 7), GameSave(playedOnAndroid = true))
+        assertTrue(merged.playedOnAndroid)
+        assertTrue(merged.money == 7)
+        assertFalse(CloudSaveSync.mergeRemote(GameSave(), GameSave()).playedOnAndroid)
+    }
 }

@@ -4,15 +4,21 @@ import android.content.Context
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.IncomingGift
+import com.bullythetrousse.core.Leaderboard
 import com.bullythetrousse.core.LegacySave
 import com.bullythetrousse.core.RecoveryCode
 import com.bullythetrousse.core.SaveCodec
 import com.bullythetrousse.core.SkinStats
 import com.google.android.gms.tasks.Task
 import com.google.firebase.FirebaseApp
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthInvalidCredentialsException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
+import com.google.firebase.auth.FirebaseAuthUserCollisionException
 import com.google.firebase.firestore.AggregateSource
 import com.google.firebase.firestore.DocumentChange
 import com.google.firebase.firestore.FieldValue
@@ -20,7 +26,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
 import com.google.firebase.firestore.SetOptions
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
@@ -36,7 +48,7 @@ import kotlin.coroutines.resumeWithException
  * - `users/{uid}` : un champ Firestore PAR champ de la sauvegarde (voir
  *   [SaveCodec.toFieldMap]), et non une chaîne JSON. Le site relit ce
  *   document tel quel.
- * - `scores` / `scoresPlage` : `{ pseudo, bestDistance, updatedAt }`, un
+ * - `scores` / `scoresPlage` : `{ pseudo, bestDistance, android, updatedAt }`, un
  *   document par joueur. Le nom `bestDistance` n'est pas négociable : c'est
  *   le champ sur lequel le site trie le classement.
  * - `profiles/{uid}` : le sous-ensemble public de la sauvegarde.
@@ -80,6 +92,37 @@ class FirebaseBridge(context: Context) {
      *  joueur, et disparaîtrait avec l'app. */
     val isAnonymous: Boolean get() = isAvailable && auth.currentUser?.isAnonymous != false
 
+    /**
+     * Le code du compte connecté, lu dans son e-mail (`codeFromEmail()` côté
+     * site) : "" pour un compte invité ou un ancien compte à vrai e-mail.
+     * C'est le SEUL code affiché au joueur : par construction, celui qui
+     * ouvre vraiment son compte.
+     */
+    val accountCode: String
+        get() {
+            if (!isAvailable) return ""
+            val user = auth.currentUser ?: return ""
+            return if (user.isAnonymous) "" else RecoveryCode.codeFromEmail(user.email)
+        }
+
+    /**
+     * Suit la session Firebase : [onSignedOut] est appelé quand plus personne
+     * n'est connecté — c'est ainsi qu'on apprend que le code a été régénéré
+     * depuis un autre appareil (Firebase révoque alors cette session).
+     */
+    fun addSignOutListener(onSignedOut: () -> Unit): FirebaseAuth.AuthStateListener? {
+        if (!isAvailable) return null
+        val listener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+            if (firebaseAuth.currentUser == null) onSignedOut()
+        }
+        auth.addAuthStateListener(listener)
+        return listener
+    }
+
+    fun removeAuthListener(listener: FirebaseAuth.AuthStateListener) {
+        if (isAvailable) auth.removeAuthStateListener(listener)
+    }
+
     // ---- Comptes ----
 
     /** `firebase.auth().signInAnonymously()` : le compte invité de départ. */
@@ -104,30 +147,110 @@ class FirebaseBridge(context: Context) {
     }
 
     /**
-     * `linkAccountToCode()` : transforme le compte anonyme de cet appareil
-     * en compte permanent identifié par ce code, **en gardant le même uid**
-     * — donc sans perdre la partie ni créer une deuxième entrée au
-     * classement. Renvoie `false` si un compte existe déjà pour ce code
-     * (cas normal : le joueur l'a créé sur le site).
+     * Transforme le compte invité de cet appareil en compte identifié par ce
+     * code, **en gardant le même uid** — donc sans perdre la partie ni créer
+     * une deuxième entrée au classement (`ensureAccountCode()` côté site).
      */
-    suspend fun linkToCode(code: String): Boolean {
-        if (!isAvailable) return false
-        val user = auth.currentUser ?: return false
-        if (!user.isAnonymous) return false
-        val credential = EmailAuthProvider.getCredential(
-            RecoveryCode.emailFor(code),
-            RecoveryCode.passwordFor(code),
-        )
+    suspend fun linkToCode(code: String): LinkResult {
+        if (!isAvailable) return LinkResult.FAILED
+        val user = auth.currentUser ?: return LinkResult.FAILED
+        if (!user.isAnonymous) return LinkResult.FAILED
         return try {
-            user.linkWithCredential(credential).await()
-            true
+            user.linkWithCredential(credentialFor(code)).await()
+            LinkResult.LINKED
+        } catch (e: FirebaseAuthUserCollisionException) {
+            // Ce code appartient déjà à un compte (relié depuis un autre appareil).
+            LinkResult.CODE_TAKEN
         } catch (e: Exception) {
-            // Compte déjà pris, e-mail/mot de passe désactivé dans la console,
-            // réseau coupé : dans tous les cas on reste sur le compte courant,
-            // le jeu continue. L'appelant décide quoi dire au joueur.
-            false
+            // E-mail/mot de passe désactivé dans la console, réseau coupé : on
+            // reste sur le compte courant, le jeu continue.
+            LinkResult.FAILED
         }
     }
+
+    /**
+     * Fait de [newCode] le code du compte connecté, sans changer d'uid
+     * (`changeAccountCode()` côté site) : relie un compte invité, ou change
+     * l'e-mail ET le mot de passe d'un compte existant EN UNE SEULE requête
+     * (API REST `accounts:update`) — avec deux appels séparés, une coupure
+     * entre les deux laisserait un compte que ni l'ancien ni le nouveau code
+     * n'ouvrent. Firebase révoque alors les sessions des autres appareils :
+     * ils sont déconnectés et devront entrer le nouveau code.
+     *
+     * Nécessite que la protection contre l'énumération des e-mails reste
+     * désactivée dans la console Firebase, comme pour le site.
+     */
+    suspend fun changeCode(newCode: String) {
+        check(isAvailable) { "Firebase indisponible" }
+        val user = auth.currentUser ?: throw IllegalStateException("Aucun compte connecté")
+        if (user.isAnonymous) {
+            user.linkWithCredential(credentialFor(newCode)).await()
+            return
+        }
+        val oldCode = RecoveryCode.codeFromEmail(user.email)
+        // Changer d'identifiants exige une connexion récente : on la refait
+        // avec l'ancien code (impossible pour un ancien compte à vrai e-mail :
+        // on tente alors directement).
+        if (oldCode.isNotEmpty()) user.reauthenticate(credentialFor(oldCode)).await()
+        val idToken = user.getIdToken(false).await().token ?: throw IllegalStateException("Jeton introuvable")
+        withContext(Dispatchers.IO) { updateCredentials(idToken, newCode) }
+        // Les jetons de CETTE session viennent d'être révoqués eux aussi :
+        // reconnexion au même compte (même uid).
+        auth.signInWithEmailAndPassword(RecoveryCode.emailFor(newCode), RecoveryCode.passwordFor(newCode)).await()
+        if (oldCode.isNotEmpty()) retireLegacyCodeCopy(oldCode, user.uid)
+    }
+
+    /**
+     * `accounts:update` de l'API REST Firebase Auth : e-mail et mot de passe
+     * changés en une seule requête. Avec la clé d'API du SITE (publique,
+     * sans restriction d'application) : celle de l'app Android peut être
+     * limitée aux appels du SDK signés par l'app, ce que ne fait pas cette
+     * requête faite à la main.
+     */
+    private fun updateCredentials(idToken: String, newCode: String) {
+        val url = URL(ACCOUNTS_UPDATE_URL + URLEncoder.encode(WEB_API_KEY, "UTF-8"))
+        val connection = url.openConnection() as HttpURLConnection
+        try {
+            connection.requestMethod = "POST"
+            connection.doOutput = true
+            connection.connectTimeout = 15_000
+            connection.readTimeout = 15_000
+            connection.setRequestProperty("Content-Type", "application/json")
+            val body = JSONObject()
+                .put("idToken", idToken)
+                .put("email", RecoveryCode.emailFor(newCode))
+                .put("password", RecoveryCode.passwordFor(newCode))
+                .put("returnSecureToken", true)
+                .toString()
+            connection.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                val error = runCatching { connection.errorStream?.bufferedReader()?.use { it.readText() } }.getOrNull().orEmpty()
+                throw IllegalStateException("accounts:update a répondu $status : $error")
+            }
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    /**
+     * Ancien code : sa copie de partie éventuelle (système d'avant la refonte
+     * des comptes, voir [lookupCode]) ne doit plus pouvoir être récupérée
+     * avec lui. Les règles permettent de réécrire le document à condition
+     * d'y mettre son propre uid.
+     */
+    private suspend fun retireLegacyCodeCopy(code: String, uid: String) {
+        runCatching {
+            val ref = firestore.collection(RECOVERY_CODES).document(code)
+            val doc = ref.get().await()
+            if (doc.exists() && doc.get("save") != null) {
+                ref.set(mapOf("uid" to uid, "retired" to true)).await()
+            }
+        }
+    }
+
+    private fun credentialFor(code: String) =
+        EmailAuthProvider.getCredential(RecoveryCode.emailFor(code), RecoveryCode.passwordFor(code))
 
     /**
      * `lookupAccountByCode()` : regarde ce que désigne un code SANS toucher à
@@ -199,24 +322,32 @@ class FirebaseBridge(context: Context) {
     }
 
     /**
-     * `cleanupAbandonedAnonymousAccount()` : purge tout ce qu'un compte
-     * invité abandonné laisserait derrière lui — sans ce nettoyage, chaque
-     * fois qu'un joueur touche à un compte invité (déconnexion, ou bascule
-     * vers le compte d'un code), son ancienne entrée de classement resterait
-     * affichée pour toujours, avec un score figé et aucun propriétaire.
+     * `abandonCurrentAccount()` : à appeler juste avant que cet appareil
+     * quitte son compte (connexion à un autre, déconnexion), TANT QU'IL Y EST
+     * ENCORE CONNECTÉ — les règles n'autorisent chacun qu'à supprimer ses
+     * propres documents.
      *
-     * Ne supprime PAS le compte Firebase Auth anonyme lui-même : si la
-     * connexion au vrai compte échouait juste après, l'appareil se
-     * retrouverait sans aucune session utilisable. Un compte anonyme
-     * orphelin ne coûte rien et ne porte plus aucune donnée une fois cette
-     * purge faite.
+     * - Son entrée de classement part toujours : si le compte sert encore
+     *   sur un autre appareil, celui-ci la republie à sa prochaine connexion.
+     *   Plus de pseudo en double au classement.
+     * - [unreachable] (voir `AccountRules.isUnreachable`, `:core`) : plus
+     *   personne ne pourra y revenir, tout le reste de ses traces publiques
+     *   part aussi.
+     *
+     * Ne supprime PAS le compte Firebase Auth lui-même : si la suite
+     * échouait, l'appareil se retrouverait sans aucune session utilisable.
      */
-    suspend fun cleanupAbandonedAnonymousAccount(uid: String, unlockedAchievements: List<String>) {
+    suspend fun abandonAccount(uid: String, unlockedAchievements: List<String>, unreachable: Boolean) {
         if (!isAvailable) return
-        val docWipes = listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, ACTIVE_PLAYERS, RECOVERY_TOKENS)
+        val docWipes = if (unreachable) {
+            listOf(USERS, PROFILES, SCORES, SCORES_PLAGE, ACTIVE_PLAYERS, RECOVERY_TOKENS)
+        } else {
+            listOf(SCORES, SCORES_PLAGE)
+        }
         for (collection in docWipes) {
             runCatching { firestore.collection(collection).document(uid).delete().await() }
         }
+        if (!unreachable) return
         // Les succès déjà marqués doivent partir avec le reste : "activePlayers"
         // est le dénominateur du pourcentage de joueurs par succès et
         // "achvUnlocks" le numérateur — n'effacer que le premier ferait
@@ -243,7 +374,7 @@ class FirebaseBridge(context: Context) {
         val data = doc.data ?: return null
         if (data.isEmpty()) return null
         val updatedAt = doc.getTimestamp(UPDATED_AT)?.toDate()?.time ?: 0L
-        return CloudSave(SaveCodec.fromFieldMap(data), updatedAt)
+        return CloudSave(SaveCodec.fromFieldMap(data), updatedAt, codeShownKnown = data.containsKey("accountCodeShown"))
     }
 
     /**
@@ -297,42 +428,31 @@ class FirebaseBridge(context: Context) {
         firestore.collection(USERS).document(uid).set(payload, SetOptions.merge()).await()
     }
 
-    /**
-     * `pushRecoverySnapshot()` : la copie rattachée au code, que le site lit
-     * pour les anciens codes (créés avant que le code ne devienne un vrai
-     * compte). On la tient à jour pour rester interchangeable avec lui.
-     */
-    suspend fun pushRecoverySnapshot(uid: String, save: GameSave) {
-        if (!isAvailable || save.recoveryCode.isBlank()) return
-        val payload = mapOf(
-            "uid" to uid,
-            "pseudo" to save.pseudo,
-            "retireToken" to save.recoveryRetireToken,
-            "save" to SaveCodec.toFieldMap(save),
-            UPDATED_AT to FieldValue.serverTimestamp(),
-        )
-        firestore.collection(RECOVERY_CODES).document(save.recoveryCode).set(payload).await()
-        firestore.collection(RECOVERY_TOKENS).document(uid)
-            .set(mapOf("token" to save.recoveryRetireToken)).await()
-    }
-
     // ---- Classement ----
 
-    /** `scoresCollection()` : la plage a son propre classement. */
-    fun scoresCollectionFor(save: GameSave): String = if (save.inPlage) SCORES_PLAGE else SCORES
+    /** `scoresCollection()` : la plage a son propre classement (voir [Leaderboard]). */
+    fun scoresCollectionFor(save: GameSave): String = Leaderboard.collectionFor(save)
 
     /**
-     * `pushScoreTo()` : un document par joueur, réécrit à chaque record (et
-     * non à chaque lancer, pour limiter les écritures).
+     * `pushScoreTo()` : un document par joueur. [android] fait s'afficher son
+     * pseudo en arc-en-ciel, sur le site comme dans l'app.
      */
-    suspend fun pushScore(collection: String, uid: String, pseudo: String, bestDistance: Double) {
+    suspend fun pushScore(collection: String, uid: String, pseudo: String, bestDistance: Double, android: Boolean) {
         if (!isAvailable || bestDistance <= 0.0) return
         val payload = mapOf(
             "pseudo" to pseudo.ifBlank { "Anonyme" },
+            "android" to android,
             "bestDistance" to bestDistance,
             UPDATED_AT to FieldValue.serverTimestamp(),
         )
         firestore.collection(collection).document(uid).set(payload, SetOptions.merge()).await()
+    }
+
+    /** Retire l'entrée de ce joueur d'un classement (la partie qui l'a
+     *  remplacée n'a pas de record dans ce monde). */
+    suspend fun deleteScore(collection: String, uid: String) {
+        if (!isAvailable) return
+        firestore.collection(collection).document(uid).delete().await()
     }
 
     /**
@@ -354,6 +474,7 @@ class FirebaseBridge(context: Context) {
                 uid = doc.id,
                 pseudo = doc.getString("pseudo").orEmpty().ifBlank { "???" },
                 distanceMeters = distance,
+                android = doc.getBoolean("android") == true,
             )
         }
     }
@@ -374,7 +495,9 @@ class FirebaseBridge(context: Context) {
             "totalMoneyEarned" to save.totalMoneyEarned.toLong(),
             "dailyEarnings" to save.dailyEarnings.mapValues { it.value.toLong() },
             "dailyBestDistance" to save.dailyBestDistance,
-            "bestDistance" to save.bestDistance,
+            // Le record du classement mondial (Cour ET Ville), voir computeRank.
+            "bestDistance" to Leaderboard.worldRecord(save),
+            "android" to save.playedOnAndroid,
             "puissance" to SkinStats.totalPuissance(save).toLong(),
             "vitesse" to SkinStats.totalVitesse(save).toLong(),
             "achievementsCount" to save.unlockedAchievements.size.toLong(),
@@ -408,6 +531,7 @@ class FirebaseBridge(context: Context) {
             puissance = (doc.getLong("puissance") ?: 0L).toInt(),
             vitesse = (doc.getLong("vitesse") ?: 0L).toInt(),
             achievementsCount = (doc.getLong("achievementsCount") ?: 0L).toInt(),
+            android = doc.getBoolean("android") == true,
             // `pingPresence()` côté site tient ce champ à jour : il sert à
             // afficher "En ligne" ou "Vu il y a...".
             updatedAtMillis = doc.getTimestamp(UPDATED_AT)?.toDate()?.time,
@@ -504,13 +628,14 @@ class FirebaseBridge(context: Context) {
     }
 
     /** `sendGift()` : écrit le cadeau que le destinataire ramassera. */
-    suspend fun sendGift(fromUid: String, toUid: String, fromPseudo: String, amount: Int) {
+    suspend fun sendGift(fromUid: String, toUid: String, fromPseudo: String, fromAndroid: Boolean, amount: Int) {
         check(isAvailable) { "Firebase indisponible" }
         firestore.collection(GIFTS).add(
             mapOf(
                 "from" to fromUid,
                 "to" to toUid,
                 "fromPseudo" to fromPseudo.ifBlank { "Anonyme" },
+                "fromAndroid" to fromAndroid,
                 "amount" to amount.toLong(),
                 "seen" to false,
                 "createdAt" to FieldValue.serverTimestamp(),
@@ -567,6 +692,7 @@ class FirebaseBridge(context: Context) {
             senderUid = data["from"] as? String ?: docId,
             senderPseudo = (data["fromPseudo"] as? String).orEmpty().ifBlank { "Anonyme" },
             amount = kotlin.math.floor(amount).toInt().coerceAtLeast(0),
+            senderAndroid = data["fromAndroid"] == true,
         )
     }
 
@@ -606,6 +732,18 @@ class FirebaseBridge(context: Context) {
     }
 
     companion object {
+        /** Ce code n'ouvre (plus) aucun compte : il est faux, ou il a été
+         *  régénéré depuis un autre appareil. */
+        fun isBadCredential(e: Throwable): Boolean =
+            e is FirebaseAuthInvalidUserException || e is FirebaseAuthInvalidCredentialsException
+
+        /** Réseau coupé ou trop d'essais : à retenter plus tard. */
+        fun isRetryable(e: Throwable): Boolean =
+            e is FirebaseNetworkException || e is FirebaseTooManyRequestsException
+
+        /** `firebaseConfig.apiKey` du site (publique, déjà dans index.html). */
+        private const val WEB_API_KEY = "AIzaSyADulCVz8u8yVb9MGR2N9EYXs4DDtFydbs"
+        private const val ACCOUNTS_UPDATE_URL = "https://identitytoolkit.googleapis.com/v1/accounts:update?key="
         private const val USERS = "users"
         private const val PROFILES = "profiles"
         private const val FOLLOWS = "follows"
@@ -622,8 +760,13 @@ class FirebaseBridge(context: Context) {
 }
 
 /** Sauvegarde reçue du cloud, avec l'horodatage serveur de sa dernière
- *  écriture (voir `CloudSaveSync` dans `:core`, qui décide si on l'applique). */
-data class CloudSave(val save: GameSave, val updatedAtMillis: Long)
+ *  écriture (voir `CloudSaveSync` dans `:core`, qui décide si on l'applique).
+ *  [codeShownKnown] : le document porte déjà `accountCodeShown` (sinon il date
+ *  d'avant la 11.3.0, voir `rememberCloudSession`). */
+data class CloudSave(val save: GameSave, val updatedAtMillis: Long, val codeShownKnown: Boolean = true)
+
+/** Résultat d'une liaison du compte invité à un code (voir [FirebaseBridge.linkToCode]). */
+enum class LinkResult { LINKED, CODE_TAKEN, FAILED }
 
 /** Ce que désigne un code de récupération (voir [FirebaseBridge.lookupCode]). */
 sealed interface CodeLookup {
@@ -640,8 +783,9 @@ sealed interface CodeLookup {
 /** Sens d'une liste d'abonnements : ceux que je suis, ou ceux qui me suivent. */
 enum class FollowDirection { FOLLOWING, FOLLOWERS }
 
-/** Une ligne du classement (`.leaderboard-row` côté site). */
-data class LeaderboardEntry(val uid: String, val pseudo: String, val distanceMeters: Double)
+/** Une ligne du classement (`.leaderboard-row` côté site). [android] : pseudo
+ *  en arc-en-ciel. */
+data class LeaderboardEntry(val uid: String, val pseudo: String, val distanceMeters: Double, val android: Boolean = false)
 
 /**
  * Le profil public d'un joueur, tel que `profiles/{uid}` le porte : le
@@ -663,6 +807,8 @@ data class PublicProfile(
     val vitesse: Int,
     val achievementsCount: Int,
     val updatedAtMillis: Long?,
+    /** Joue sur l'app Android : pseudo en arc-en-ciel. */
+    val android: Boolean = false,
 )
 
 /**

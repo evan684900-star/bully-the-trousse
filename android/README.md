@@ -31,6 +31,18 @@ Android) avant d'être branché à l'affichage dans `:app`.
    un iPhone, via un service comme [Appetize.io](https://appetize.io/) qui
    fait tourner l'APK compilé dans le navigateur).
 
+## Textes et journal repris du site
+
+Deux fichiers sont générés depuis `index.html` (ne pas les éditer à la main) :
+
+- `core/.../I18nStrings.kt` (table `STRINGS` du site) :
+  `node android/tools/gen-i18n-strings.js .`
+- `app/.../Changelog.kt` (tableau `CHANGELOG` du site, qui donne aussi le
+  numéro de version affiché sur le menu) : `node android/tools/gen-changelog.js .`
+
+À relancer depuis la racine du dépôt après chaque changement de texte ou de
+version du site.
+
 ## Ce qui est fait
 
 - Squelette Gradle multi-module (`:core` + `:app`, avec le plugin Kotlin

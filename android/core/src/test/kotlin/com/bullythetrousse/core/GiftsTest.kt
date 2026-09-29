@@ -48,4 +48,17 @@ class GiftsTest {
         assertEquals(listOf("Léa" to 40, "Tom" to 5), Gifts.mergeBySender(gifts))
         assertEquals(45, Gifts.total(gifts))
     }
+
+    @Test
+    fun `les lignes des cadeaux gardent l arc-en-ciel des expediteurs Android`() {
+        val lines = Gifts.linesBySender(
+            listOf(
+                IncomingGift("a", "Robot", 10, senderAndroid = true),
+                IncomingGift("b", "Web", 5),
+                IncomingGift("a", "Robot", 15),
+                IncomingGift("c", "Rien", 0, senderAndroid = true),
+            ),
+        )
+        assertEquals(listOf(GiftLine("Robot", 25, true), GiftLine("Web", 5, false)), lines)
+    }
 }

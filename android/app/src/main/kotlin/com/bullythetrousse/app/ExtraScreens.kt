@@ -725,12 +725,8 @@ fun LeaderboardScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(
-                "${tr("pseudoLabel")}${save.pseudo.ifBlank { "-" }}",
-                color = TextDim,
-                fontSize = 13.sp,
-                textAlign = TextAlign.Center,
-            )
+            Text(tr("pseudoLabel"), color = TextDim, fontSize = 13.sp)
+            PlayerName(save.pseudo.ifBlank { "-" }, android = save.playedOnAndroid, fontSize = 13.sp, color = TextDim, fontWeight = FontWeight.Normal)
             GameButton("✏️", secondary = true, small = true) { editingPseudo = true }
         }
         Text(
@@ -845,12 +841,14 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean, on
             fontSize = 13.sp,
             fontWeight = FontWeight.ExtraBold,
         )
-        Text(
+        // Pseudo arc-en-ciel des joueurs de l'app Android (voir PlayerName).
+        PlayerName(
             entry.pseudo,
-            color = TextColor,
+            android = entry.android,
             fontSize = 14.sp,
             fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp),
+            maxLines = 1,
+            modifier = Modifier.weight(1f).padding(horizontal = 10.dp),
         )
         Text(
             "${"%.1f".format(entry.distanceMeters)} m",

@@ -1,6 +1,8 @@
 package com.bullythetrousse.core
 
+import java.security.SecureRandom
 import kotlin.random.Random
+import kotlin.random.asKotlinRandom
 
 /**
  * Le code de récupération à 16 chiffres, porté de `generateRecoveryCode()`/
@@ -23,10 +25,11 @@ object RecoveryCode {
     /** `"c" + code + "@" + ACCOUNT_EMAIL_DOMAIN` côté web. */
     const val EMAIL_DOMAIN = "players.bullythetrousse.app"
 
-    /** 16 chiffres tirés au hasard (`b % 10` sur des octets aléatoires côté
-     *  web ; ici directement un chiffre, la distribution du web étant de
-     *  toute façon uniforme à 6/256 près sur les chiffres 0 à 5). */
-    fun generate(random: Random = Random.Default): String =
+    /** 16 chiffres tirés au hasard, chacun uniforme de 0 à 9 (le site écarte
+     *  lui aussi les octets qui fausseraient la répartition). Tirage
+     *  cryptographique par défaut : c'est un secret, il ne doit pas être
+     *  devinable (Random.Default ne l'est pas). */
+    fun generate(random: Random = SecureRandom().asKotlinRandom()): String =
         (1..DIGITS).joinToString("") { random.nextInt(10).toString() }
 
     /** "1234567890123456" → "1234 5678 9012 3456" (plus facile à recopier). */
@@ -41,6 +44,24 @@ object RecoveryCode {
 
     /** L'adresse e-mail technique du compte Firebase désigné par ce code. */
     fun emailFor(code: String): String = "c$code@$EMAIL_DOMAIN"
+
+    /**
+     * L'inverse de [emailFor] : le code d'un compte à partir de son e-mail
+     * Firebase (`codeFromEmail()` côté site), "" si l'e-mail ne vient pas
+     * d'un code (compte invité, ancien compte créé avec un vrai e-mail).
+     *
+     * C'est la SEULE source du code affiché au joueur : par construction,
+     * c'est celui qui ouvre vraiment son compte. (Avant la 11.3.0, le code
+     * était une copie gardée dans la sauvegarde, qui pouvait ne plus
+     * correspondre à rien.)
+     */
+    fun codeFromEmail(email: String?): String {
+        val e = email.orEmpty().lowercase()
+        val suffix = "@$EMAIL_DOMAIN"
+        if (!e.startsWith("c") || !e.endsWith(suffix)) return ""
+        val code = e.substring(1, e.length - suffix.length)
+        return if (isValid(code)) code else ""
+    }
 
     /**
      * Le mot de passe technique. Il n'ajoute aucun secret (il se déduit du

@@ -3,12 +3,12 @@ package com.bullythetrousse.core
 // FICHIER GÉNÉRÉ depuis la table STRINGS de index.html : ne pas éditer à la
 // main, relancer le générateur pour le mettre à jour.
 //
-// Découpé en plusieurs fonctions : une seule méthode contenant les 367
+// Découpé en plusieurs fonctions : une seule méthode contenant les 383
 // entrées frôlerait la limite de taille de méthode de la JVM (64 Ko).
 
 internal object I18nStrings {
     val TABLE: Map<String, Pair<String, String>> by lazy {
-        HashMap<String, Pair<String, String>>(734).apply {
+        HashMap<String, Pair<String, String>>(766).apply {
             part0(this)
             part1(this)
             part2(this)
@@ -59,6 +59,8 @@ internal object I18nStrings {
         m["onlineConnected"] = "En ligne ✅" to "Online ✅"
         m["onlineOfflineNoConfig"] = "Hors ligne (Firebase non configuré)" to "Offline (Firebase not configured)"
         m["onlineOfflineFailed"] = "Hors ligne (connexion échouée)" to "Offline (connection failed)"
+        m["throwSpeedTitle"] = "Accélérer le lancer" to "Speed up the throw"
+        m["onlineRevoked"] = "Déconnecté (code changé)" to "Logged out (code changed)"
         m["leaderboardUnavailable"] = "Classement indisponible hors ligne." to "Leaderboard unavailable offline."
         m["leaderboardLoading"] = "Chargement..." to "Loading..."
         m["leaderboardEmpty"] = "Aucun score pour l'instant, sois le premier !" to "No scores yet, be the first!"
@@ -93,14 +95,14 @@ internal object I18nStrings {
         m["volcanReplayTitle"] = "🌋 Refaire la cinématique ?" to "🌋 Replay the cutscene?"
         m["volcanReplayText"] = "Tu peux revivre la cinématique de déblocage, ou aller directement au monde Volcans." to "You can relive the unlock cutscene, or go straight to the Volcans world."
         m["volcanReplayYes"] = "🔁 Refaire" to "🔁 Replay"
+    }
+
+    private fun part1(m: MutableMap<String, Pair<String, String>>) {
         m["volcanReplayNo"] = "🌋 Juste y aller" to "🌋 Just go there"
         m["claquettesName"] = "Trousse à Claquettes" to "Flip-Flop Pencil Case"
         m["claquettesDesc"] = "Aucun bonus de stats : elle sert juste de ticket d'entrée. L'acheter débloque l'accès au monde Plage depuis le menu." to "No stat bonus: it's just the entry ticket. Buying it unlocks access to the Beach world from the menu."
         m["claquettesOwned"] = "Achetée" to "Owned"
         m["claquettesBought"] = "🩴 Trousse à Claquettes achetée ! Le monde Plage t'attend." to "🩴 Flip-Flop Pencil Case bought! The Beach world awaits."
-    }
-
-    private fun part1(m: MutableMap<String, Pair<String, String>>) {
         m["plageNeedsClaquettes"] = "🩴 Achète la Trousse à Claquettes en boutique (100 000 \$) pour aller à la Plage !" to "🩴 Buy the Flip-Flop Pencil Case in the shop (\$100,000) to reach the Beach!"
         m["busTicketName"] = "Billet de bus (retour)" to "Bus ticket (return)"
         m["busTicketDesc"] = "Le bus du retour vers le monde normal. Tu retrouveras ta progression d'avant la plage exactement là où tu l'avais laissée (et ta progression plage t'attendra si tu reviens)." to "The bus back to the normal world. You'll find your pre-beach progress exactly where you left it (and your beach progress will wait for you if you come back)."
@@ -173,6 +175,9 @@ internal object I18nStrings {
         m["challengeThrowsDesc"] = "Lance ta trousse {target} fois" to "Throw your pencil case {target} times"
         m["challengeDistanceDesc"] = "Atteins {target} m en un seul lancer" to "Reach {target} m in a single throw"
         m["challengeEarnDesc"] = "Gagne {target} \$ aujourd'hui" to "Earn {target}\$ today"
+    }
+
+    private fun part2(m: MutableMap<String, Pair<String, String>>) {
         m["challengePerfectDesc"] = "Réussis {target} lancer(s) parfait(s)" to "Land {target} perfect throw(s)"
         m["challengeVolcanDesc"] = "Lance {target} fois dans le monde Volcan" to "Throw {target} times in the Volcano world"
         m["challengeSkidDesc"] = "Déclenche {target} dérapage(s)" to "Trigger {target} skid(s)"
@@ -181,9 +186,6 @@ internal object I18nStrings {
         m["challengeQteDesc"] = "Réussis {target} QTE parfait(s) dans l'espace aujourd'hui" to "Land {target} perfect zero-G QTE(s) today"
         m["challengeSpendDesc"] = "Dépense {target} \$ en boutique aujourd'hui" to "Spend {target}\$ in the shop today"
         m["achvUnlockedPrefix"] = "🏆 Succès débloqué : " to "🏆 Achievement unlocked: "
-    }
-
-    private fun part2(m: MutableMap<String, Pair<String, String>>) {
         m["achvFirstThrowName"] = "Premier envol" to "First launch"
         m["achvFirstThrowDesc"] = "Fais un premier lancer." to "Make a first throw."
         m["achv100mName"] = "100 mètres" to "100 meters"
@@ -253,6 +255,9 @@ internal object I18nStrings {
         m["achvPlage5000Name"] = "5000 m à la plage" to "5000 m at the beach"
         m["achvPlage5000Desc"] = "Atteins un record de 5000 m sur la plage." to "Reach a record of 5000 m at the beach."
         m["achv1000ThrowsName"] = "1000 lancers" to "1000 throws"
+    }
+
+    private fun part3(m: MutableMap<String, Pair<String, String>>) {
         m["achv1000ThrowsDesc"] = "Effectue 1000 lancers au total." to "Make 1000 throws in total."
         m["achvLevel100Name"] = "Niveau 100" to "Level 100"
         m["achvLevel100Desc"] = "Atteins un total de 100 niveaux (Puissance + Vitesse)." to "Reach a combined total of 100 levels (Power + Speed)."
@@ -264,9 +269,6 @@ internal object I18nStrings {
         m["achvVilleThrowsDesc"] = "Fais 100 lancers depuis le toit de la Tour." to "Make 100 throws from the Tower's rooftop."
         m["achvVille1000Name"] = "Vue imprenable" to "Breathtaking view"
         m["achvVille1000Desc"] = "Atteins un record de 1000 m depuis le toit de la Ville." to "Reach a record of 1000 m from the City rooftop."
-    }
-
-    private fun part3(m: MutableMap<String, Pair<String, String>>) {
         m["achvVille10000Name"] = "Par-dessus les gratte-ciel" to "Over the skyscrapers"
         m["achvVille10000Desc"] = "Atteins un record de 10 000 m depuis le toit de la Ville." to "Reach a record of 10,000 m from the City rooftop."
         m["achvVille50000Name"] = "Plus loin que l'aéroport" to "Past the airport"
@@ -325,14 +327,30 @@ internal object I18nStrings {
         m["btnCancel"] = "Annuler" to "Cancel"
         m["settingsRecoveryTitle"] = "🔑 Mon compte" to "🔑 My account"
         m["settingsRecoveryHint"] = "Ce code EST ton compte : entre-le sur un autre appareil et tu joues sur la même partie, synchronisée dans les deux sens. Note-le quelque part, c'est le seul moyen de retrouver ta partie si ce navigateur efface ses données." to "This code IS your account: enter it on another device and you play the same save, synced both ways. Write it down — it's the only way to get your save back if this browser clears its data."
-        m["btnRecoveryReveal"] = "🔑 Créer / afficher mon code" to "🔑 Create / show my code"
+        m["btnRecoveryReveal"] = "👁️ Afficher" to "👁️ Show"
+        m["btnRecoveryHide"] = "🙈 Masquer" to "🙈 Hide"
         m["btnRecoveryCopy"] = "📋 Copier" to "📋 Copy"
-        m["settingsRecoveryWarn"] = "⚠️ Garde-le pour toi : qui a ce code entre dans ton compte." to "⚠️ Keep it to yourself: anyone with this code gets into your account."
+        m["btnRecoveryRegen"] = "🔄 Régénérer" to "🔄 Regenerate"
+        m["btnRecoveryCreate"] = "🔑 Créer mon code" to "🔑 Create my code"
+        m["settingsRecoveryWarn"] = "⚠️ Garde-le pour toi : qui a ce code entre dans ton compte. S'il a fuité, régénère-le." to "⚠️ Keep it to yourself: anyone with this code gets into your account. If it leaked, regenerate it."
+        m["settingsRecoverySuggest"] = "Cet appareil avait ce code, relié depuis à un autre compte : appuie sur « Connecter cet appareil » pour rejoindre ce compte." to "This device had this code, since tied to another account: tap \"Connect this device\" to join that account."
+        m["regenConfirmTitle"] = "🔄 Régénérer ton code ?" to "🔄 Regenerate your code?"
+    }
+
+    private fun part4(m: MutableMap<String, Pair<String, String>>) {
+        m["regenConfirmText"] = "Tu vas recevoir un nouveau code et l'ancien ne marchera plus. Ta partie ne change pas, mais tes autres appareils seront déconnectés : il faudra y entrer le nouveau code." to "You'll get a new code and the old one will stop working. Your save stays the same, but your other devices will be logged out: you'll have to enter the new code on them."
+        m["regenConfirmYes"] = "🔄 Régénérer" to "🔄 Regenerate"
+        m["regenDone"] = "🔄 Nouveau code créé, l'ancien ne marche plus" to "🔄 New code created, the old one no longer works"
+        m["regenError"] = "Impossible de régénérer le code pour le moment. Réessaie plus tard." to "Couldn't regenerate the code right now. Try again later."
+        m["codeCreateError"] = "Impossible de créer ton code pour le moment. Réessaie plus tard." to "Couldn't create your code right now. Try again later."
         m["settingsRecoveryPlaceholder"] = "J'ai déjà un code (16 chiffres)" to "I already have a code (16 digits)"
         m["btnRecoverySubmit"] = "📥 Connecter cet appareil" to "📥 Connect this device"
         m["accountStatusLinked"] = "✅ Appareil connecté à ton compte — la partie se synchronise automatiquement." to "✅ Device connected to your account — the save syncs automatically."
         m["accountStatusLocal"] = "📱 Partie locale à cet appareil. Crée ton code ci-dessous pour la retrouver ailleurs." to "📱 Save local to this device. Create your code below to access it elsewhere."
         m["accountStatusOffline"] = "🔌 Hors ligne : compte indisponible pour le moment." to "🔌 Offline: account unavailable right now."
+        m["accountStatusEmail"] = "✅ Connecté à ton ancien compte e-mail. Crée un code pour pouvoir le retrouver sur un autre appareil." to "✅ Connected to your old email account. Create a code to get it back on another device."
+        m["accountStatusRevoked"] = "⚠️ Cet appareil a été déconnecté : ton code a été régénéré sur un autre appareil. Entre ton nouveau code ci-dessous pour retrouver ta partie." to "⚠️ This device was logged out: your code was regenerated on another device. Enter your new code below to get your save back."
+        m["accountRevokedToast"] = "⚠️ Ton code a changé : entre le nouveau dans les Réglages" to "⚠️ Your code changed: enter the new one in Settings"
         m["accountLinked"] = "✅ Compte créé, cet appareil y est connecté" to "✅ Account created, this device is connected to it"
         m["accountConnected"] = "✅ Appareil connecté à ton compte" to "✅ Device connected to your account"
         m["cloudSyncPulled"] = "🔄 Partie synchronisée depuis un autre appareil" to "🔄 Save synced from another device"
@@ -347,12 +365,10 @@ internal object I18nStrings {
         m["recoverySelectToCopy"] = "Code sélectionné, il ne reste qu'à copier" to "Code selected, just copy it"
         m["recoveryDone"] = "✅ Partie récupérée" to "✅ Save restored"
         m["recoveryErrFormat"] = "Le code doit faire 16 chiffres." to "The code must be 16 digits."
-    }
-
-    private fun part4(m: MutableMap<String, Pair<String, String>>) {
         m["recoveryErrUnknown"] = "Aucune partie trouvée pour ce code." to "No save found for this code."
         m["recoveryErrSameAccount"] = "C'est déjà le code de cette partie." to "That's already this save's code."
         m["recoveryErrOffline"] = "Indisponible hors ligne." to "Unavailable offline."
+        m["recoveryErrRetry"] = "Connexion impossible pour le moment, réessaie dans un instant." to "Couldn't connect right now, try again in a moment."
         m["statLevel"] = "Niveau" to "Level"
         m["mergeChoiceTitle"] = "🔀 Deux parties trouvées" to "🔀 Two saves found"
         m["mergeChoiceHint"] = "Choisis la partie à garder — l'autre sera définitivement remplacée par celle-ci." to "Choose which save to keep — the other one will be permanently replaced by it."

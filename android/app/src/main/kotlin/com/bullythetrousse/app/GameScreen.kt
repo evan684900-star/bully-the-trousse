@@ -2,6 +2,8 @@
 
 package com.bullythetrousse.app
 
+import com.bullythetrousse.core.ThrowSpeed
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.foundation.background
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -117,6 +119,10 @@ fun GameScreen(
 ) {
     val sequence = remember { ThrowSequence() }
     var state by remember { mutableStateOf<ThrowState>(sequence.state) }
+    // Vitesse du bouton ⏩, gardée d'un lancer à l'autre sur cet appareil.
+    val deviceContext = LocalContext.current
+    val devicePrefs = remember { DevicePrefs(deviceContext) }
+    LaunchedEffect(Unit) { PlayState.throwSpeed = devicePrefs.throwSpeed }
     val sfx = LocalSfx.current
     val haptics = LocalHaptics.current
     val isVille = save.currentWorld == Ville.WORLD_ID
@@ -391,6 +397,25 @@ fun GameScreen(
                         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp),
                     )
                 }
+            }
+
+            // Bouton ⏩ (#btn-throw-speed) : en bas à droite, au-dessus des
+            // icônes son/réglages, seulement quand il y a du vol (ou un
+            // dérapage) à accélérer — pas pendant l'apesanteur, la relance
+            // depuis une flaque ou le crash sur l'avion.
+            val speedUpUseful = current is ThrowState.Landed && !flight.resolved &&
+                spaceFlight?.state == null && planeCrash.state == null &&
+                rooftopFlight?.phase != RooftopPhase.AIMING
+            if (speedUpUseful) {
+                ThrowSpeedButton(
+                    speed = PlayState.throwSpeed,
+                    onClick = {
+                        val next = ThrowSpeed.next(PlayState.throwSpeed)
+                        PlayState.throwSpeed = next
+                        devicePrefs.throwSpeed = next
+                    },
+                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 72.dp),
+                )
             }
         }
 
@@ -996,6 +1021,28 @@ private fun VampireBoostButton(boost: VampireBoostController, modifier: Modifier
 }
 
 /**
+ * `#btn-throw-speed` : accélère le vol ×1 → ×2 → ×4 quand un lancer dure
+ * trop longtemps. La trajectoire et la distance ne changent pas : ce sont
+ * les mêmes pas de physique, plusieurs par image.
+ */
+@Composable
+private fun ThrowSpeedButton(speed: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val shape = RoundedCornerShape(50)
+    val fast = speed > 1
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(Color(0xBF141826))
+            .border(2.dp, if (fast) Accent else Color.White.copy(alpha = 0.3f), shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("⏩ ×$speed", color = if (fast) Accent else Color.White, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+    }
+}
+
+/**
  * `#screen-game.vampire-boosting::after` : halo violet pulsant sur les bords
  * de l'écran tant que le boost est maintenu, pour que l'accélération se voie
  * ailleurs que sur le compteur de distance.
@@ -1045,4 +1092,8 @@ object PlayState {
 
     /** `gamePaused` : une fenêtre s'est ouverte par-dessus un lancer en cours. */
     var paused by mutableStateOf(false)
+
+    /** Bouton ⏩ (`throwSpeed` côté site) : nombre de pas de physique joués
+     *  par image pendant le vol et le dérapage (voir [ThrowSpeed], `:core`). */
+    var throwSpeed by mutableStateOf(1)
 }

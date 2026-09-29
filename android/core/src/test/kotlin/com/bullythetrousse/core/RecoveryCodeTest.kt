@@ -17,6 +17,25 @@ class RecoveryCodeTest {
     }
 
     @Test
+    fun `le code se relit depuis l e-mail du compte connecte`() {
+        // C'est la SEULE source du code affiché : il doit retomber exactement
+        // sur celui qui a servi à créer l'e-mail.
+        val code = "0042567890123456"
+        assertEquals(code, RecoveryCode.codeFromEmail(RecoveryCode.emailFor(code)))
+        assertEquals(code, RecoveryCode.codeFromEmail("C0042567890123456@Players.BullyTheTrousse.app"))
+    }
+
+    @Test
+    fun `un e-mail qui ne vient pas d un code ne donne aucun code`() {
+        assertEquals("", RecoveryCode.codeFromEmail(null))
+        assertEquals("", RecoveryCode.codeFromEmail(""))
+        assertEquals("", RecoveryCode.codeFromEmail("joueur@gmail.com"))
+        assertEquals("", RecoveryCode.codeFromEmail("c123@players.bullythetrousse.app"))
+        assertEquals("", RecoveryCode.codeFromEmail("c123456789012345a@players.bullythetrousse.app"))
+        assertEquals("", RecoveryCode.codeFromEmail("x1234567890123456@players.bullythetrousse.app"))
+    }
+
+    @Test
     fun `le code s affiche par groupes de quatre`() {
         assertEquals("1234 5678 9012 3456", RecoveryCode.format("1234567890123456"))
     }
@@ -52,5 +71,10 @@ class RecoveryCodeTest {
         val code = RecoveryCode.normalize(typed)
         assertTrue(RecoveryCode.isValid(code))
         assertEquals(typed, RecoveryCode.format(code))
+    }
+
+    @Test
+    fun `le tirage par defaut donne bien seize chiffres`() {
+        repeat(50) { assertTrue(RecoveryCode.isValid(RecoveryCode.generate())) }
     }
 }

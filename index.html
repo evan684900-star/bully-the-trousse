@@ -822,6 +822,25 @@
         .leaderboard-row .pseudo { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .leaderboard-row .dist { color: var(--money); font-weight: 800; }
         .leaderboard-row.you { border-color: var(--accent); }
+        /* Pseudo arc-en-ciel des joueurs de l'app Android (voir pseudoClass),
+           partout où leur nom apparaît (classement, profil, abonnés, cadeaux).
+           Deux arcs-en-ciel à la suite sur 200 % de large : chaque nom, même
+           court, montre toutes les couleurs, et le défilement boucle sans saut. */
+        .rainbow-name {
+            --rb: #ff4d4d, #ff9f40, #ffe04d, #5cff7a, #4dd2ff, #8a6bff, #ff5ce1;
+            background: linear-gradient(90deg, var(--rb), var(--rb), #ff4d4d);
+            background-size: 200% 100%;
+            -webkit-background-clip: text; background-clip: text;
+            color: transparent; -webkit-text-fill-color: transparent;
+            animation: rainbow-name-shift 4s linear infinite;
+            font-weight: 800;
+        }
+        /* Thème clair : teintes plus soutenues, sinon le jaune disparaît sur le blanc. */
+        [data-theme="light"] .rainbow-name {
+            --rb: #e0202a, #e8710a, #c99a00, #1f9d3a, #0b86c4, #5b3fd1, #c2188f;
+        }
+        @keyframes rainbow-name-shift { from { background-position: 0% 0; } to { background-position: 100% 0; } }
+        @media (prefers-reduced-motion: reduce) { .rainbow-name { animation: none; } }
         .leaderboard-row.clickable { cursor: pointer; }
 
         /* ---------- ÉCRAN PROFIL ---------- */
@@ -1434,7 +1453,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.5.0</div>
+                <div class="version-tag" id="version-tag">v11.6.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -2397,6 +2416,16 @@
         return String(str).replace(/[&<>"']/g, (c) => map[c]);
     }
 
+    // Classe CSS du pseudo d'un joueur : arc-en-ciel s'il joue sur l'app
+    // Android (champ "android" de son entrée de classement / profil, ou
+    // "fromAndroid" d'un cadeau, tous deux tirés de save.playedOnAndroid).
+    function pseudoClass(isAndroid) { return isAndroid === true ? " rainbow-name" : ""; }
+    // Mon propre nom (classement, fiche trousse) suit la même règle.
+    function paintOwnName(el) {
+        el.classList.remove("rainbow-name");
+        if (save.playedOnAndroid) el.classList.add("rainbow-name");
+    }
+
     // Le profil public d'un joueur (profiles/{uid}) n'est pas validé côté
     // serveur (contrairement à "scores") : un compte techniquement compromis
     // pourrait y écrire n'importe quoi directement via l'API Firestore. Comme
@@ -2871,6 +2900,7 @@
             recoveryCode: "",          // ancienne copie du code (avant 11.3.0) : le code vit maintenant hors sauvegarde, voir ACCOUNT_CODE_KEY
             recoveryRetireToken: "",   // second secret des anciens codes, sert seulement à retirer l'ancienne entrée du classement
             accountCodeShown: false,   // le code du compte a déjà été affiché ou copié (sinon personne ne le connaît, voir abandonCurrentAccount)
+            playedOnAndroid: false,    // ce compte a déjà joué sur l'app Android : pseudo arc-en-ciel partout (voir pseudoClass), jamais remis à false
             // --- Défis quotidiens (voir CHALLENGE_POOL et ensureDailyChallenges) ---
             dailyChallengeDate: "",    // "AAAA-MM-JJ" du jour où dailyChallenges a été généré
             dailyChallenges: [],       // [{ kind, target, progress, reward, claimed }, ...]
@@ -9252,6 +9282,8 @@
         // Le temps de jeu ne doit jamais reculer : chaque appareil compte le
         // sien, on garde donc le plus avancé des deux.
         incoming.playTime = Math.max(incoming.playTime || 0, localPlayTime);
+        // Un compte qui a joué sur Android garde son pseudo arc-en-ciel.
+        if (save.playedOnAndroid) incoming.playedOnAndroid = true;
         adoptSave(incoming);
         if (currentUser) markLocalSynced(currentUser.uid);
         showToast(tr("cloudSyncPulled"));
@@ -9647,6 +9679,9 @@
                 : Promise.resolve("other");
             return choiceAsked.then((choice) => {
                 if (!choice) return; // annulé, rien ne change
+                // Un compte qui a déjà joué sur Android garde son pseudo
+                // arc-en-ciel, même si c'est la partie de cet appareil qui reste.
+                if (otherSave.playedOnAndroid) localSave.playedOnAndroid = true;
                 document.getElementById("recovery-input").value = "";
                 return found.kind === "account"
                     ? joinAccount(code, choice, localSave)
@@ -9813,6 +9848,7 @@
             dailyEarnings: save.dailyEarnings,
             dailyBestDistance: save.dailyBestDistance,
             bestDistance: mainLeaderboardRecord(), // record du classement mondial (voir computeRank)
+            android: !!save.playedOnAndroid, // pseudo arc-en-ciel (voir pseudoClass)
             puissance: totalPuissance(),
             vitesse: totalVitesse(),
             achievementsCount: save.unlockedAchievements.length,
@@ -9898,6 +9934,7 @@
         if (!canWriteCloud() || !(distanceMeters > 0)) return;
         db.collection(col).doc(currentUser.uid).set({
             pseudo: save.pseudo || "Anonyme",
+            android: !!save.playedOnAndroid, // pseudo arc-en-ciel (voir pseudoClass)
             bestDistance: distanceMeters,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
         }, { merge: true }).catch((err) => console.error("Envoi du score impossible :", err));
@@ -9923,6 +9960,7 @@
     // Affiche le pseudo actuel et (re)charge le classement à l'ouverture de l'écran
     function refreshLeaderboardScreen() {
         document.getElementById("leaderboard-pseudo").textContent = save.pseudo || "-";
+        paintOwnName(document.getElementById("leaderboard-pseudo"));
         document.querySelector('[data-i18n="leaderboardTitle"]').textContent =
             save.inPlage ? tr("leaderboardTitlePlage") : tr("leaderboardTitle");
         loadLeaderboard();
@@ -9953,7 +9991,7 @@
                 row.className = "leaderboard-row clickable" + (isMe ? " you" : "");
                 row.innerHTML =
                     '<span class="rank">#' + rank + '</span>' +
-                    '<span class="pseudo">' + escapeHtml(data.pseudo || "???") + '</span>' +
+                    '<span class="pseudo' + pseudoClass(data.android) + '">' + escapeHtml(data.pseudo || "???") + '</span>' +
                     '<span class="dist">' + num(data.bestDistance).toFixed(1) + ' m</span>';
                 // Ouvre le profil de ce joueur (voir renderProfile) ; le score
                 // reste affiché ici même si son compte est privé (voir la
@@ -10000,6 +10038,7 @@
             dailyEarnings: save.dailyEarnings,
             dailyBestDistance: save.dailyBestDistance,
             bestDistance: mainLeaderboardRecord(), // record du classement mondial (voir computeRank)
+            android: !!save.playedOnAndroid, // pseudo arc-en-ciel (voir pseudoClass)
             puissance: totalPuissance(),
             vitesse: totalVitesse(),
             achievementsCount: save.unlockedAchievements.length,
@@ -10091,7 +10130,7 @@
         const avatarHtml = '<div class="profile-avatar-lg">' + (safeAvatar || "🎒") + '</div>';
 
         let html = '<div class="profile-header">' + avatarHtml +
-            '<h2 class="profile-pseudo">' + escapeHtml(data.pseudo || "?") + '</h2>' +
+            '<h2 class="profile-pseudo' + pseudoClass(data.android) + '">' + escapeHtml(data.pseudo || "?") + '</h2>' +
             formatPresenceHtml(data, isOwn);
         if (!isOwn && uid) {
             html += '<button class="btn small" id="btn-profile-follow">' + tr("profileFollowLoading") + '</button>';
@@ -10227,7 +10266,7 @@
                 document.getElementById("profile-detail-body").innerHTML = '<div class="skin-list">' + rows.map((r) =>
                     '<button type="button" class="skin-list-row follow-list-row" data-uid="' + escapeHtml(r.uid) + '">' +
                         '<span class="follow-avatar">' + (safeAvatarEmoji(r.data.avatarEmoji) || "🎒") + '</span>' +
-                        '<span class="name">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
+                        '<span class="name' + pseudoClass(r.data.android) + '">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
                     '</button>'
                 ).join("") + '</div>';
                 document.querySelectorAll(".follow-list-row").forEach((btn) => {
@@ -10315,7 +10354,7 @@
                     '<div class="gift-row" data-uid="' + escapeHtml(r.uid) + '">' +
                         '<div class="gift-row-top">' +
                             '<span class="follow-avatar">' + (safeAvatarEmoji(r.data.avatarEmoji) || "🎒") + '</span>' +
-                            '<span class="name">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
+                            '<span class="name' + pseudoClass(r.data.android) + '">' + escapeHtml(r.data.pseudo || "?") + '</span>' +
                         '</div>' +
                         '<div class="gift-row-controls">' +
                             '<button type="button" class="btn tiny secondary gift-quick-btn" data-add="10">+10</button>' +
@@ -10379,6 +10418,7 @@
             from: currentUser.uid,
             to: targetUid,
             fromPseudo: save.pseudo || "Anonyme",
+            fromAndroid: !!save.playedOnAndroid, // pseudo arc-en-ciel chez le destinataire
             amount: amount,
             seen: false,
             createdAt: firebase.firestore.FieldValue.serverTimestamp(),
@@ -10423,7 +10463,7 @@
                 const amt = Math.max(0, Math.floor(num(g.amount)));
                 total += amt;
                 const senderUid = g.from || doc.id;
-                const entry = bySender.get(senderUid) || { pseudo: g.fromPseudo || "Anonyme", amount: 0 };
+                const entry = bySender.get(senderUid) || { pseudo: g.fromPseudo || "Anonyme", android: g.fromAndroid === true, amount: 0 };
                 entry.amount += amt;
                 bySender.set(senderUid, entry);
                 batch.update(doc.ref, { seen: true });
@@ -10434,7 +10474,7 @@
             refreshMenu();
             batch.commit().catch((err) => console.error("Marquage des cadeaux vus impossible :", err));
             const rows = [...bySender.values()].map((entry) =>
-                '<div class="gift-received-row">🎁 <b>' + escapeHtml(entry.pseudo) + '</b> : +' + entry.amount + ' $</div>'
+                '<div class="gift-received-row">🎁 <b class="' + pseudoClass(entry.android).trim() + '">' + escapeHtml(entry.pseudo) + '</b> : +' + entry.amount + ' $</div>'
             );
             showProfileDetailModal(tr("giftsReceivedTitle"),
                 rows.join("") + '<p class="gift-received-total">' + tr("giftsReceivedTotal").replace("{amount}", total) + '</p>');
@@ -10845,6 +10885,7 @@
         document.getElementById("info-dura").textContent = save.durability + " / " + maxDurability();
         document.getElementById("info-dura-bar").style.width = (save.durability / maxDurability() * 100) + "%";
         document.getElementById("info-name").textContent = save.pseudo || "Trousse";
+        paintOwnName(document.getElementById("info-name"));
         document.getElementById("info-time").textContent = formatPlayTime(save.playTime);
         document.getElementById("info-best").textContent =
             (save.currentWorld === "plage" ? save.plageBestDistance : save.currentWorld === "ville" ? save.villeBestDistance : save.bestDistance).toFixed(1) + " m";
@@ -10902,8 +10943,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.5.0";
+    const VERSION_NUMBER = "11.6.0";
     const CHANGELOG = [
+        {
+            version: "11.6.0",
+            major: [
+                { fr: "Les joueurs de l'app Android ont maintenant un pseudo arc-en-ciel partout où ils apparaissent : classement, profil, listes d'abonnés et cadeaux", en: "Android app players now have a rainbow nickname everywhere they show up: leaderboard, profile, follower lists and gifts" },
+            ],
+            minor: [
+                { fr: "L'app Android reprend toutes les nouveautés du site : comptes à code (avec régénération du code), bouton ⏩ pendant le lancer, et la Ville dans le classement mondial", en: "The Android app gets everything new from the site: code-based accounts (with code regeneration), the ⏩ button during throws, and the City on the global leaderboard" },
+            ],
+        },
         {
             version: "11.5.0",
             major: [

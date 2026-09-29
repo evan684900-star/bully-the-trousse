@@ -27,6 +27,7 @@ import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.BeachCinematic
 import com.bullythetrousse.core.CloudSaveSync
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.GiftLine
 import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.GraphicsQuality
 import com.bullythetrousse.core.HapticEvent
@@ -172,7 +173,7 @@ fun GameRoot() {
 
     // Cadeaux ramassés à la connexion, affichés dans une modale (voir
     // checkIncomingGifts() côté site) : lignes fusionnées par expéditeur + total.
-    var receivedGifts by remember { mutableStateOf<Pair<List<Pair<String, Int>>, Int>?>(null) }
+    var receivedGifts by remember { mutableStateOf<Pair<List<GiftLine>, Int>?>(null) }
 
     // Temps de jeu et série d'écoute musicale, accumulés en mémoire et
     // reportés dans la sauvegarde toutes les 30 s (voir PlayTimeTracker).
@@ -213,6 +214,7 @@ fun GameRoot() {
 
     /** `applyRemoteSave()` : la partie de l'autre appareil, temps de jeu gardé au max. */
     fun applyRemoteSave(remote: CloudSave) {
+        // mergeRemote garde aussi l'arc-en-ciel : ce téléphone joue sur Android.
         val merged = CloudSaveSync.mergeRemote(remote.save, save)
         repository.saveFromCloud(merged, remote.updatedAtMillis)
         save = merged
@@ -229,12 +231,15 @@ fun GameRoot() {
         // (avec l'horodatage du serveur) : la réécrire ici lui collerait
         // l'heure locale et ferait croire que ce téléphone vient de jouer.
         onSaveChange = { save = it },
+        // Les modifications faites par la session elle-même (pseudo par
+        // défaut, code du compte...) s'enregistrent comme toutes les autres.
+        onLocalChange = ::updateSave,
         onGifts = { gifts, atLogin ->
             val total = Gifts.total(gifts)
             if (total > 0) {
                 updateSave(save.copy(money = save.money + total))
                 if (atLogin) {
-                    receivedGifts = Gifts.mergeBySender(gifts) to total
+                    receivedGifts = Gifts.linesBySender(gifts) to total
                 } else {
                     val lang = Lang.fromId(save.lang)
                     gifts.forEach { gift ->
@@ -254,6 +259,7 @@ fun GameRoot() {
                 }
             }
         },
+        onRevoked = { toasts += I18n.tr("accountRevokedToast", Lang.fromId(save.lang)) },
         inForeground = inForeground,
     )
     cloudRef = cloud
@@ -275,6 +281,11 @@ fun GameRoot() {
         if (save.lang.isEmpty()) {
             updateSave(save.copy(lang = Lang.forDeviceLanguage(Locale.getDefault().language).id))
         }
+    }
+    // Ce compte joue sur Android : pseudo arc-en-ciel partout (classement,
+    // profil, abonnés, cadeaux), sur le site comme ici. Même hors ligne.
+    LaunchedEffect(save.playedOnAndroid) {
+        if (!save.playedOnAndroid) updateSave(save.copy(playedOnAndroid = true))
     }
 
     // Une piste par monde, coupée par le bouton 🔊 (voir applyWorldMusic()),

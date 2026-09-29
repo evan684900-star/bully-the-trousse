@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.bullythetrousse.core.Achievements
 import com.bullythetrousse.core.DailyStats
 import com.bullythetrousse.core.GameSave
+import com.bullythetrousse.core.Leaderboard
 import com.bullythetrousse.core.I18n
 import com.bullythetrousse.core.Presence
 import com.bullythetrousse.core.PresenceStatus
@@ -67,6 +68,8 @@ data class ProfileData(
     val vitesse: Int,
     val achievementsCount: Int,
     val updatedAtMillis: Long?,
+    /** Joue sur l'app Android : pseudo en arc-en-ciel. */
+    val android: Boolean = false,
 ) {
     companion object {
         fun fromSave(save: GameSave) = ProfileData(
@@ -78,11 +81,13 @@ data class ProfileData(
             totalMoneyEarned = save.totalMoneyEarned.toLong(),
             dailyEarnings = save.dailyEarnings.mapValues { it.value.toLong() },
             dailyBestDistance = save.dailyBestDistance,
-            bestDistance = save.bestDistance,
+            // Le record du classement mondial (Cour ET Ville), comme le profil public.
+            bestDistance = Leaderboard.worldRecord(save),
             puissance = SkinStats.totalPuissance(save),
             vitesse = SkinStats.totalVitesse(save),
             achievementsCount = save.unlockedAchievements.size,
             updatedAtMillis = null,
+            android = save.playedOnAndroid,
         )
 
         fun fromPublic(p: PublicProfile) = ProfileData(
@@ -99,6 +104,7 @@ data class ProfileData(
             vitesse = p.vitesse,
             achievementsCount = p.achievementsCount,
             updatedAtMillis = p.updatedAtMillis,
+            android = p.android,
         )
     }
 }
@@ -227,7 +233,8 @@ private fun ProfileBody(
         if (uid == null || !online) return@LaunchedEffect
         runCatching { following = session.bridge.countFollowing(uid) }
         runCatching { followers = session.bridge.countFollowers(uid) }
-        runCatching { rank = session.bridge.computeRank(session.bridge.scoresCollectionFor(save), data.bestDistance) }
+        // Toujours le classement mondial : c'est son record que porte le profil.
+        runCatching { rank = session.bridge.computeRank(Leaderboard.WORLD, data.bestDistance) }
     }
 
     // .profile-header
@@ -246,7 +253,7 @@ private fun ProfileBody(
         ) {
             Text(data.avatarEmoji.ifBlank { "🎒" }, fontSize = 40.sp)
         }
-        Text(data.pseudo, color = TextColor, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        PlayerName(data.pseudo, android = data.android, fontSize = 18.sp, textAlign = TextAlign.Center)
         // `formatPresenceHtml()` : mon propre profil est toujours « en ligne »
         // (je suis en train de l'utiliser), celui d'un autre se déduit de
         // son dernier signe de vie.
@@ -630,7 +637,7 @@ private fun FollowListDialog(
             else -> for ((otherUid, profile) in list) {
                 ListRow(modifier = Modifier.clickable { onOpenPlayer(otherUid) }) {
                     Text(profile?.avatarEmoji.orEmpty().ifBlank { "🎒" }, fontSize = 22.sp)
-                    Text(profile?.pseudo ?: "?", color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    PlayerName(profile?.pseudo ?: "?", android = profile?.android == true, fontSize = 13.sp, modifier = Modifier.weight(1f))
                 }
             }
         }

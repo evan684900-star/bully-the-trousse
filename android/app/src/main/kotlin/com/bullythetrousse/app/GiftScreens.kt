@@ -36,6 +36,7 @@ import com.bullythetrousse.core.BumpMode
 import com.bullythetrousse.core.DailyChallenges
 import com.bullythetrousse.core.GameSave
 import com.bullythetrousse.core.GiftCheck
+import com.bullythetrousse.core.GiftLine
 import com.bullythetrousse.core.Gifts
 import com.bullythetrousse.core.SkinStats
 import java.time.LocalDate
@@ -104,7 +105,7 @@ fun GiftSendDialog(
         onSaveChange(currentSave.copy(money = currentSave.money - amount))
         session.launchDetached {
             try {
-                session.bridge.sendGift(me, targetUid, currentSave.pseudo, amount)
+                session.bridge.sendGift(me, targetUid, currentSave.pseudo, currentSave.playedOnAndroid, amount)
                 // Compté une fois le cadeau confirmé seulement (succès « Grand
                 // donateur » et défi « gift »), pas à la déduction optimiste.
                 var updated = currentSave.copy(totalMoneyGifted = currentSave.totalMoneyGifted + amount)
@@ -139,6 +140,7 @@ fun GiftSendDialog(
                 GiftRow(
                     avatar = profile?.avatarEmoji.orEmpty().ifBlank { "🎒" },
                     pseudo = profile?.pseudo ?: "?",
+                    android = profile?.android == true,
                     input = inputs[uid].orEmpty(),
                     onInput = { typed -> inputs[uid] = typed.filter { it.isDigit() }.take(12) },
                     onQuickAdd = { add -> inputs[uid] = Gifts.quickAdd(inputs[uid].orEmpty(), add, currentSave.money).toString() },
@@ -157,6 +159,7 @@ fun GiftSendDialog(
 private fun GiftRow(
     avatar: String,
     pseudo: String,
+    android: Boolean,
     input: String,
     onInput: (String) -> Unit,
     onQuickAdd: (Int) -> Unit,
@@ -177,7 +180,7 @@ private fun GiftRow(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(avatar, fontSize = 22.sp)
-            Text(pseudo, color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            PlayerName(pseudo, android = android, fontSize = 13.sp, modifier = Modifier.weight(1f))
         }
         FlowRowCentered(gap = 6.dp) {
             GameButton("+10", secondary = true, small = true) { onQuickAdd(10) }
@@ -212,10 +215,14 @@ private fun GiftRow(
  * expéditeur (dons fusionnés) et le total crédité.
  */
 @Composable
-fun GiftsReceivedDialog(rows: List<Pair<String, Int>>, total: Int, onDismiss: () -> Unit) {
+fun GiftsReceivedDialog(rows: List<GiftLine>, total: Int, onDismiss: () -> Unit) {
     InfoDialog(title = tr("giftsReceivedTitle"), onDismiss = onDismiss) {
-        for ((pseudo, amount) in rows) {
-            Text("🎁 $pseudo : +$amount $", color = TextColor, fontSize = 14.sp)
+        for (line in rows) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("🎁 ", color = TextColor, fontSize = 14.sp)
+                PlayerName(line.pseudo, android = line.android, fontSize = 14.sp)
+                Text(" : +${line.amount} $", color = TextColor, fontSize = 14.sp)
+            }
         }
         Text(
             tr("giftsReceivedTotal", "amount" to total),

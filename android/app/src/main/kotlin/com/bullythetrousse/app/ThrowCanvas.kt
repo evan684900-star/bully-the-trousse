@@ -767,22 +767,27 @@ fun animateFlight(
             // défile mais ni la physique ni les chronos n'avancent.
             if (PlayState.paused) continue
 
-            // Apogée atteinte (`vy <= 0` côté site) : on bascule en apesanteur
-            // au lieu de laisser la trousse redescendre.
-            if (!spaceDone && space != null && state.vy <= 0.0) {
-                spaceDone = true
-                val boost = space.run()
-                state = state.copy(vx = boost.first, vy = boost.second)
-                // Le temps a passé pendant la séquence : repartir de l'horloge
-                // courante, sinon le premier pas d'après avalerait toute sa durée.
-                lastFrameMillis = System.currentTimeMillis()
-                continue
-            }
+            // Bouton ⏩ : plusieurs pas de la vitesse normale par image (même
+            // trajectoire, mêmes détections), voir PlayState.throwSpeed.
+            var steps = PlayState.throwSpeed
+            while (steps-- > 0 && !state.hasLanded) {
+                // Apogée atteinte (`vy <= 0` côté site) : on bascule en apesanteur
+                // au lieu de laisser la trousse redescendre.
+                if (!spaceDone && space != null && state.vy <= 0.0) {
+                    spaceDone = true
+                    val boost = space.run()
+                    state = state.copy(vx = boost.first, vy = boost.second)
+                    // Le temps a passé pendant la séquence : repartir de l'horloge
+                    // courante, sinon le premier pas d'après avalerait toute sa durée.
+                    lastFrameMillis = System.currentTimeMillis()
+                    break
+                }
 
-            // Le boost 🦇 accélère vx AVANT le pas de simulation, comme la
-            // section "flying" de gameLoop() côté site.
-            if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
-            state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
+                // Le boost 🦇 accélère vx AVANT le pas de simulation, comme la
+                // section "flying" de gameLoop() côté site.
+                if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
+                state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
+            }
         }
         onLanded()
     }
@@ -826,7 +831,7 @@ fun animateBeachFlight(
         var castleCrushed = false
 
         var lastFrameMillis = System.currentTimeMillis()
-        while (true) {
+        flight@ while (true) {
             withFrameNanos { }
             val now = System.currentTimeMillis()
             val dt = ((now - lastFrameMillis).coerceAtMost(50)) / 1000.0
@@ -834,38 +839,43 @@ fun animateBeachFlight(
             // Partie en pause (fenêtre ouverte en plein lancer) : l'image
             // défile mais ni la physique ni les chronos n'avancent.
             if (PlayState.paused) continue
-            if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
-            state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
-            // Monde Plage : un lancer parfait, juste avant l'apogée, finit
-            // encastré sur le flanc d'un avion de ligne — direction la Ville.
-            // Le lancer ne se termine jamais : pas d'atterrissage ni de gain.
-            if (planeCrash != null && PlaneCrash.shouldStart("plage", result.isPerfect, inSpaceMode = false, flight = state)) {
-                planeCrash.run(
-                    PlaneCrash.start(state, rotSpeed, screenWidth()),
-                    result.effectiveGravity,
-                    onImpact = onPlaneImpact,
-                    onHandOver = onPlaneHandOver,
-                )
-                return@LaunchedEffect
-            }
-            if (state.hasLanded) {
-                when (Beach.landingOutcome(events, used, inSpaceMode = false)) {
-                    BeachLandingOutcome.PARASOL_BOUNCE -> {
-                        used = used.copy(parasol = true)
-                        parasolBounced = true
-                        state = Beach.applyParasolBounce(state)
+            // Bouton ⏩ : plusieurs pas de la vitesse normale par image (même
+            // trajectoire, mêmes détections), voir PlayState.throwSpeed.
+            var steps = PlayState.throwSpeed
+            while (steps-- > 0) {
+                if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
+                state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
+                // Monde Plage : un lancer parfait, juste avant l'apogée, finit
+                // encastré sur le flanc d'un avion de ligne — direction la Ville.
+                // Le lancer ne se termine jamais : pas d'atterrissage ni de gain.
+                if (planeCrash != null && PlaneCrash.shouldStart("plage", result.isPerfect, inSpaceMode = false, flight = state)) {
+                    planeCrash.run(
+                        PlaneCrash.start(state, rotSpeed, screenWidth()),
+                        result.effectiveGravity,
+                        onImpact = onPlaneImpact,
+                        onHandOver = onPlaneHandOver,
+                    )
+                    return@LaunchedEffect
+                }
+                if (state.hasLanded) {
+                    when (Beach.landingOutcome(events, used, inSpaceMode = false)) {
+                        BeachLandingOutcome.PARASOL_BOUNCE -> {
+                            used = used.copy(parasol = true)
+                            parasolBounced = true
+                            state = Beach.applyParasolBounce(state)
+                        }
+                        BeachLandingOutcome.TOWEL_FOUND -> {
+                            used = used.copy(towel = true)
+                            towelFound = true
+                            break@flight
+                        }
+                        BeachLandingOutcome.CASTLE_CRUSHED -> {
+                            used = used.copy(castle = true)
+                            castleCrushed = true
+                            break@flight
+                        }
+                        BeachLandingOutcome.NORMAL -> break@flight
                     }
-                    BeachLandingOutcome.TOWEL_FOUND -> {
-                        used = used.copy(towel = true)
-                        towelFound = true
-                        break
-                    }
-                    BeachLandingOutcome.CASTLE_CRUSHED -> {
-                        used = used.copy(castle = true)
-                        castleCrushed = true
-                        break
-                    }
-                    BeachLandingOutcome.NORMAL -> break
                 }
             }
         }
@@ -897,9 +907,13 @@ fun animateSkid(landingWorldX: Double, onFinished: (finalWorldX: Double) -> Unit
             // Partie en pause (fenêtre ouverte en plein lancer) : l'image
             // défile mais ni la physique ni les chronos n'avancent.
             if (PlayState.paused) continue
-            val step = Skid.step(worldX = state.worldX, targetWorldX = target, rotation = state.rotation, dt = dt)
-            state = state.copy(worldX = step.worldX, rotation = step.rotation)
-            finished = step.finished
+            // Bouton ⏩ : plusieurs pas de glissade par image.
+            var steps = PlayState.throwSpeed
+            while (steps-- > 0 && !finished) {
+                val step = Skid.step(worldX = state.worldX, targetWorldX = target, rotation = state.rotation, dt = dt)
+                state = state.copy(worldX = step.worldX, rotation = step.rotation)
+                finished = step.finished
+            }
         }
         onFinished(state.worldX)
     }

@@ -121,9 +121,19 @@ data class GameSave(
     val dailyBestDistance: Map<String, Double> = emptyMap(),
     val isPrivate: Boolean = false,
     val avatarEmoji: String = "",
-    // --- Code de récupération ---
+    // --- Compte à code (voir RecoveryCode et CloudSession côté :app) ---
+    /** Ancienne copie du code (avant la 11.3.0) : le code vit maintenant HORS
+     *  de la sauvegarde, gardé par l'appareil et déduit de l'e-mail du compte
+     *  connecté. Ne sert plus qu'à migrer les parties d'avant. */
     val recoveryCode: String = "",
     val recoveryRetireToken: String = "",
+    /** Le code du compte a déjà été affiché ou copié : sinon personne ne le
+     *  connaît, et un compte quitté peut être effacé (voir AccountRules). */
+    val accountCodeShown: Boolean = false,
+    /** Ce compte a déjà joué sur l'app Android : pseudo arc-en-ciel partout
+     *  (classement, profil, abonnés, cadeaux), sur le site comme ici. Jamais
+     *  remis à false. */
+    val playedOnAndroid: Boolean = false,
     // --- Défis quotidiens ---
     val dailyChallengeDate: String = "",
     val dailyChallenges: List<DailyChallenge> = emptyList(),

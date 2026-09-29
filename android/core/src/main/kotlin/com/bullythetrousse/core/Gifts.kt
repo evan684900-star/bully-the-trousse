@@ -1,7 +1,12 @@
 package com.bullythetrousse.core
 
-/** Un cadeau reçu, tel que stocké dans la collection `gifts`. */
-data class IncomingGift(val senderUid: String, val senderPseudo: String, val amount: Int)
+/** Un cadeau reçu, tel que stocké dans la collection `gifts`. [senderAndroid] :
+ *  l'expéditeur joue sur l'app Android (`fromAndroid`), son pseudo s'affiche
+ *  en arc-en-ciel. */
+data class IncomingGift(val senderUid: String, val senderPseudo: String, val amount: Int, val senderAndroid: Boolean = false)
+
+/** Une ligne de la modale des cadeaux reçus : un expéditeur, son total. */
+data class GiftLine(val pseudo: String, val amount: Int, val android: Boolean)
 
 /** Ce que la validation d'un envoi décide, dans l'ordre des tests du site. */
 sealed interface GiftCheck {
@@ -69,6 +74,21 @@ object Gifts {
             merged[gift.senderUid] = (previous?.first ?: gift.senderPseudo) to ((previous?.second ?: 0) + amount)
         }
         return merged.values.filter { it.second > 0 }
+    }
+
+    /** Comme [mergeBySender], avec en plus l'arc-en-ciel des joueurs Android. */
+    fun linesBySender(gifts: List<IncomingGift>): List<GiftLine> {
+        val merged = LinkedHashMap<String, GiftLine>()
+        for (gift in gifts) {
+            val amount = gift.amount.coerceAtLeast(0)
+            val previous = merged[gift.senderUid]
+            merged[gift.senderUid] = GiftLine(
+                pseudo = previous?.pseudo ?: gift.senderPseudo,
+                amount = (previous?.amount ?: 0) + amount,
+                android = (previous?.android ?: false) || gift.senderAndroid,
+            )
+        }
+        return merged.values.filter { it.amount > 0 }
     }
 
     fun total(gifts: List<IncomingGift>): Int = gifts.sumOf { it.amount.coerceAtLeast(0) }

@@ -132,17 +132,27 @@ fun animateVilleFlight(
             }
             when (rooftop.phase) {
                 RooftopPhase.FLYING -> {
-                    if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
-                    state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
-                    if (state.hasLanded) {
-                        state = state.copy(worldY = 0.0)
-                        if (!rooftop.puddleAt(state.worldX)) break
-                        // Fuite d'eau / pluie : la trousse glisse sur une flaque.
-                        slideSpeed = VilleRooftop.slideStartSpeed(state.vx)
-                        slideTime = 0.0
-                        rooftop.startSlide()
-                        sfx.play(SPLASH)
+                    // Bouton ⏩ : plusieurs pas de la vitesse normale par image,
+                    // tant que la trousse est en l'air (voir PlayState.throwSpeed).
+                    var steps = PlayState.throwSpeed
+                    var landed = false
+                    while (steps-- > 0 && rooftop.phase == RooftopPhase.FLYING) {
+                        if (vampire != null) state = state.copy(vx = vampire.step(dt, state.vx))
+                        state = FlightSimulator.step(state, result.effectiveGravity, rotSpeed, dt)
+                        if (state.hasLanded) {
+                            state = state.copy(worldY = 0.0)
+                            if (!rooftop.puddleAt(state.worldX)) {
+                                landed = true
+                                break
+                            }
+                            // Fuite d'eau / pluie : la trousse glisse sur une flaque.
+                            slideSpeed = VilleRooftop.slideStartSpeed(state.vx)
+                            slideTime = 0.0
+                            rooftop.startSlide()
+                            sfx.play(SPLASH)
+                        }
                     }
+                    if (landed) break
                 }
                 RooftopPhase.SLIDING -> {
                     slideTime += dt

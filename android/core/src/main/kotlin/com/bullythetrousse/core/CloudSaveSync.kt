@@ -34,8 +34,12 @@ object CloudSaveSync {
 
     /**
      * `applyRemoteSave()` : la partie de l'autre appareil remplace la locale,
-     * mais le temps de jeu ne recule jamais — on garde le plus avancé.
+     * mais le temps de jeu ne recule jamais — on garde le plus avancé — et un
+     * compte qui a joué sur Android garde son pseudo arc-en-ciel.
      */
     fun mergeRemote(remote: GameSave, local: GameSave): GameSave =
-        remote.copy(playTime = maxOf(remote.playTime, local.playTime))
+        remote.copy(
+            playTime = maxOf(remote.playTime, local.playTime),
+            playedOnAndroid = remote.playedOnAndroid || local.playedOnAndroid,
+        )
 }

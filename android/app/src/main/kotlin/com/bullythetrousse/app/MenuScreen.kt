@@ -209,9 +209,13 @@ private fun MenuDialogs(
             val max = SkinStats.maxDurability(save)
             InfoLine(tr("labelDurability"), "${save.durability} / $max")
             DurabilityBar(fraction = if (max > 0) save.durability.toFloat() / max else 0f)
-            InfoLine(tr("labelName"), save.pseudo.ifBlank { tr("app.trousseDefaultName") })
+            InfoLine(tr("labelName"), save.pseudo.ifBlank { tr("app.trousseDefaultName") }, rainbow = save.playedOnAndroid)
             InfoLine(tr("labelPlaytime"), formatPlayTime(save.playTime))
-            val best = if (save.currentWorld == "plage") save.plageBestDistance else save.bestDistance
+            val best = when (save.currentWorld) {
+                "plage" -> save.plageBestDistance
+                Ville.WORLD_ID -> save.villeBestDistance
+                else -> save.bestDistance
+            }
             InfoLine(tr("labelBest"), "${"%.1f".format(best)} m")
         }
 
@@ -303,14 +307,14 @@ private fun ReplayDialog(
 
 /** `.info-line` : libellé à gauche, valeur en gras à droite, filet dessous. */
 @Composable
-private fun InfoLine(label: String, value: String) {
+private fun InfoLine(label: String, value: String, rainbow: Boolean = false) {
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(label, color = TextColor, fontSize = 14.sp)
-            Text(value, color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
+            PlayerName(value, android = rainbow, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold)
         }
         Box(modifier = Modifier.fillMaxWidth().height(1.dp).background(Color(0x2E808080)))
     }

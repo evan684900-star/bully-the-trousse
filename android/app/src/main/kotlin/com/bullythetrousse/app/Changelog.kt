@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (106
+ * Le journal des changements du site, repris intégralement (110
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,26 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.6.0",
+        listOf(ChangelogLine("Les joueurs de l'app Android ont maintenant un pseudo arc-en-ciel partout où ils apparaissent : classement, profil, listes d'abonnés et cadeaux", "Android app players now have a rainbow nickname everywhere they show up: leaderboard, profile, follower lists and gifts")),
+        listOf(ChangelogLine("L'app Android reprend toutes les nouveautés du site : comptes à code (avec régénération du code), bouton ⏩ pendant le lancer, et la Ville dans le classement mondial", "The Android app gets everything new from the site: code-based accounts (with code regeneration), the ⏩ button during throws, and the City on the global leaderboard")),
+    ),
+    ChangelogEntry(
+        "11.5.0",
+        listOf(ChangelogLine("Les lancers depuis le toit de la Ville comptent maintenant dans le classement mondial, au même titre que la Cour d'école : ton entrée affiche le meilleur des deux records (avant, le record de la Ville n'apparaissait nulle part). Les records déjà faits en Ville y sont envoyés dès la prochaine ouverture du jeu", "Throws from the City rooftop now count on the global leaderboard, just like the Schoolyard: your entry shows the better of the two records (previously the City record showed up nowhere). City records you already set are sent there the next time you open the game")),
+        listOf(ChangelogLine("Profil : le rang mondial tient compte du record de la Ville", "Profile: the global rank takes the City record into account")),
+    ),
+    ChangelogEntry(
+        "11.4.0",
+        listOf(ChangelogLine("Nouveau bouton ⏩ pendant le lancer (en bas à droite) : accélère le vol ×2 ou ×4 quand un lancer dure trop longtemps. La trajectoire et la distance ne changent pas, ça va juste plus vite. Le réglage est gardé pour les lancers suivants", "New ⏩ button during the throw (bottom right): speeds up the flight ×2 or ×4 when a throw takes too long. The trajectory and distance don't change, it just goes faster. The setting is kept for the next throws")),
+        listOf(),
+    ),
+    ChangelogEntry(
+        "11.3.0",
+        listOf(ChangelogLine("Nouveau bouton « Régénérer » dans Réglages > Mon compte : il te donne un nouveau code et l'ancien ne marche plus nulle part. Ta partie ne change pas ; tes autres appareils sont déconnectés et te demandent le nouveau code", "New \"Regenerate\" button in Settings > My account: you get a new code and the old one stops working everywhere. Your save stays the same; your other devices are logged out and ask for the new code"), ChangelogLine("Système de comptes corrigé pour de bon : chaque partie a maintenant son code dès le départ, et si le navigateur perd la connexion au compte, le jeu s'y reconnecte tout seul au lieu de créer un deuxième compte avec une copie de ta partie", "Account system fixed for good: every save now gets its code right away, and if the browser loses the connection to the account, the game reconnects to it on its own instead of creating a second account with a copy of your save")),
+        listOf(ChangelogLine("Le code affiché est toujours celui qui ouvre vraiment ton compte (avant, une copie gardée dans la sauvegarde pouvait ne plus correspondre à rien) ; il est masqué par défaut, bouton « Afficher »", "The code shown is always the one that actually opens your account (a copy kept in the save could previously point to nothing); it's hidden by default, tap \"Show\""), ChangelogLine("Classement : les records au-delà de 100 km sont enfin acceptés (ils restaient bloqués à l'ancienne valeur)", "Leaderboard: records beyond 100 km are finally accepted (they stayed stuck at the old value)"), ChangelogLine("Classement : changer de pseudo depuis la plage n'écrit plus le record du monde normal dans le classement Plage, et le pseudo change dans les deux classements", "Leaderboard: changing your nickname from the beach no longer writes your normal-world record into the Beach leaderboard, and the nickname changes on both leaderboards"), ChangelogLine("Classement : connecter un appareil à un autre compte (ou s'en déconnecter) retire son ancienne entrée, plus de pseudo en double", "Leaderboard: connecting a device to another account (or logging out) removes its old entry, no more duplicate nicknames"), ChangelogLine("Profil : le rang mondial est toujours celui du classement du monde normal, même depuis la plage", "Profile: the global rank is always the one from the normal-world leaderboard, even from the beach"), ChangelogLine("Une partie jouée hors ligne (ou un lancer juste avant de fermer l'onglet) n'est plus écrasée par la sauvegarde du compte à la reconnexion", "A save played offline (or a throw right before closing the tab) is no longer overwritten by the account's save when reconnecting"), ChangelogLine("Plus rien n'est envoyé au compte avant que sa sauvegarde soit chargée : une sauvegarde automatique pendant la connexion ne peut plus écraser ta partie", "Nothing is sent to the account before its save is loaded: an autosave during login can no longer overwrite your save"), ChangelogLine("Connecter un appareil qui n'a encore rien joué ne demande plus quelle partie garder", "Connecting a device that hasn't played yet no longer asks which save to keep")),
+    ),
     ChangelogEntry(
         "11.2.7",
         listOf(),
@@ -274,6 +294,10 @@ private fun changelogPart0(): List<ChangelogEntry> = listOf(
         listOf(ChangelogLine("Le classement (monde normal ET Plage) n'est plus limité à un top 15 : il affiche tout le monde, sans exception (l'ancien rappel de \"ta ligne\" en bas de classement n'a donc plus lieu d'être)", "The leaderboard (normal world AND Beach) is no longer capped at a top 15: it now shows everyone, no exceptions (the old \"your row\" recall at the bottom is no longer needed)"), ChangelogLine("Le code de récupération (Réglages) couvre maintenant aussi le classement de la Plage : récupérer sa partie sur un autre appareil retire proprement l'ancienne entrée des deux classements", "The recovery code (Settings) now also covers the Beach leaderboard: recovering your save on another device properly retires the old entry from both leaderboards")),
         listOf(),
     ),
+)
+
+// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
+private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "8.1.7",
         listOf(),
@@ -284,10 +308,6 @@ private fun changelogPart0(): List<ChangelogEntry> = listOf(
         listOf(),
         listOf(ChangelogLine("Rééquilibrage du monde Plage : trois évènements aléatoires par lancer (parasol, serviette, château de sable), tirés indépendamment au-delà de 100 m ; 11 succès liés à la plage", "Beach world rebalance: three random events per throw (parasol, towel, sandcastle), rolled independently past 100 m; 11 beach-related achievements")),
     ),
-)
-
-// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
-private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "8.1.3",
         listOf(),
