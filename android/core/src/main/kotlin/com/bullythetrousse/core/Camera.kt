@@ -17,9 +17,22 @@ object Camera {
     fun followX(worldX: Double, screenWidth: Double): Double =
         maxOf(0.0, worldX - screenWidth * 0.3)
 
-    /** `const groundY = h * 0.68; cameraY = Math.max(0, VERTICAL_SAFE_TOP - groundY + worldY);` */
-    fun followY(worldY: Double, screenHeight: Double, verticalSafeTop: Double): Double {
-        val groundY = screenHeight * 0.68
+    /** `VERTICAL_SAFE_TOP` côté site : marge toujours laissée entre le haut de
+     *  l'écran et la trousse une fois que la caméra la suit en hauteur. */
+    const val VERTICAL_SAFE_TOP = 90.0
+
+    /**
+     * `const groundY = h * 0.68; cameraY = Math.max(0, VERTICAL_SAFE_TOP - groundY + worldY);`
+     * La ligne du sol (et tout le décor) descend alors de `cameraY` : sur un
+     * lancer puissant, la trousse ne sort plus par le haut de l'écran.
+     */
+    fun followY(
+        worldY: Double,
+        screenHeight: Double,
+        verticalSafeTop: Double = VERTICAL_SAFE_TOP,
+        groundFraction: Double = 0.68,
+    ): Double {
+        val groundY = screenHeight * groundFraction
         return maxOf(0.0, verticalSafeTop - groundY + worldY)
     }
 

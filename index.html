@@ -1453,7 +1453,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.6.0</div>
+                <div class="version-tag" id="version-tag">v11.6.1</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -10943,8 +10943,16 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.6.0";
+    const VERSION_NUMBER = "11.6.1";
     const CHANGELOG = [
+        {
+            version: "11.6.1",
+            major: [],
+            minor: [
+                { fr: "App Android : le décor, la trousse et les objets (parasols, château de sable...) s'affichent enfin à la même taille que sur le site, au lieu d'être minuscules ; pareil pour les cinématiques de la plage et du volcan", en: "Android app: the scenery, the pencil case and objects (umbrellas, sandcastle...) finally show at the same size as on the site instead of being tiny; same for the beach and volcano cutscenes" },
+                { fr: "App Android : la caméra suit maintenant la trousse en hauteur, elle ne sort plus par le haut de l'écran sur un lancer puissant", en: "Android app: the camera now follows the pencil case vertically, it no longer leaves the top of the screen on a powerful throw" },
+            ],
+        },
         {
             version: "11.6.0",
             major: [

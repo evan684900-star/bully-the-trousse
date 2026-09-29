@@ -402,9 +402,9 @@ private fun Ctx2D.drawRooftopProp(kind: String, x: Float, gY: Float, seed: Int, 
  *
  * [k] agrandit le décor (ciel, silhouettes, accessoires, textes) sans
  * toucher aux positions qui comptent pour le jeu (flaques, repères de
- * distance, en pixels "monde") : le canvas de jeu Android travaille en
- * pixels physiques, là où le site dessine en pixels CSS — sans ce facteur,
- * une clim du toit serait trois fois plus petite que la trousse.
+ * distance, en pixels "monde"). Il reste à 1 : le canvas de jeu dessine
+ * désormais toute la scène en dp, comme le site en pixels CSS (voir
+ * inCssPixels).
  */
 internal fun Ctx2D.drawRooftop(
     w: Float,

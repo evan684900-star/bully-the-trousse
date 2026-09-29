@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -109,8 +110,11 @@ fun BeachCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", on
     // Effets d'ambiance (voir CineEffects.kt).
     val profile = LocalGraphicsQuality.current.profile
     val particles = remember(profile) { ParticleField(profile) }
+    // Taille de l'écran en dp, le repère où la scène est dessinée (voir
+    // inCssPixels) : les particules y naissent au même endroit que le décor.
     var viewWidth by remember { mutableFloatStateOf(0f) }
     var viewHeight by remember { mutableFloatStateOf(0f) }
+    val screenDensity = LocalDensity.current.density
 
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
@@ -345,8 +349,8 @@ fun BeachCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", on
             .fillMaxSize()
             .background(Color.Black)
             .onSizeChanged {
-                viewWidth = it.width.toFloat()
-                viewHeight = it.height.toFloat()
+                viewWidth = it.width / screenDensity
+                viewHeight = it.height / screenDensity
             }
             // bcTap() côté web : un tap fait avancer un dialogue, ou tire
             // plus tôt pendant la visée (refusé si la barre est dans la
@@ -366,42 +370,47 @@ fun BeachCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", on
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             if (phase != BeachCinePhase.BLACK) {
-                if (phase in YARD_PHASES) {
-                    drawBeachCineYard(
-                        profile = profile,
-                        phase = phase,
-                        phaseElapsed = state.phaseElapsed,
-                        lean = lean,
-                        door = door,
-                        onBus = onBus,
-                        clock = clock,
-                        sprite = sprite,
-                        skinId = equippedSkin,
-                        cosmetic = equippedCosmetic,
-                        skinFilter = skinFilter,
-                    )
-                } else {
-                    drawBeachCineBeach(
-                        profile = profile,
-                        phase = phase,
-                        phaseElapsed = state.phaseElapsed,
-                        scroll = scroll,
-                        zoom = zoom,
-                        lean = lean,
-                        altitude = altitude,
-                        drop = drop,
-                        bang = bang,
-                        onBus = onBus,
-                        crabs = crabs,
-                        props = props,
-                        clock = clock,
-                        sprite = sprite,
-                        skinId = equippedSkin,
-                        cosmetic = equippedCosmetic,
-                        skinFilter = skinFilter,
-                    )
+                // Décor, trousse et particules en dp, comme le site en pixels
+                // CSS (voir inCssPixels) ; l'étalonnage et le diaphragme
+                // couvrent l'écran entier et n'en ont pas besoin.
+                inCssPixels {
+                    if (phase in YARD_PHASES) {
+                        drawBeachCineYard(
+                            profile = profile,
+                            phase = phase,
+                            phaseElapsed = state.phaseElapsed,
+                            lean = lean,
+                            door = door,
+                            onBus = onBus,
+                            clock = clock,
+                            sprite = sprite,
+                            skinId = equippedSkin,
+                            cosmetic = equippedCosmetic,
+                            skinFilter = skinFilter,
+                        )
+                    } else {
+                        drawBeachCineBeach(
+                            profile = profile,
+                            phase = phase,
+                            phaseElapsed = state.phaseElapsed,
+                            scroll = scroll,
+                            zoom = zoom,
+                            lean = lean,
+                            altitude = altitude,
+                            drop = drop,
+                            bang = bang,
+                            onBus = onBus,
+                            crabs = crabs,
+                            props = props,
+                            clock = clock,
+                            sprite = sprite,
+                            skinId = equippedSkin,
+                            cosmetic = equippedCosmetic,
+                            skinFilter = skinFilter,
+                        )
+                    }
+                    drawParticles(particles)
                 }
-                drawParticles(particles)
                 // Étalonnage : lumière dorée de bord de mer, puis vignetage.
                 drawLightWash(Color(0xFFFFC46B), 0.10f)
                 if (profile.vignette) drawVignette(0.34f)

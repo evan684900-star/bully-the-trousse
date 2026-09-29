@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -288,5 +289,26 @@ internal class Ctx2D(val ds: DrawScope, private val texts: TextMeasurer?) {
 
         /** 0xRRGGBB + alpha. */
         fun rgb(color: Int, a: Float = 1f): Color = rgba((color shr 16) and 255, (color shr 8) and 255, color and 255, a)
+    }
+}
+
+/**
+ * Dessine [block] dans le repère du site : une unité = un dp, soit à peu
+ * près un pixel CSS. Le site dessine en pixels CSS et Compose en pixels
+ * physiques, 2,5 à 3 fois plus nombreux sur un téléphone : sans ce repère,
+ * tout ce qui est porté tel quel du JS (tailles, vitesses, décalages) sort
+ * 2,5 à 3 fois trop petit. `size` (et donc `center`) est ramené en dp
+ * pendant [block], pour que les fonctions qui s'en servent restent justes.
+ */
+internal fun DrawScope.inCssPixels(block: DrawScope.() -> Unit) {
+    val k = density
+    val physical = drawContext.size
+    withTransform({ scale(k, k, pivot = Offset.Zero) }) {
+        drawContext.size = Size(physical.width / k, physical.height / k)
+        try {
+            block()
+        } finally {
+            drawContext.size = physical
+        }
     }
 }

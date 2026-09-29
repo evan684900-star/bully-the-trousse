@@ -52,6 +52,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -112,8 +113,11 @@ fun VolcanoCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", 
     var smoke by remember { mutableFloatStateOf(0f) }
     var shockwave by remember { mutableFloatStateOf(-1f) }
     var impactDone by remember { mutableStateOf(false) }
+    // Taille de l'écran en dp, le repère où la scène est dessinée (voir
+    // inCssPixels) : les particules y naissent au même endroit que le décor.
     var viewWidth by remember { mutableFloatStateOf(0f) }
     var viewHeight by remember { mutableFloatStateOf(0f) }
+    val screenDensity = LocalDensity.current.density
 
     val sprite = rememberTrousseSprite()
     val skinFilter = rememberSkinColorFilter(equippedSkin)
@@ -360,8 +364,8 @@ fun VolcanoCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", 
             .fillMaxSize()
             .background(Color.Black)
             .onSizeChanged {
-                viewWidth = it.width.toFloat()
-                viewHeight = it.height.toFloat()
+                viewWidth = it.width / screenDensity
+                viewHeight = it.height / screenDensity
             }
             // pointerdown : un tap n'importe où compte pour le QTE de la
             // descente ; pendant les roches, c'est le côté touché qui décide
@@ -445,14 +449,19 @@ fun VolcanoCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", 
                     )
                 }
             }
-            if (amplitude > 0.15f) {
-                translate(shakeOffset.x, shakeOffset.y) {
-                    scale(1f + amplitude / 260f) {
-                        rotate(shakeRotation) { body() }
+            // Le plan (et sa secousse, en pixels CSS côté web) est dessiné en
+            // dp, comme le site (voir inCssPixels) ; l'étalonnage, l'éclair et
+            // le voile couvrent l'écran entier et n'en ont pas besoin.
+            inCssPixels {
+                if (amplitude > 0.15f) {
+                    translate(shakeOffset.x, shakeOffset.y) {
+                        scale(1f + amplitude / 260f) {
+                            rotate(shakeRotation) { body() }
+                        }
                     }
+                } else {
+                    body()
                 }
-            } else {
-                body()
             }
 
             // Étalonnage du plan : la lumière chaude du volcan, puis le

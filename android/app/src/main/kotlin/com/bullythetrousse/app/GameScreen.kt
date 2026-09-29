@@ -131,7 +131,7 @@ fun GameScreen(
     var rooftopSeed by remember { mutableDoubleStateOf(kotlin.random.Random.nextDouble() * 1000) }
     var rooftopFlight by remember { mutableStateOf<RooftopFlight?>(null) }
     val planeCrash = remember { PlaneCrashFlight() }
-    var canvasWidth by remember { mutableFloatStateOf(1080f) }
+    var canvasWidth by remember { mutableFloatStateOf(400f) }
     // La distance et le "parfait" réellement obtenus : sur le toit, une
     // flaque prolonge le lancer au-delà de la distance calculée au départ.
     var outcome by remember { mutableStateOf<Pair<Double, Boolean>?>(null) }
@@ -212,7 +212,10 @@ fun GameScreen(
         !(current is ThrowState.ChargingPower && current.bounceCount > 0)
     val lastDown = remember { floatArrayOf(-1f, -1f) }
     val lastDownHeight = remember { floatArrayOf(0f) }
-    val poopHitRadius = with(LocalDensity.current) { maxOf(CourDecor.POOP_EGG_HIT_RADIUS.toFloat(), 16.dp.toPx()) }
+    // Le canvas dessine dans le repère du site (1 unité = 1 dp, voir
+    // ThrowCanvas) : le toucher, en pixels physiques, y est ramené avant de
+    // tester le 💩.
+    val screenDensity = LocalDensity.current.density
 
     Box(
         modifier = Modifier
@@ -235,11 +238,10 @@ fun GameScreen(
                     // Un tap sur le 💩 est « absorbé » : il ne lance pas la charge,
                     // le temps de voir la découverte (revealPoopEgg()).
                     if (poopVisible && CourDecor.hitsPoopEgg(
-                            tapX = lastDown[0].toDouble(),
-                            tapY = lastDown[1].toDouble(),
+                            tapX = (lastDown[0] / screenDensity).toDouble(),
+                            tapY = (lastDown[1] / screenDensity).toDouble(),
                             cameraX = 0.0,
-                            groundScreenY = (lastDownHeight[0] * GROUND_FRACTION).toDouble(),
-                            hitRadius = poopHitRadius.toDouble(),
+                            groundScreenY = (lastDownHeight[0] / screenDensity * GROUND_FRACTION).toDouble(),
                         )
                     ) {
                         toast = "💩"
@@ -307,7 +309,9 @@ fun GameScreen(
             spaceState = spaceFlight?.state,
             showPoopEgg = poopVisible,
             groundVerticalFraction = GROUND_FRACTION,
-            modifier = Modifier.fillMaxSize().onSizeChanged { canvasWidth = it.width.toFloat() },
+            // Largeur dans le repère du site (voir ThrowCanvas) : l'avion du
+            // crash arrive de derrière le bord gauche de l'écran.
+            modifier = Modifier.fillMaxSize().onSizeChanged { canvasWidth = it.width / screenDensity },
             rooftop = if (isVille) RooftopView(rooftopFlight?.puddleSeed ?: rooftopSeed) else null,
             planeCrash = planeCrash.state,
             equippedCosmetic = save.equippedCosmetic,

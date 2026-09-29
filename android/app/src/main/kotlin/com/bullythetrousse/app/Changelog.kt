@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (110
+ * Le journal des changements du site, repris intégralement (111
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,11 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.6.1",
+        listOf(),
+        listOf(ChangelogLine("App Android : le décor, la trousse et les objets (parasols, château de sable...) s'affichent enfin à la même taille que sur le site, au lieu d'être minuscules ; pareil pour les cinématiques de la plage et du volcan", "Android app: the scenery, the pencil case and objects (umbrellas, sandcastle...) finally show at the same size as on the site instead of being tiny; same for the beach and volcano cutscenes"), ChangelogLine("App Android : la caméra suit maintenant la trousse en hauteur, elle ne sort plus par le haut de l'écran sur un lancer puissant", "Android app: the camera now follows the pencil case vertically, it no longer leaves the top of the screen on a powerful throw")),
+    ),
     ChangelogEntry(
         "11.6.0",
         listOf(ChangelogLine("Les joueurs de l'app Android ont maintenant un pseudo arc-en-ciel partout où ils apparaissent : classement, profil, listes d'abonnés et cadeaux", "Android app players now have a rainbow nickname everywhere they show up: leaderboard, profile, follower lists and gifts")),

@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.unit.dp
 import com.bullythetrousse.core.Beach
 import com.bullythetrousse.core.BeachDecor
 import com.bullythetrousse.core.BeachEvents
@@ -122,88 +121,109 @@ fun ThrowCanvas(
     val trailRgb = remember(equippedTrail) { Trails.ALL.firstOrNull { it.id == equippedTrail }?.rgb ?: "255,255,255" }
 
     Canvas(modifier = modifier) {
-        val groundScreenY = size.height * groundVerticalFraction
+        // Le site dessine en pixels CSS, ce canvas en pixels physiques (2,5 à
+        // 3 fois plus nombreux sur un téléphone) : sans rien faire, décor,
+        // parasols, caméra et sillage sortaient 2,5 à 3 fois trop petits.
+        // Toute la scène est donc dessinée en dp (voir inCssPixels), et la
+        // caméra calculée sur la taille de l'écran en dp.
+        val w = size.width / density
+        val h = size.height / density
 
         // Caméra centrée sur worldX=0 tant qu'il n'y a pas de vol en cours,
-        // sinon elle suit la trousse (voir Camera.followX, portage de la
-        // logique de gameLoop côté web).
-        val cameraX = if (flightState != null) Camera.followX(flightState.worldX, size.width.toDouble()) else 0.0
-
-        // Pendant l'apesanteur, c'est le décor spatial qui remplace le monde —
-        // et les nuages de la transition cachent la bascule, comme côté site.
-        val ctx = Ctx2D(this, textMeasurer)
-        val detail = density // voir drawRooftop : décor à l'échelle de la trousse
-        if (spaceState != null) {
-            drawSpaceBackdrop(cameraX, groundScreenY, animationTimeSeconds)
-        } else if (world == "ville" && rooftop != null) {
-            val w = size.width.toDouble()
-            ctx.drawRooftop(
-                size.width, size.height, cameraX.toFloat(), groundScreenY, rooftop.event,
-                rooftop.puddles(cameraX - 200 * detail, cameraX + w + 200 * detail), detail,
-            )
+        // sinon elle suit la trousse en largeur ET en hauteur (cameraX et
+        // cameraY de gameLoop côté web) : sur un lancer puissant, le sol
+        // descend au lieu de laisser la trousse sortir par le haut.
+        val cameraX = if (flightState != null) Camera.followX(flightState.worldX, w.toDouble()) else 0.0
+        val cameraY = if (flightState != null) {
+            Camera.followY(flightState.worldY, h.toDouble(), groundFraction = groundVerticalFraction.toDouble())
         } else {
-            drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds, showPoopEgg = showPoopEgg)
+            0.0
         }
+        val groundScreenY = h * groundVerticalFraction + cameraY.toFloat()
 
-        // Le sillage ne vit que pendant le vol : au repos on repart de zéro,
-        // sinon le ruban du lancer précédent resterait accroché à la trousse.
-        val nowMillis = System.currentTimeMillis()
-        if (flightState == null) {
-            trailPoints.clear()
-        } else {
-            trailPoints.add(TrailPoint(flightState.worldX, flightState.worldY, nowMillis))
-            trailPoints.removeAll { nowMillis - it.atMillis > TRAIL_LIFE_MS }
-            while (trailPoints.size > profile.trailPoints) trailPoints.removeAt(0)
-            drawTrail(
-                points = trailPoints,
+        inCssPixels {
+            // Pendant l'apesanteur, c'est le décor spatial qui remplace le monde —
+            // et les nuages de la transition cachent la bascule, comme côté site.
+            val ctx = Ctx2D(this, textMeasurer)
+            if (spaceState != null) {
+                drawSpaceBackdrop(cameraX, groundScreenY, animationTimeSeconds, w, h)
+            } else if (world == "ville" && rooftop != null) {
+                ctx.drawRooftop(
+                    w, h, cameraX.toFloat(), groundScreenY, rooftop.event,
+                    rooftop.puddles(cameraX - 200, cameraX + w + 200),
+                )
+            } else {
+                drawWorldBackdrop(world, cameraX, groundScreenY, animationTimeSeconds, width = w, height = h, showPoopEgg = showPoopEgg)
+            }
+
+            // Le sillage ne vit que pendant le vol : au repos on repart de zéro,
+            // sinon le ruban du lancer précédent resterait accroché à la trousse.
+            val nowMillis = System.currentTimeMillis()
+            if (flightState == null) {
+                trailPoints.clear()
+            } else {
+                trailPoints.add(TrailPoint(flightState.worldX, flightState.worldY, nowMillis))
+                trailPoints.removeAll { nowMillis - it.atMillis > TRAIL_LIFE_MS }
+                while (trailPoints.size > profile.trailPoints) trailPoints.removeAt(0)
+                drawTrail(
+                    points = trailPoints,
+                    cameraX = cameraX,
+                    groundScreenY = groundScreenY,
+                    nowMillis = nowMillis,
+                    color = trailColor(trailRgb, animationTimeSeconds),
+                    passes = profile.trailPasses,
+                )
+            }
+
+            if (planeCrash != null) ctx.drawCrashPlane(planeCrash, cameraX.toFloat(), groundScreenY, 1f)
+
+            val worldY = flightState?.worldY ?: 0.0
+            val screen = Camera.worldToScreen(
+                worldX = flightState?.worldX ?: 0.0,
+                worldY = worldY,
                 cameraX = cameraX,
-                groundScreenY = groundScreenY,
-                nowMillis = nowMillis,
-                color = trailColor(trailRgb, animationTimeSeconds),
-                passes = profile.trailPasses,
+                groundScreenY = groundScreenY.toDouble(),
             )
-        }
+            drawTrousseSprite(
+                image = sprite,
+                skinId = equippedSkin,
+                centerX = screen.sx.toFloat(),
+                centerY = screen.sy.toFloat(),
+                // `const size = 60` de drawTrousse() côté site.
+                size = TROUSSE_SIZE,
+                rotationRadians = (flightState?.rotation ?: 0.0).toFloat(),
+                colorFilter = skinFilter,
+                filterQuality = spriteFilter,
+                cosmetic = equippedCosmetic,
+            )
 
-        if (planeCrash != null) ctx.drawCrashPlane(planeCrash, cameraX.toFloat(), groundScreenY, detail)
+            if (world == "ville" && rooftop != null && spaceState == null) {
+                ctx.drawVilleWeather(w, h, groundScreenY, rooftop.event)
+            }
+            if (planeCrash != null) ctx.drawCrashClouds(planeCrash, 1f, w, h)
 
-        val worldY = flightState?.worldY ?: 0.0
-        val screen = Camera.worldToScreen(
-            worldX = flightState?.worldX ?: 0.0,
-            worldY = worldY,
-            cameraX = cameraX,
-            groundScreenY = groundScreenY.toDouble(),
-        )
-        drawTrousseSprite(
-            image = sprite,
-            skinId = equippedSkin,
-            centerX = screen.sx.toFloat(),
-            centerY = screen.sy.toFloat(),
-            size = 56.dp.toPx(),
-            rotationRadians = (flightState?.rotation ?: 0.0).toFloat(),
-            colorFilter = skinFilter,
-            filterQuality = spriteFilter,
-            cosmetic = equippedCosmetic,
-        )
-
-        if (world == "ville" && rooftop != null && spaceState == null) {
-            ctx.drawVilleWeather(size.width, size.height, groundScreenY, rooftop.event, detail)
-        }
-        if (planeCrash != null) ctx.drawCrashClouds(planeCrash, detail)
-
-        if (spaceState != null) {
-            when (spaceState.phase) {
-                SpacePhase.TRANSITION -> drawCloudSweep(
-                    (spaceState.phaseElapsed / SpaceSequence.TRANSITION_DURATION).toFloat(),
-                )
-                SpacePhase.QTE -> drawQteRings(
-                    currentRadius = SpaceSequence.currentRingRadius(spaceState.phaseElapsed).toFloat(),
-                    targetRadius = spaceState.ringTargetRadius.toFloat(),
-                )
-                else -> Unit
+            if (spaceState != null) {
+                when (spaceState.phase) {
+                    SpacePhase.TRANSITION -> drawCloudSweep(
+                        (spaceState.phaseElapsed / SpaceSequence.TRANSITION_DURATION).toFloat(),
+                        w,
+                        h,
+                    )
+                    SpacePhase.QTE -> drawQteRings(
+                        currentRadius = SpaceSequence.currentRingRadius(spaceState.phaseElapsed).toFloat(),
+                        targetRadius = spaceState.ringTargetRadius.toFloat(),
+                        w = w,
+                        h = h,
+                    )
+                    else -> Unit
+                }
             }
         }
     }
 }
+
+/** Taille de la trousse dans le repère du site (`const size = 60` de drawTrousse()). */
+private const val TROUSSE_SIZE = 60f
 
 /**
  * Le décor complet d'un monde : ciel, sol, nuages et éléments de fond,
@@ -266,8 +286,7 @@ internal fun DrawScope.drawWorldBackdrop(
  * lunaire. Les étoiles ont une légère parallaxe, comme le décor des autres
  * mondes.
  */
-private fun DrawScope.drawSpaceBackdrop(cameraX: Double, groundScreenY: Float, timeSeconds: Float) {
-    val w = size.width
+private fun DrawScope.drawSpaceBackdrop(cameraX: Double, groundScreenY: Float, timeSeconds: Float, w: Float, h: Float) {
     drawRect(
         brush = Brush.verticalGradient(
             colors = listOf(Color(0xFF05040F), Color(0xFF1B1240)),
@@ -304,10 +323,10 @@ private fun DrawScope.drawSpaceBackdrop(cameraX: Double, groundScreenY: Float, t
         brush = Brush.verticalGradient(
             colors = listOf(Color(0xFF9AA0AB), Color(0xFF6F7480)),
             startY = groundScreenY,
-            endY = size.height,
+            endY = h,
         ),
         topLeft = Offset(0f, groundScreenY),
-        size = Size(w, size.height - groundScreenY),
+        size = Size(w, h - groundScreenY),
     )
 
     // Cratères décoratifs, à la place de la craie et des arbres de la cour.
@@ -345,10 +364,8 @@ private fun DrawScope.drawMoonCrater(centerX: Float, centerY: Float, radius: Flo
  * (0 → 1 → 0). C'est ce voile qui garantit qu'on ne voit JAMAIS le décor
  * basculer, quelle que soit la position des nuages.
  */
-private fun DrawScope.drawCloudSweep(progress: Float) {
+private fun DrawScope.drawCloudSweep(progress: Float, w: Float, h: Float) {
     val p = progress.coerceIn(0f, 1f)
-    val w = size.width
-    val h = size.height
     val drift = h * 1.15f - p * h * 1.3f
     for (i in 0 until 5) {
         val cy = drift - i * 150f
@@ -359,15 +376,15 @@ private fun DrawScope.drawCloudSweep(progress: Float) {
         drawCircle(color = cloud, radius = 68f, center = Offset(cx - 65f, cy + 18f))
     }
     val coverage = kotlin.math.sin(p * Math.PI).toFloat()
-    drawRect(color = Color(0xFFF4F8FF).copy(alpha = coverage.coerceIn(0f, 1f)))
+    drawRect(color = Color(0xFFF4F8FF).copy(alpha = coverage.coerceIn(0f, 1f)), size = Size(w, h))
 }
 
 /**
  * `drawQteRing()` : l'anneau-cible fixe (vert) et l'anneau blanc qui
  * rétrécit. Il faut taper quand les deux tailles coïncident.
  */
-private fun DrawScope.drawQteRings(currentRadius: Float, targetRadius: Float) {
-    val center = Offset(size.width / 2f, size.height * 0.4f)
+private fun DrawScope.drawQteRings(currentRadius: Float, targetRadius: Float, w: Float, h: Float) {
+    val center = Offset(w / 2f, h * 0.4f)
     drawCircle(
         color = Color(0xFF6BFFB0).copy(alpha = 0.9f),
         radius = targetRadius,
@@ -956,10 +973,8 @@ internal fun Ctx2D.drawCrashPlane(pc: PlaneCrashState, cameraX: Float, groundScr
 }
 
 /** Les nuages qui balaient l'écran de droite à gauche au bout de 3 s (`drawPlaneCrashClouds()`). */
-internal fun Ctx2D.drawCrashClouds(pc: PlaneCrashState, k: Float) {
+internal fun Ctx2D.drawCrashClouds(pc: PlaneCrashState, k: Float, w: Float = ds.size.width, h: Float = ds.size.height) {
     if (pc.sweepStart == null) return
-    val w = ds.size.width
-    val h = ds.size.height
     val p = minOf(1f, pc.sweep.toFloat())
     val edge = w * (1.08f - 1.5f * p * p)
     saved {
