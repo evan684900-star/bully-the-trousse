@@ -237,7 +237,7 @@ fun GameRoot() {
         onGifts = { gifts, atLogin ->
             val total = Gifts.total(gifts)
             if (total > 0) {
-                updateSave(save.copy(money = save.money + total))
+                updateSave(save.copy(money = Gifts.credit(save.money, total)))
                 if (atLogin) {
                     receivedGifts = Gifts.linesBySender(gifts) to total
                 } else {

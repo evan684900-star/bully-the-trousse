@@ -71,7 +71,7 @@ object Gifts {
         for (gift in gifts) {
             val amount = gift.amount.coerceAtLeast(0)
             val previous = merged[gift.senderUid]
-            merged[gift.senderUid] = (previous?.first ?: gift.senderPseudo) to ((previous?.second ?: 0) + amount)
+            merged[gift.senderUid] = (previous?.first ?: gift.senderPseudo) to credit(previous?.second ?: 0, amount)
         }
         return merged.values.filter { it.second > 0 }
     }
@@ -84,12 +84,20 @@ object Gifts {
             val previous = merged[gift.senderUid]
             merged[gift.senderUid] = GiftLine(
                 pseudo = previous?.pseudo ?: gift.senderPseudo,
-                amount = (previous?.amount ?: 0) + amount,
+                amount = credit(previous?.amount ?: 0, amount),
                 android = (previous?.android ?: false) || gift.senderAndroid,
             )
         }
         return merged.values.filter { it.amount > 0 }
     }
 
-    fun total(gifts: List<IncomingGift>): Int = gifts.sumOf { it.amount.coerceAtLeast(0) }
+    fun total(gifts: List<IncomingGift>): Int = gifts.fold(0) { sum, gift -> credit(sum, gift.amount) }
+
+    /**
+     * Ajoute un cadeau à [money] sans jamais déborder : les cadeaux n'ont plus
+     * de plafond, mais l'argent de l'app tient dans un Int (≈ 2,1 milliards).
+     * Au-delà, il reste bloqué au maximum au lieu de repasser en négatif.
+     */
+    fun credit(money: Int, amount: Int): Int =
+        (money.toLong() + amount.coerceAtLeast(0)).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
 }

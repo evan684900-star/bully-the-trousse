@@ -61,4 +61,20 @@ class GiftsTest {
         )
         assertEquals(listOf(GiftLine("Robot", 25, true), GiftLine("Web", 5, false)), lines)
     }
+
+    @Test
+    fun `un gros cadeau passe sans plafond et sans faire deborder l argent`() {
+        // Plus de plafond à 1 000 000 : 5 millions passent tels quels.
+        assertEquals(GiftCheck.Ok(5_000_000), Gifts.check("5000000", money = 6_000_000, lastSentAtMillis = 0, nowMillis = 100_000))
+        assertEquals(7_000_000, Gifts.credit(2_000_000, 5_000_000))
+        // Au-delà de l'Int, l'argent reste au maximum au lieu de passer en négatif.
+        assertEquals(Int.MAX_VALUE, Gifts.credit(Int.MAX_VALUE - 10, 2_000_000_000))
+        val gifts = listOf(
+            IncomingGift("a", "A", 2_000_000_000),
+            IncomingGift("a", "A", 2_000_000_000),
+            IncomingGift("b", "B", -5),
+        )
+        assertEquals(Int.MAX_VALUE, Gifts.total(gifts))
+        assertEquals(listOf(GiftLine("A", Int.MAX_VALUE, false)), Gifts.linesBySender(gifts))
+    }
 }

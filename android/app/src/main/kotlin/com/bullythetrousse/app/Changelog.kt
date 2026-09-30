@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (112
+ * Le journal des changements du site, repris intégralement (113
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,11 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.6.3",
+        listOf(),
+        listOf(ChangelogLine("Cadeaux : plus de limite de 1 000 000 \$ par envoi, tu peux offrir autant d'argent que tu en as", "Gifts: no more \$1,000,000 limit per gift, you can send as much money as you have")),
+    ),
     ChangelogEntry(
         "11.6.2",
         listOf(),

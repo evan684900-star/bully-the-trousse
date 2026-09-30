@@ -58,7 +58,12 @@
         dayCache[d] = out;
         return out;
     }
-    let forcedEvent = null;
+    // TEST TEMPORAIRE — coupure de courant forcée pendant 24 h à chaque chargement du jeu.
+    // Pour l'enlever : repasser TEST_FORCED_OUTAGE à false (ou supprimer ces lignes).
+    const TEST_FORCED_OUTAGE = true;
+    let forcedEvent = TEST_FORCED_OUTAGE
+        ? { type: "coupure", start: Date.now(), end: Date.now() + DAY, forced: true }
+        : null;
     function activeEvent(now) {
         now = now || Date.now();
         if (forcedEvent && now < forcedEvent.end) return forcedEvent;
