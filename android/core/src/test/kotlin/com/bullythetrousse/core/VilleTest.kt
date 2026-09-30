@@ -142,6 +142,14 @@ class VilleTest {
     }
 
     @Test
+    fun `les flaques vont jusqu'a 2 000 000 m et s'arretent apres`() {
+        val scale = PhysicsConstants.SCALE
+        // Pluie : 70 % des cases ont une flaque, 40 cases tirées de chaque côté.
+        assertTrue(VilleRooftop.puddlesInRange(1_900_000.0 * scale, 1_901_500.0 * scale, VilleEventType.PLUIE, 7.0).isNotEmpty())
+        assertTrue(VilleRooftop.puddlesInRange(2_000_100.0 * scale, 2_010_000.0 * scale, VilleEventType.PLUIE, 7.0).isEmpty())
+    }
+
+    @Test
     fun `puddleAt detecte l'interieur d'une flaque et pas le bord exterieur`() {
         assertTrue(VilleRooftop.puddleAt(1236.0, VilleEventType.PLUIE, 123.456))
         assertTrue(VilleRooftop.puddleAt(1236.4892579881882 + 74.8, VilleEventType.PLUIE, 123.456))

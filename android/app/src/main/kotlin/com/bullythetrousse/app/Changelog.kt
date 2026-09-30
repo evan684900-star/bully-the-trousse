@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (111
+ * Le journal des changements du site, repris intégralement (112
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,11 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.6.2",
+        listOf(),
+        listOf(ChangelogLine("Plage : le décor (parasols, serviettes, châteaux de sable) va maintenant jusqu'à 2 000 000 m au lieu de 100 000 m, sans ralentir le jeu", "Beach: the scenery (umbrellas, towels, sandcastles) now goes up to 2,000,000 m instead of 100,000 m, without slowing the game down"), ChangelogLine("Ville : les flaques sur le toit vont maintenant jusqu'à 2 000 000 m au lieu de 500 000 m", "City: rooftop puddles now go up to 2,000,000 m instead of 500,000 m"), ChangelogLine("Ville : fin de la pluie de test, la météo suit de nouveau son programme normal", "City: the test rain is over, the weather follows its normal schedule again")),
+    ),
     ChangelogEntry(
         "11.6.1",
         listOf(),
@@ -294,15 +299,15 @@ private fun changelogPart0(): List<ChangelogEntry> = listOf(
         listOf(),
         listOf(ChangelogLine("Chaque monde a maintenant sa propre musique de fond : une piste pour la Plage, une pour les Volcans, en plus de celle du monde normal. Le changement se fait automatiquement en changeant de monde", "Each world now has its own background music: one track for the Beach, one for the Volcanoes, on top of the normal world's. It switches automatically when you change world"), ChangelogLine("Nouveau succès \"Adorateur de la musique\" : écouter la musique de fond sans coupure pendant 3h d'affilée", "New \"Music worshipper\" achievement: listen to the background music without interruption for 3 hours straight")),
     ),
+)
+
+// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
+private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "9.0.0",
         listOf(ChangelogLine("Le classement (monde normal ET Plage) n'est plus limité à un top 15 : il affiche tout le monde, sans exception (l'ancien rappel de \"ta ligne\" en bas de classement n'a donc plus lieu d'être)", "The leaderboard (normal world AND Beach) is no longer capped at a top 15: it now shows everyone, no exceptions (the old \"your row\" recall at the bottom is no longer needed)"), ChangelogLine("Le code de récupération (Réglages) couvre maintenant aussi le classement de la Plage : récupérer sa partie sur un autre appareil retire proprement l'ancienne entrée des deux classements", "The recovery code (Settings) now also covers the Beach leaderboard: recovering your save on another device properly retires the old entry from both leaderboards")),
         listOf(),
     ),
-)
-
-// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
-private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "8.1.7",
         listOf(),

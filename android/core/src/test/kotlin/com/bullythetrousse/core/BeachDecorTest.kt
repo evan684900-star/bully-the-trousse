@@ -4,6 +4,7 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /** Valeurs de référence calculées depuis drawBeachBackground()/
@@ -56,10 +57,34 @@ class BeachDecorTest {
     }
 
     @Test
-    fun `decorativeProps couvre jusqu'a 100 000m par defaut`() {
-        val props = BeachDecor.decorativeProps()
-        val lastX = props.last().worldX
-        assertTrue(lastX >= 100000.0 * PhysicsConstants.SCALE - BeachDecor.PROP_SLOT)
+    fun `le decor couvre jusqu'a 2 000 000 m et s'arrete apres`() {
+        val last = BeachDecor.propInSlot(BeachDecor.PROP_COUNT - 1)
+        assertTrue(last != null && last.worldX >= 2_000_000.0 * PhysicsConstants.SCALE - BeachDecor.PROP_SLOT)
+        assertNull(BeachDecor.propInSlot(BeachDecor.PROP_COUNT))
+        assertNull(BeachDecor.propInSlot(-1))
+        assertEquals(BeachDecor.PROP_COUNT, BeachDecor.decorativeProps().size)
+    }
+
+    @Test
+    fun `propInSlot donne les memes accessoires que decorativeProps`() {
+        val props = BeachDecor.decorativeProps(count = 50)
+        props.forEachIndexed { i, prop -> assertEquals(prop, BeachDecor.propInSlot(i)) }
+    }
+
+    @Test
+    fun `visiblePropIndices n'oublie aucun accessoire a l'ecran`() {
+        val screenWidth = 412.0
+        var cameraX = 0.0
+        while (cameraX < 2_000_100.0 * PhysicsConstants.SCALE) {
+            val range = BeachDecor.visiblePropIndices(cameraX, screenWidth)
+            val around = (range.first - 3)..(range.last + 3)
+            for (i in around) {
+                val prop = BeachDecor.propInSlot(i) ?: continue
+                val sx = prop.worldX - cameraX
+                if (sx >= -160.0 && sx <= screenWidth + 160.0) assertTrue(i in range, "case $i oubliée à cameraX=$cameraX")
+            }
+            cameraX += 7919.0
+        }
     }
 
     private fun assertClose(expected: Double, actual: Double, tolerance: Double = 1e-9) {

@@ -33,8 +33,8 @@ data class PuddleRelaunch(
  */
 object VilleRooftop {
     /** Distance de génération des flaques : calculées à la demande, aucune
-     *  liste à stocker, même jusqu'à 500 000 m. */
-    const val PUDDLE_MAX_METERS = 500_000.0
+     *  liste à stocker, même jusqu'à 2 000 000 m. */
+    const val PUDDLE_MAX_METERS = 2_000_000.0
     const val SLIDE_SECONDS = 3.0
 
     /** La barre de relance ne bloque jamais : tir automatique au bout de 6 s. */

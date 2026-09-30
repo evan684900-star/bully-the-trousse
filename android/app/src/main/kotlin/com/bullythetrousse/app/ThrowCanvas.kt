@@ -557,16 +557,15 @@ private fun DrawScope.drawBeachDecor(cameraX: Double, screenWidth: Double, groun
             drawCircle(color = Color(0xFFFFF3E0), radius = 3f, center = Offset(sx.toFloat() + 34f, groundScreenY + 34f))
         }
     }
-    for (prop in beachDecorProps) {
+    // Seules les cases à l'écran sont calculées (voir BeachDecor.propInSlot) :
+    // la plage va jusqu'à 2 000 000 m.
+    for (index in BeachDecor.visiblePropIndices(cameraX, screenWidth)) {
+        val prop = BeachDecor.propInSlot(index) ?: continue
         val sx = prop.worldX - cameraX
         if (sx < -160.0 || sx > screenWidth + 160.0) continue
         drawBeachProp(prop.type, sx.toFloat(), groundScreenY + prop.depth.toFloat(), prop.scale.toFloat())
     }
 }
-
-/** Générée une seule fois (déterministe, voir BeachDecor.decorativeProps) :
- *  pas besoin de la recalculer à chaque frame. */
-private val beachDecorProps by lazy { BeachDecor.decorativeProps() }
 
 /** Modulo qui reste toujours positif (contrairement à `%` en Kotlin comme en
  *  JS, qui garde le signe du dividende) : utile pour les motifs qui

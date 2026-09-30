@@ -1453,7 +1453,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.6.1</div>
+                <div class="version-tag" id="version-tag">v11.6.2</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -7610,7 +7610,7 @@
 
     /* ---- Décor du monde Plage ---- */
     // Sable jaune, petites dunes, coquillages, mer à l'horizon, plus les
-    // accessoires tirés au hasard pour ce lancer (voir beachProps).
+    // accessoires tirés au hasard pour ce lancer (voir beachDecorInSlot).
     function drawBeachBackground(w, h) {
         groundScreenY = h * 0.68 + cameraY;
         const night = save.theme === "dark";
@@ -7712,22 +7712,35 @@
         }
     }
 
-    // Dessine les accessoires posés sur le sable pour ce lancer (voir beachProps)
+    // Dessine les accessoires posés sur le sable pour ce lancer : le décor
+    // des cases visibles (voir beachDecorInSlot), puis ceux des évènements
+    // (voir beachProps), par-dessus.
     function drawBeachProps(w, h) {
-        beachProps.forEach((prop) => {
-            const sx = prop.x - cameraX;
-            if (sx < -160 || sx > w + 160) return;
-            const baseY = groundScreenY + (prop.depth || 0);
-            if (prop.type === "parasol") drawParasol(ctx, sx, baseY, prop.seed, prop.scale || 1);
-            else if (prop.type === "towel") drawTowel(ctx, sx, baseY, prop.seed);
-            else if (prop.type === "castle") drawSandcastle(ctx, sx, baseY, prop.seed, prop.collapsed);
-        });
+        const slot = BEACH_DECOR_SLOT;
+        const first = Math.max(0, Math.floor((cameraX - 160 - 350 - (slot - 220)) / slot));
+        const last = Math.floor((cameraX + w + 160 - 350) / slot);
+        for (let i = first; i <= last; i++) {
+            const prop = beachDecorInSlot(i);
+            if (prop && !beachDecorHidden(prop)) drawBeachProp(prop, w);
+        }
+        beachProps.forEach((prop) => drawBeachProp(prop, w));
+    }
+
+    function drawBeachProp(prop, w) {
+        const sx = prop.x - cameraX;
+        if (sx < -160 || sx > w + 160) return;
+        const baseY = groundScreenY + (prop.depth || 0);
+        if (prop.type === "parasol") drawParasol(ctx, sx, baseY, prop.seed, prop.scale || 1);
+        else if (prop.type === "towel") drawTowel(ctx, sx, baseY, prop.seed);
+        else if (prop.type === "castle") drawSandcastle(ctx, sx, baseY, prop.seed, prop.collapsed);
     }
 
     /* ---- Accessoires et évènements d'un lancer ---- */
-    // beachProps : ce qui est posé sur le sable pour CE lancer. La plage est
-    // regénérée à chaque lancer, donc rien n'est jamais deux fois au même
-    // endroit (voir generateBeachDecor / beachPlaceLandingProp).
+    // beachProps : les accessoires des évènements de CE lancer (celui de
+    // l'atterrissage, ceux de la cinématique). Chacun dégage le décor autour
+    // de lui (`clear`, en px) pour ne jamais empiler deux objets. Le décor,
+    // lui, est retiré à chaque lancer (voir generateBeachDecor), donc rien
+    // n'est jamais deux fois au même endroit.
     let beachProps = [];
     let beachEvents = { parasol: false, towel: false, castle: false };
     let beachUsed = { parasol: false, towel: false, castle: false };
@@ -7735,31 +7748,43 @@
 
     // Décor purement visuel semé un peu partout devant la trousse : c'est lui
     // qui donne l'impression d'une plage différente à chaque lancer.
+    // Réparti par cases (jamais deux objets au même endroit), mais avec une
+    // position aléatoire DANS sa case : la plage change vraiment d'un lancer
+    // à l'autre sans jamais s'empiler. Couvre jusqu'à 2 000 000 m, calculé à
+    // la demande comme les flaques de la Ville : l'objet d'une case ne dépend
+    // que de son numéro et de la graine du lancer, donc rien à générer
+    // d'avance (plus de 46 000 objets à cette distance) et chaque image ne
+    // regarde que les cases à l'écran.
+    const BEACH_DECOR_SLOT = 520;
+    const BEACH_DECOR_MAX_M = 2000000;
+    let beachDecorSeed = 0;
+    let beachCollapsedSlots = new Set(); // châteaux du décor écrasés pendant ce lancer
+
     function generateBeachDecor() {
         beachProps = [];
-        // Réparti par tranches (jamais deux objets au même endroit), mais avec
-        // une position aléatoire DANS sa tranche : la plage change vraiment
-        // d'un lancer à l'autre sans jamais s'empiler.
-        const slot = 520;
-        // Couvre jusqu'à 100 000m : des joueurs dépassent déjà les 50 000m avec
-        // des niveaux Puissance/Vitesse élevés, laissant la plage vide au-delà
-        // de la portée générée. Le culling de drawBeachProps limite déjà le
-        // coût de rendu au champ visible, donc étendre ce tableau ne coûte
-        // rien à l'affichage (juste plus d'entrées dans un tableau généré une
-        // seule fois par lancer, jamais par frame).
-        const count = Math.ceil((100000 * SCALE) / slot);
-        for (let i = 0; i < count; i++) {
-            const roll = Math.random();
-            const type = roll < 0.4 ? "parasol" : (roll < 0.75 ? "towel" : "castle");
-            beachProps.push({
-                type,
-                x: 350 + i * slot + Math.random() * (slot - 220),
-                seed: Math.random() * 1000,
-                scale: 0.8 + Math.random() * 0.4,
-                depth: 10 + Math.random() * 40,
-                decorative: true,
-            });
-        }
+        beachDecorSeed = Math.random() * 1000;
+        beachCollapsedSlots = new Set();
+    }
+
+    // L'accessoire de la case i, ou null au-delà de la portée.
+    function beachDecorInSlot(i) {
+        const slot = BEACH_DECOR_SLOT;
+        if (i < 0 || (i * slot) / SCALE > BEACH_DECOR_MAX_M) return null;
+        const roll = seededRand(i * 5.17 + beachDecorSeed);
+        return {
+            type: roll < 0.4 ? "parasol" : (roll < 0.75 ? "towel" : "castle"),
+            x: 350 + i * slot + seededRand(i * 2.39 + beachDecorSeed) * (slot - 220),
+            seed: seededRand(i * 3.83 + beachDecorSeed) * 1000,
+            scale: 0.8 + seededRand(i * 1.61 + beachDecorSeed) * 0.4,
+            depth: 10 + seededRand(i * 4.27 + beachDecorSeed) * 40,
+            collapsed: beachCollapsedSlots.has(i),
+            slot: i,
+        };
+    }
+
+    // Un accessoire d'évènement est posé tout près : le décor lui laisse la place.
+    function beachDecorHidden(prop) {
+        return beachProps.some((p) => p.clear && Math.abs(p.x - prop.x) < p.clear);
     }
 
     // Tirage des évènements de ce lancer (voir BEACH_EVENT_CHANCE)
@@ -7791,10 +7816,10 @@
         else if (beachEvents.castle && !beachUsed.castle) type = "castle";
         if (!type) return;
         const x = predictLandingX();
-        // enlève l'ancien accessoire d'évènement (repositionné après un boost/rebond)
-        // et tout accessoire décoratif trop proche, pour ne pas empiler deux objets
-        beachProps = beachProps.filter((p) => !p.event && !(p.decorative && Math.abs(p.x - x) < 140));
-        beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1, depth: 0, event: true });
+        // enlève l'ancien accessoire d'évènement (repositionné après un boost/rebond) ;
+        // le nouveau masque le décor trop proche, pour ne pas empiler deux objets
+        beachProps = beachProps.filter((p) => !p.event);
+        beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1, depth: 0, event: true, clear: 140 });
     }
 
     // Appelé juste après le lancer (voir lockAccuracyAndLaunch). En dessous de
@@ -7839,14 +7864,22 @@
             beachUsed.castle = true;
             beachLog.push("castle");
             save.plageCastlesCrushed++;
-            // le château le plus proche s'effondre sur la trousse
+            // le château le plus proche s'effondre sur la trousse (celui de
+            // l'évènement, ou un château du décor dans les cases voisines)
             let best = null, bestD = 200;
-            beachProps.forEach((p) => {
+            const candidates = beachProps.slice();
+            const slotAt = Math.floor((worldX - 350) / BEACH_DECOR_SLOT);
+            for (let i = slotAt - 1; i <= slotAt + 1; i++) {
+                const p = beachDecorInSlot(i);
+                if (p && !beachDecorHidden(p)) candidates.push(p);
+            }
+            candidates.forEach((p) => {
                 if (p.type !== "castle") return;
                 const d = Math.abs(p.x - worldX);
                 if (d < bestD) { bestD = d; best = p; }
             });
-            if (best) best.collapsed = true;
+            if (best && best.slot !== undefined) beachCollapsedSlots.add(best.slot);
+            else if (best) best.collapsed = true;
         }
     }
 
@@ -8001,8 +8034,7 @@
     // décor aléatoire autour pour ne pas empiler deux objets au même endroit.
     function bcAddProp(type, ahead) {
         const x = bcTrousseWorldX() + ahead;
-        beachProps = beachProps.filter((p) => !(p.decorative && Math.abs(p.x - x) < 200));
-        beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1.25, depth: BCINE_FG });
+        beachProps.push({ type, x, seed: Math.random() * 1000, scale: 1.25, depth: BCINE_FG, clear: 200 });
     }
 
     // File de textes "appuyer n'importe où pour continuer" : le jeu se fige
@@ -8463,7 +8495,7 @@
     let villePuddleSeed = 0; // flaques tirées au hasard à chaque lancer
     let villeSlideV = 0;
     let villeHintShown = "";
-    const VILLE_PUDDLE_MAX_M = 500000; // distance de génération des flaques
+    const VILLE_PUDDLE_MAX_M = 2000000; // distance de génération des flaques
     const VILLE_SLIDE_SECONDS = 3;
 
     function villeResetThrow() {
@@ -8493,7 +8525,7 @@
     }
 
     // Flaques : une "case" tous les N mètres, qui contient (ou non) une flaque.
-    // Calcul à la demande : aucune liste à stocker, même jusqu'à 500 000 m.
+    // Calcul à la demande : aucune liste à stocker, même jusqu'à 2 000 000 m.
     function villePuddleParams() {
         const t = villeEventType();
         if (t === "fuite") return { seg: 70 * SCALE, chance: 0.4, half: 55 };
@@ -10943,8 +10975,17 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.6.1";
+    const VERSION_NUMBER = "11.6.2";
     const CHANGELOG = [
+        {
+            version: "11.6.2",
+            major: [],
+            minor: [
+                { fr: "Plage : le décor (parasols, serviettes, châteaux de sable) va maintenant jusqu'à 2 000 000 m au lieu de 100 000 m, sans ralentir le jeu", en: "Beach: the scenery (umbrellas, towels, sandcastles) now goes up to 2,000,000 m instead of 100,000 m, without slowing the game down" },
+                { fr: "Ville : les flaques sur le toit vont maintenant jusqu'à 2 000 000 m au lieu de 500 000 m", en: "City: rooftop puddles now go up to 2,000,000 m instead of 500,000 m" },
+                { fr: "Ville : fin de la pluie de test, la météo suit de nouveau son programme normal", en: "City: the test rain is over, the weather follows its normal schedule again" },
+            ],
+        },
         {
             version: "11.6.1",
             major: [],
