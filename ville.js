@@ -58,12 +58,7 @@
         dayCache[d] = out;
         return out;
     }
-    // TEST TEMPORAIRE — pluie forcée pendant 24 h à chaque chargement du jeu.
-    // Pour l'enlever : repasser TEST_FORCED_RAIN à false (ou supprimer ces lignes).
-    const TEST_FORCED_RAIN = true;
-    let forcedEvent = TEST_FORCED_RAIN
-        ? { type: "pluie", start: Date.now(), end: Date.now() + DAY, forced: true }
-        : null;
+    let forcedEvent = null;
     function activeEvent(now) {
         now = now || Date.now();
         if (forcedEvent && now < forcedEvent.end) return forcedEvent;
