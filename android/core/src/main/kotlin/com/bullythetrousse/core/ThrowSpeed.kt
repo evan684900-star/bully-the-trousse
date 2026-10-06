@@ -7,9 +7,9 @@ package com.bullythetrousse.core
  * d'avion et d'atterrissage), simplement enchaînés plus vite.
  */
 object ThrowSpeed {
-    val SPEEDS = listOf(1, 2, 4)
+    val SPEEDS = listOf(1, 2, 4, 10)
 
-    /** Chaque appui passe à la vitesse suivante : ×1 → ×2 → ×4 → ×1. */
+    /** Chaque appui passe à la vitesse suivante : ×1 → ×2 → ×4 → ×10 → ×1. */
     fun next(current: Int): Int = SPEEDS[(SPEEDS.indexOf(current) + 1) % SPEEDS.size]
 
     /** Une valeur relue du stockage, ramenée à une vitesse connue. */
