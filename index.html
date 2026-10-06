@@ -1453,7 +1453,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.6.5</div>
+                <div class="version-tag" id="version-tag">v11.6.6</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -6156,7 +6156,7 @@
     // Accélération du vol (bouton ⏩, pratique quand un lancer dure trop
     // longtemps) : nombre de pas de physique joués par image pendant le vol et
     // le dérapage. Réglage propre à cet appareil, gardé d'un lancer à l'autre.
-    const THROW_SPEEDS = [1, 2, 4, 10];
+    const THROW_SPEEDS = [1, 2, 4, 10, 100];
     const THROW_SPEED_KEY = "bullyTrousseThrowSpeed";
     let throwSpeed = THROW_SPEEDS.includes(Number(lsGet(THROW_SPEED_KEY))) ? Number(lsGet(THROW_SPEED_KEY)) : 1;
     let throwSpeedBtnShown = false;
@@ -10975,8 +10975,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.6.5";
+    const VERSION_NUMBER = "11.6.6";
     const CHANGELOG = [
+        {
+            version: "11.6.6",
+            major: [],
+            minor: [
+                { fr: "Bouton ⏩ pendant le lancer : une vitesse ×100 en plus (×1 → ×2 → ×4 → ×10 → ×100), pour les lancers gigantesques. La trajectoire et la distance ne changent pas", en: "⏩ button during the throw: an extra ×100 speed (×1 → ×2 → ×4 → ×10 → ×100), for gigantic throws. The trajectory and distance don't change" },
+            ],
+        },
         {
             version: "11.6.5",
             major: [],

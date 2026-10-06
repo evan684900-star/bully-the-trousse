@@ -9,7 +9,8 @@ class ThrowSpeedTest {
         assertEquals(2, ThrowSpeed.next(1))
         assertEquals(4, ThrowSpeed.next(2))
         assertEquals(10, ThrowSpeed.next(4))
-        assertEquals(1, ThrowSpeed.next(10))
+        assertEquals(100, ThrowSpeed.next(10))
+        assertEquals(1, ThrowSpeed.next(100))
     }
 
     @Test
@@ -18,6 +19,7 @@ class ThrowSpeedTest {
         assertEquals(1, ThrowSpeed.sanitize(3))
         assertEquals(4, ThrowSpeed.sanitize(4))
         assertEquals(10, ThrowSpeed.sanitize(10))
+        assertEquals(100, ThrowSpeed.sanitize(100))
         assertEquals(2, ThrowSpeed.next(ThrowSpeed.sanitize(99)))
     }
 }

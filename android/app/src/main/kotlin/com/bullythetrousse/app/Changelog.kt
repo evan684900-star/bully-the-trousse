@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (115
+ * Le journal des changements du site, repris intégralement (116
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,11 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.6.6",
+        listOf(),
+        listOf(ChangelogLine("Bouton ⏩ pendant le lancer : une vitesse ×100 en plus (×1 → ×2 → ×4 → ×10 → ×100), pour les lancers gigantesques. La trajectoire et la distance ne changent pas", "⏩ button during the throw: an extra ×100 speed (×1 → ×2 → ×4 → ×10 → ×100), for gigantic throws. The trajectory and distance don't change")),
+    ),
     ChangelogEntry(
         "11.6.5",
         listOf(),
@@ -304,15 +309,15 @@ private fun changelogPart0(): List<ChangelogEntry> = listOf(
         listOf(),
         listOf(ChangelogLine("4 nouvelles traînées : Encre (un ruban épais qui bave en taches), Confettis (des rectangles multicolores qui tournoient en tombant), Aurore (de grands rideaux boréaux qui ondulent du vert au violet) et Trou Noir (la lumière aspirée en spirale derrière la trousse)", "4 new trails: Ink (a thick ribbon that bleeds into blots), Confetti (multicolored rectangles tumbling as they fall), Aurora (big northern-lights curtains rippling from green to violet) and Black Hole (light sucked into a spiral behind the pencil case)"), ChangelogLine("Traînées bien plus réalistes : le sillage est maintenant un vrai ruban fuselé et lissé (fini le chapelet de segments), il ondule avec sa propre turbulence comme de la fumée, et un halo lumineux qui palpite est collé à la trousse", "Much more realistic trails: the wake is now a real tapered, smoothed ribbon (no more string of segments), it ripples with its own turbulence like smoke, and a pulsing glow is attached to the pencil case"), ChangelogLine("Étincelles retouchées : chaque particule baigne dans sa propre lueur, et les fumées/taches ont des bords flous au lieu de cercles nets", "Reworked sparks: every particle now sits in its own bloom, and smoke/blots have soft edges instead of hard circles")),
     ),
+)
+
+// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
+private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "9.2.0",
         listOf(),
         listOf(ChangelogLine("Une trousse déjà lancée peut maintenant être mise en pause : ouvrir les Réglages (⚙️) pendant le vol fige la partie, et la refermer la reprend exactement où elle en était", "A pencil case already in the air can now be paused: opening Settings (⚙️) mid-flight freezes the game, and closing it resumes exactly where you left off")),
     ),
-)
-
-// Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
-private fun changelogPart1(): List<ChangelogEntry> = listOf(
     ChangelogEntry(
         "9.1.0",
         listOf(),
