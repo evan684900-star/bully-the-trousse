@@ -3,7 +3,7 @@ package com.bullythetrousse.app
 // FICHIER GÉNÉRÉ depuis CHANGELOG (index.html) : ne pas éditer à la main.
 
 /**
- * Le journal des changements du site, repris intégralement (116
+ * Le journal des changements du site, repris intégralement (117
  * versions, même ordre, entrées majeures et mineures) dans les deux langues.
  * Accessible en touchant le numéro de version sur le menu, comme
  * `#version-tag` côté web.
@@ -19,6 +19,11 @@ val CHANGELOG: List<ChangelogEntry> by lazy { changelogPart0() + changelogPart1(
 
 // Découpé en deux fonctions : une seule dépasserait la taille de méthode JVM.
 private fun changelogPart0(): List<ChangelogEntry> = listOf(
+    ChangelogEntry(
+        "11.7.0",
+        listOf(ChangelogLine("Boutique : deux boutons +10 et +100 sous le prix de Puissance et de Vitesse pour acheter plusieurs niveaux d'un coup. Chaque niveau garde son propre prix, et si tu n'as pas assez d'argent pour tous, tu en prends autant que possible", "Shop: two +10 and +100 buttons under the Power and Speed price to buy several levels at once. Each level keeps its own price, and if you can't afford them all, you get as many as you can")),
+        listOf(),
+    ),
     ChangelogEntry(
         "11.6.6",
         listOf(),

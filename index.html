@@ -784,6 +784,9 @@
                 linear-gradient(90deg, rgba(255,235,180,0.12), rgba(255,235,180,0.75));
         }
         .upgrade-card .info, .skin-card .info { flex: 1; }
+        /* Prix d'un niveau puis +10 / +100 : trois boutons empilés, de même largeur */
+        .upgrade-buy { display: flex; flex-direction: column; gap: 6px; }
+        .upgrade-buy .btn { width: 100%; }
         .upgrade-card .info h3, .skin-card .info h3 { margin: 0 0 4px; font-size: 15px; }
         .upgrade-card .info p, .skin-card .info p { margin: 0; font-size: 12px; color: var(--text-dim); }
         .skin-card img {
@@ -1453,7 +1456,7 @@
         <div class="menu-wrap">
             <div class="title-card">
                 <!-- Clic = ouvre le journal des changements (#changelog-modal) -->
-                <div class="version-tag" id="version-tag">v11.6.6</div>
+                <div class="version-tag" id="version-tag">v11.7.0</div>
                 <h1>🎒 Bully the Trousse</h1>
                 <p data-i18n="menuSubtitle">Lance ta trousse le plus loin possible !</p>
             </div>
@@ -3612,42 +3615,12 @@
             body.appendChild(buildUpgradeCard(
                 "💪", tr("upgradePuissanceName"), save.puissanceLevel,
                 tr("upgradePuissanceDesc"),
-                () => {
-                    const cost = upgradeCost(save.puissanceLevel);
-                    if (save.money >= cost) {
-                        save.money -= cost;
-                        save.puissanceLevel++;
-                        bumpDailyChallenge("spend", cost, "add");
-                        persist();
-                        sfxBuy();
-                        showToast("✅ " + tr("upgradePuissanceName") + " (" + tr("levelShort") + save.puissanceLevel + ")");
-                        refreshShop();
-                        playPurchasePop();
-                    } else {
-                        sfxError();
-                        showToast(tr("notEnoughMoney"));
-                    }
-                }
+                (count) => buyUpgradeLevels("puissanceLevel", "upgradePuissanceName", count)
             ));
             body.appendChild(buildUpgradeCard(
                 "⚡", tr("upgradeVitesseName"), save.vitesseLevel,
                 tr("upgradeVitesseDesc"),
-                () => {
-                    const cost = upgradeCost(save.vitesseLevel);
-                    if (save.money >= cost) {
-                        save.money -= cost;
-                        save.vitesseLevel++;
-                        bumpDailyChallenge("spend", cost, "add");
-                        persist();
-                        sfxBuy();
-                        showToast("✅ " + tr("upgradeVitesseName") + " (" + tr("levelShort") + save.vitesseLevel + ")");
-                        refreshShop();
-                        playPurchasePop();
-                    } else {
-                        sfxError();
-                        showToast(tr("notEnoughMoney"));
-                    }
-                }
+                (count) => buyUpgradeLevels("vitesseLevel", "upgradeVitesseName", count)
             ));
             // Réparation : n'apparaît qu'une fois le monde Volcan découvert,
             // puisque les dérapages y sont la seule source de dégâts. Inutile
@@ -3735,7 +3708,39 @@
         return card;
     }
 
+    // Achète jusqu'à `count` niveaux d'un coup (boutons +10 / +100), chacun au
+    // prix de son propre niveau (le prix monte à chaque achat). Si l'argent ne
+    // suffit pas pour tous, on prend autant de niveaux que possible ; s'il ne
+    // couvre même pas le premier, rien n'est acheté.
+    function buyUpgradeLevels(field, nameKey, count) {
+        let bought = 0, spent = 0;
+        while (bought < count) {
+            const cost = upgradeCost(save[field] + bought);
+            if (save.money < spent + cost) break;
+            spent += cost;
+            bought++;
+        }
+        if (bought === 0) {
+            sfxError();
+            showToast(tr("notEnoughMoney"));
+            return;
+        }
+        save.money -= spent;
+        save[field] += bought;
+        bumpDailyChallenge("spend", spent, "add");
+        persist();
+        sfxBuy();
+        showToast("✅ " + tr(nameKey) + " (" + tr("levelShort") + save[field] + ")" + (bought > 1 ? " +" + bought : ""));
+        refreshShop();
+        playPurchasePop();
+    }
+
+    // Quantités des boutons d'achat groupé d'une carte d'amélioration.
+    const UPGRADE_BULK_COUNTS = [10, 100];
+
     // Crée une carte d'amélioration (Puissance ou Vitesse) avec son bouton d'achat
+    // (un niveau, avec son prix) et les boutons +10 / +100 en dessous. `onBuy`
+    // reçoit le nombre de niveaux voulus.
     function buildUpgradeCard(icon, name, level, desc, onBuy) {
         const cost = upgradeCost(level);
         const card = document.createElement("div");
@@ -3744,11 +3749,21 @@
             '<div class="icon">' + icon + '</div>' +
             '<div class="info"><h3>' + name + ' <span class="level-badge">' + tr("levelShort") + level + '</span></h3>' +
             '<p>' + desc + '</p></div>';
+        const buy = document.createElement("div");
+        buy.className = "upgrade-buy";
         const btn = document.createElement("button");
         btn.className = "btn small";
         btn.textContent = cost + " $";
-        btn.addEventListener("click", onBuy);
-        card.appendChild(btn);
+        btn.addEventListener("click", () => onBuy(1));
+        buy.appendChild(btn);
+        UPGRADE_BULK_COUNTS.forEach((count) => {
+            const bulk = document.createElement("button");
+            bulk.className = "btn small secondary";
+            bulk.textContent = "+" + count;
+            bulk.addEventListener("click", () => onBuy(count));
+            buy.appendChild(bulk);
+        });
+        card.appendChild(buy);
         return card;
     }
 
@@ -10975,8 +10990,15 @@
     //   Y (mineur)  = nouvelle fonctionnalité ou rééquilibrage notable, mais qui
     //                 ne change pas la nature du jeu (ex: nouveau succès, +3%/niveau)
     //   Z (patch)   = correctif de bug, ajustement mineur, retouche visuelle
-    const VERSION_NUMBER = "11.6.6";
+    const VERSION_NUMBER = "11.7.0";
     const CHANGELOG = [
+        {
+            version: "11.7.0",
+            major: [
+                { fr: "Boutique : deux boutons +10 et +100 sous le prix de Puissance et de Vitesse pour acheter plusieurs niveaux d'un coup. Chaque niveau garde son propre prix, et si tu n'as pas assez d'argent pour tous, tu en prends autant que possible", en: "Shop: two +10 and +100 buttons under the Power and Speed price to buy several levels at once. Each level keeps its own price, and if you can't afford them all, you get as many as you can" },
+            ],
+            minor: [],
+        },
         {
             version: "11.6.6",
             major: [],

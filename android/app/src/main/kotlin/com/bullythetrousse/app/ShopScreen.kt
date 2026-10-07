@@ -7,6 +7,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.style.TextAlign
 import com.bullythetrousse.core.Ville
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -208,10 +210,10 @@ private fun UpgradesTab(save: GameSave, actions: ShopActions) {
         levelBadge = "$level${save.puissanceLevel}",
         leading = { Text("💪", fontSize = 30.sp) },
     ) {
-        GameButton("${Ville.price(Economy.upgradeCost(save.puissanceLevel), save)} $", small = true) {
-            when (val result = Shop.buyPuissance(save)) {
+        UpgradeButtons(save, save.puissanceLevel, buy = { Shop.buyPuissance(save, it) }) { result ->
+            when (result) {
                 is Shop.PurchaseResult.Success ->
-                    actions.purchase(result.save, result.cost, "✅ $puissanceName ($level${result.save.puissanceLevel})")
+                    actions.purchase(result.save, result.cost, upgradeMessage(puissanceName, level, result.save.puissanceLevel, result.levels))
                 else -> actions.notEnoughMoney()
             }
         }
@@ -223,10 +225,10 @@ private fun UpgradesTab(save: GameSave, actions: ShopActions) {
         levelBadge = "$level${save.vitesseLevel}",
         leading = { Text("⚡", fontSize = 30.sp) },
     ) {
-        GameButton("${Ville.price(Economy.upgradeCost(save.vitesseLevel), save)} $", small = true) {
-            when (val result = Shop.buyVitesse(save)) {
+        UpgradeButtons(save, save.vitesseLevel, buy = { Shop.buyVitesse(save, it) }) { result ->
+            when (result) {
                 is Shop.PurchaseResult.Success ->
-                    actions.purchase(result.save, result.cost, "✅ $vitesseName ($level${result.save.vitesseLevel})")
+                    actions.purchase(result.save, result.cost, upgradeMessage(vitesseName, level, result.save.vitesseLevel, result.levels))
                 else -> actions.notEnoughMoney()
             }
         }
@@ -414,3 +416,31 @@ private fun trailBrush(rgb: String): Brush {
     val color = if (parts.size == 3) Color(parts[0], parts[1], parts[2]) else TextColor
     return Brush.horizontalGradient(listOf(color.copy(alpha = 0.15f), color))
 }
+
+/**
+ * Le prix d'un niveau, puis les boutons +10 et +100 du site : on achète
+ * jusqu'à ce nombre de niveaux d'un coup, autant que l'argent le permet.
+ */
+@Composable
+private fun UpgradeButtons(
+    save: GameSave,
+    currentLevel: Int,
+    buy: (count: Int) -> Shop.PurchaseResult,
+    onResult: (Shop.PurchaseResult) -> Unit,
+) {
+    // Largeur du plus large des trois boutons, qu'ils remplissent tous.
+    Column(modifier = Modifier.width(IntrinsicSize.Max), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        GameButton("${Ville.price(Economy.upgradeCost(currentLevel), save)} $", small = true, modifier = Modifier.fillMaxWidth()) {
+            onResult(buy(1))
+        }
+        Shop.BULK_COUNTS.forEach { count ->
+            GameButton("+$count", secondary = true, small = true, modifier = Modifier.fillMaxWidth()) {
+                onResult(buy(count))
+            }
+        }
+    }
+}
+
+/** « ✅ Puissance (N12) », avec « +10 » quand plusieurs niveaux d'un coup. */
+private fun upgradeMessage(name: String, level: String, newLevel: Int, bought: Int): String =
+    "✅ $name ($level$newLevel)" + if (bought > 1) " +$bought" else ""
