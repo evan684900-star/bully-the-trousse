@@ -73,8 +73,8 @@ version du site.
   décor (bâtiments en parallaxe, arbres) est dessiné en pur Canvas, avec son
   placement calculé et testé dans `:core` (`CourDecor`, portage de
   `drawBackground()`/`drawBuilding()`/`drawTree()`/`seededRand()`) ; la
-  trousse elle-même reste une forme vectorielle stylisée (corps + rabat +
-  fermeture éclair), pas encore le vrai sprite bitmap du web.
+  trousse en vol est le vrai sprite du skin équipé (`drawTrousseSprite`,
+  le même que dans le menu), avec son filtre de couleur et son cosmétique.
 - **Sauvegarde locale** : `GameSave` dans `:core` (portage champ par champ de
   `defaultSave()`), sérialisée en JSON par `SaveCodec` (kotlinx.serialization,
   `ignoreUnknownKeys` + valeurs par défaut pour les champs absents — le même
@@ -332,16 +332,32 @@ côté serveur, l'app écrit les mêmes collections avec la même forme.
 1. **Déposer `google-services.json`** (voir « Activer le compte en ligne »
    ci-dessus) : c'est la seule étape qui ne peut pas être faite depuis le
    dépôt, puisqu'elle passe par la console Firebase.
-2. **Cadeaux et abonnements** — l'app lit les compteurs d'abonnés, mais ne
-   permet pas encore de suivre quelqu'un ni d'envoyer de l'argent
-   (`gifts`/`follows` côté site).
-3. **Thème clair et bilingue FR/EN** — les deux boutons des Réglages sont
-   encore inertes : ce sont des refontes transversales qui touchent chaque
-   couleur et chaque texte.
-4. **Monde Ville en anglais** — reprendre les ~150 textes `L(fr, en)` de
+2. **Monde Ville en anglais** — reprendre les ~150 textes `L(fr, en)` de
    `ville.js`/`ville-levels.js` dans `VilleEngine`/`VilleLevels`/
    `VilleCredits` et les panneaux dessinés (voir la section Monde Ville).
 
 Chaque étape devrait suivre le même principe que celle-ci : porter la
 logique dans `:core` avec des tests dont les valeurs de référence viennent
 directement des formules JS, avant de la brancher à l'UI.
+
+## Écarts de design volontaires par rapport au site
+
+Le portage reste fidèle au site, sauf là où le rendu web est peu lisible ou
+peu pratique sur un téléphone :
+
+- **Menu** : « Jouer » en gros bouton pleine largeur, Boutique / Classement /
+  Profil en tuiles sur 3 colonnes, cartes des mondes en grille de 3 colonnes,
+  le tout sur un voile léger (`MenuScrim`) pour rester lisible par-dessus
+  la ligne d'horizon.
+- **Lisibilité** : titre blanc avec contour et ombre, sous-titre sur une
+  pastille, texte doré et vert foncés en thème clair (`AccentText`,
+  `MoneyText` : plus de 4,5:1 sur blanc). Textes d'au moins 12sp, et 14sp
+  pour le corps.
+- **Cartes verrouillées** : cadenas et condition de déblocage écrits sur la
+  carte. La carte Défis porte un point rouge quand une récompense attend.
+- **Toucher** : cibles d'au moins 48dp (numéro de version, boutons ronds,
+  cartes), boutons qui s'enfoncent à l'appui comme `.btn:active`, cartes qui
+  se tassent légèrement, état désactivé (`GameButton(enabled = false)`).
+- **Material** : formes arrondies du jeu appliquées aux champs de saisie
+  (`BullyShapes`), icône thémée d'Android 13+, titre qui suit la police
+  système (plafonné à +30 %).

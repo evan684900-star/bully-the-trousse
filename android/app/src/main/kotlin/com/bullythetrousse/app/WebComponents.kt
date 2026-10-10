@@ -3,6 +3,20 @@
 package com.bullythetrousse.app
 
 import androidx.compose.animation.core.CubicBezierEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
@@ -20,7 +34,6 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
@@ -59,6 +72,10 @@ import kotlinx.coroutines.delay
 /**
  * `.btn` / `.btn.secondary` / `.btn.small` : coins arrondis, texte très
  * gras, et l'ombre "dure" de 5px en dessous (`box-shadow: 0 5px 0`).
+ *
+ * @param large Variante propre à l'app pour le bouton principal du menu
+ *   (« Jouer » en pleine largeur) : texte plus gros, bouton plus haut.
+ * @param enabled Faux : bouton grisé, sans effet au toucher.
  */
 @Composable
 fun GameButton(
@@ -66,18 +83,67 @@ fun GameButton(
     modifier: Modifier = Modifier,
     secondary: Boolean = false,
     small: Boolean = false,
+    large: Boolean = false,
+    enabled: Boolean = true,
     onClick: () -> Unit,
+) {
+    // .btn : 14px de rayon, 14/30 de padding, 18px ; .btn.small : 10px, 10/18, 14px
+    HardShadowButton(
+        modifier = modifier,
+        secondary = secondary,
+        cornerRadius = if (small) 10.dp else 14.dp,
+        contentPadding = PaddingValues(
+            horizontal = if (small) 18.dp else 30.dp,
+            vertical = if (small) 10.dp else if (large) 18.dp else 14.dp,
+        ),
+        enabled = enabled,
+        onClick = onClick,
+    ) { content ->
+        Text(
+            label,
+            color = content,
+            fontSize = if (small) 14.sp else if (large) 22.sp else 18.sp,
+            fontWeight = FontWeight.ExtraBold,
+            letterSpacing = 0.5.sp,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+/**
+ * Le corps commun des boutons "à ombre dure" : la face colorée posée sur son
+ * ombre décalée de 5px. Appuyé, la face s'enfonce de 4px et l'ombre se réduit
+ * à 1px, comme `.btn:active { transform: translateY(4px); box-shadow: 0 1px 0 }`
+ * côté site. Désactivé, le bouton est estompé et ignore les appuis.
+ *
+ * [content] reçoit la couleur de texte à utiliser (sombre sur l'or, blanche
+ * sur le gris-bleu du `.secondary`).
+ */
+@Composable
+fun HardShadowButton(
+    modifier: Modifier = Modifier,
+    secondary: Boolean = false,
+    cornerRadius: Dp = 14.dp,
+    contentPadding: PaddingValues = PaddingValues(horizontal = 30.dp, vertical = 14.dp),
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    content: @Composable (contentColor: Color) -> Unit,
 ) {
     val background = if (secondary) ButtonSecondary else Accent
     val shadowColor = if (secondary) ButtonSecondaryShadow else ButtonAccentShadow
-    val content = if (secondary) Color.White else OnAccent
-    // .btn : 14px de rayon, 14/30 de padding, 18px ; .btn.small : 10px, 10/18, 14px
-    val shape = RoundedCornerShape(if (small) 10.dp else 14.dp)
+    val contentColor = if (secondary) Color.White else OnAccent
+    val shape = RoundedCornerShape(cornerRadius)
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val sink by animateDpAsState(if (pressed && enabled) 4.dp else 0.dp, tween(70), label = "btnSink")
 
     // propagateMinConstraints : un bouton étiré (fillMaxWidth, weight) étire
     // aussi sa face, pas seulement son ombre, et centre son libellé comme le
     // `.btn` du site. Sans taille imposée, rien ne change.
-    Box(modifier = modifier, propagateMinConstraints = true) {
+    Box(
+        modifier = modifier.alpha(if (enabled) 1f else 0.5f),
+        propagateMinConstraints = true,
+    ) {
         Box(
             modifier = Modifier
                 .matchParentSize()
@@ -87,24 +153,76 @@ fun GameButton(
         )
         Box(
             modifier = Modifier
+                .offset(y = sink)
                 .clip(shape)
                 .background(background)
-                .clickable(onClick = onClick)
-                .padding(
-                    horizontal = if (small) 18.dp else 30.dp,
-                    vertical = if (small) 10.dp else 14.dp,
-                ),
+                .clickable(
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
+                    enabled = enabled,
+                    role = Role.Button,
+                    onClick = onClick,
+                )
+                .padding(contentPadding),
             contentAlignment = Alignment.Center,
         ) {
-            Text(
-                label,
-                color = content,
-                fontSize = if (small) 14.sp else 18.sp,
-                fontWeight = FontWeight.ExtraBold,
-                letterSpacing = 0.5.sp,
-            )
+            content(contentColor)
         }
     }
+}
+
+/**
+ * Retour visuel au toucher des cartes (mondes, tuiles du menu...) : la carte
+ * se tasse légèrement tant que le doigt est posé. À combiner avec un
+ * `clickable` qui partage le même [interaction].
+ */
+@Composable
+fun Modifier.pressScale(interaction: MutableInteractionSource, pressedScale: Float = 0.95f): Modifier {
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, tween(90), label = "pressScale")
+    return graphicsLayer {
+        scaleX = scale
+        scaleY = scale
+    }
+}
+
+/**
+ * Texte sur une seule ligne qui rétrécit (jusqu'à [minFontSize]) plutôt que
+ * de déborder : les libellés des tuiles et des cartes du menu tiennent ainsi
+ * en anglais comme en français, et même avec une grande police système.
+ */
+@Composable
+fun FitText(
+    text: String,
+    color: Color,
+    fontSize: TextUnit,
+    modifier: Modifier = Modifier,
+    minFontSize: TextUnit = 12.sp,
+    fontWeight: FontWeight? = null,
+    textAlign: TextAlign? = null,
+) {
+    var size by remember(text, fontSize) { mutableStateOf(fontSize) }
+    var fits by remember(text, fontSize) { mutableStateOf(false) }
+    Text(
+        text,
+        color = color,
+        fontSize = size,
+        fontWeight = fontWeight,
+        textAlign = textAlign,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Ellipsis,
+        // Pas de dessin tant que la bonne taille n'est pas trouvée : évite un
+        // clignotement du texte trop gros pendant les mesures.
+        modifier = modifier.drawWithContent { if (fits) drawContent() },
+        onTextLayout = { layout ->
+            if (layout.didOverflowWidth && size.value > minFontSize.value) {
+                size = (size.value * 0.92f).coerceAtLeast(minFontSize.value).sp
+            } else {
+                fits = true
+            }
+        },
+    )
 }
 
 /**
@@ -116,7 +234,7 @@ fun GameButton(
 fun MoneyPill(
     text: String,
     modifier: Modifier = Modifier,
-    color: Color = Money,
+    color: Color = MoneyText,
     small: Boolean = false,
 ) {
     val shape = RoundedCornerShape(999.dp)
@@ -146,8 +264,8 @@ fun StatChip(label: String, value: String) {
             .padding(horizontal = 12.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("$label ", color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
-        Text(value, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Text("$label ", color = TextColor, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        Text(value, color = AccentText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -392,7 +510,8 @@ fun BottomBar(
         Box(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .height(42.dp)
+                // 42px côté site, 48dp ici : la taille minimale d'une cible tactile Android.
+                .heightIn(min = 48.dp)
                 .clip(RoundedCornerShape(999.dp))
                 .background(PanelBg)
                 .border(2.dp, PanelBorder, RoundedCornerShape(999.dp))
@@ -400,7 +519,7 @@ fun BottomBar(
                 .padding(horizontal = 14.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Text(tr("linksButton"), color = TextDim, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            Text(tr("linksButton"), color = TextDim, fontSize = 14.sp, fontWeight = FontWeight.Bold)
         }
         // .corner-icons-right : deux ronds de 42px
         Row(
@@ -414,12 +533,13 @@ fun BottomBar(
     }
 }
 
-/** `.mute-btn` / `.theme-btn` : rond de 42px, fond panneau, bordure. */
+/** `.mute-btn` / `.theme-btn` : rond de 42px côté site, 48dp ici (cible tactile
+ *  minimale Android), fond panneau, bordure. */
 @Composable
 private fun RoundIconButton(emoji: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(42.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .background(PanelBg)
             .border(2.dp, PanelBorder, CircleShape)
@@ -460,7 +580,7 @@ fun ShopTabs(tabs: List<String>, selectedIndex: Int, onSelect: (Int) -> Unit) {
                 Text(
                     label,
                     color = if (active) OnAccent else TextDim,
-                    fontSize = 13.sp,
+                    fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     textAlign = TextAlign.Center,
                 )
@@ -503,9 +623,9 @@ fun ShopCard(
                             .padding(start = 6.dp)
                             .clip(RoundedCornerShape(999.dp))
                             .background(Accent)
-                            .padding(horizontal = 6.dp, vertical = 1.dp),
+                            .padding(horizontal = 7.dp, vertical = 1.dp),
                     ) {
-                        Text(levelBadge, color = OnAccent, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(levelBadge, color = OnAccent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     }
                 }
             }
@@ -513,7 +633,7 @@ fun ShopCard(
                 Text(
                     description,
                     color = TextDim,
-                    fontSize = 12.sp,
+                    fontSize = 13.sp,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }

@@ -195,7 +195,7 @@ private fun UpgradesTab(save: GameSave, actions: ShopActions) {
     if (save.currentWorld == Ville.WORLD_ID) {
         Text(
             tr("villeShopNote"),
-            color = Money,
+            color = MoneyText,
             fontSize = 13.sp,
             fontWeight = FontWeight.ExtraBold,
             textAlign = TextAlign.Center,
@@ -378,7 +378,7 @@ private fun CosmeticCard(
 ) {
     ShopCard(title = title, description = description, leading = preview) {
         when {
-            equipped -> Text("✅ ${tr("equipped")}", color = Money, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            equipped -> Text("✅ ${tr("equipped")}", color = MoneyText, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
             owned -> GameButton(tr("equip"), secondary = true, small = true, onClick = onEquip)
             else -> GameButton("$cost $", small = true, onClick = onBuy)
         }

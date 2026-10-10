@@ -8,6 +8,27 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.ExperimentalTextApi
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import kotlinx.coroutines.delay
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +42,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
@@ -118,21 +138,36 @@ internal fun MenuScreen(
             // Toucher la trousse ouvre sa fiche (openTrousseModal()).
             TroussePreview(equippedSkin = save.equippedSkin, onClick = { dialog = MenuDialog.TrousseInfo })
 
-            // .stats-row
-            FlowRowCentered(gap = 10.dp) {
-                StatChip(tr("statPuissance"), SkinStats.totalPuissance(save).toString())
-                StatChip(tr("statVitesse"), SkinStats.totalVitesse(save).toString())
-                val record = when (save.currentWorld) {
-                    "plage" -> save.plageBestDistance
-                    Ville.WORLD_ID -> save.villeBestDistance
-                    else -> save.bestDistance
+            // Propre à l'app : un voile léger regroupe stats, boutons et cartes,
+            // pour qu'ils restent lisibles quand ils défilent par-dessus la
+            // ligne d'horizon du fond (fixe, lui).
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 520.dp)
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(MenuScrim)
+                    .padding(12.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                // .stats-row
+                FlowRowCentered(gap = 10.dp) {
+                    StatChip(tr("statPuissance"), SkinStats.totalPuissance(save).toString())
+                    StatChip(tr("statVitesse"), SkinStats.totalVitesse(save).toString())
+                    val record = when (save.currentWorld) {
+                        "plage" -> save.plageBestDistance
+                        Ville.WORLD_ID -> save.villeBestDistance
+                        else -> save.bestDistance
+                    }
+                    StatChip(tr("statRecord"), "${"%.1f".format(record)} m")
                 }
-                StatChip(tr("statRecord"), "${"%.1f".format(record)} m")
-            }
 
-            // .menu-buttons
-            FlowRowCentered(gap = 14.dp) {
-                GameButton(tr("btnPlay")) {
+                // .menu-buttons, réorganisé pour Android : « Jouer » en gros bouton
+                // pleine largeur (l'action principale), les trois autres en
+                // grille de 3 colonnes plutôt qu'un FlowRow au retour à la ligne
+                // imprévisible.
+                GameButton(tr("btnPlay"), large = true, modifier = Modifier.fillMaxWidth()) {
                     when {
                         // En Ville, "Jouer" ramène à la réception de la Tour.
                         save.currentWorld == Ville.WORLD_ID && save.inVille -> onEnterVille(VilleEntry.RECEPTION)
@@ -144,22 +179,27 @@ internal fun MenuScreen(
                         else -> onPlay()
                     }
                 }
-                GameButton(tr("btnShop"), secondary = true, onClick = onOpenShop)
-                GameButton(tr("btnLeaderboard"), secondary = true, onClick = onOpenLeaderboard)
-                GameButton(tr("btnProfile"), secondary = true, onClick = onOpenProfile)
-            }
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    MenuTile(tr("btnShop"), Modifier.weight(1f).fillMaxHeight(), onClick = onOpenShop)
+                    MenuTile(tr("btnLeaderboard"), Modifier.weight(1f).fillMaxHeight(), onClick = onOpenLeaderboard)
+                    MenuTile(tr("btnProfile"), Modifier.weight(1f).fillMaxHeight(), onClick = onOpenProfile)
+                }
 
-            WorldsRow(
-                save = save,
-                onSaveChange = onSaveChange,
-                onOpenAchievements = onOpenAchievements,
-                onOpenChallenges = onOpenChallenges,
-                onStartVolcanoCinematic = onStartVolcanoCinematic,
-                onStartBeachCinematic = onStartBeachCinematic,
-                onEnterVille = onEnterVille,
-                onShowDialog = { dialog = it },
-                onToast = { toast = it },
-            )
+                WorldsRow(
+                    save = save,
+                    onSaveChange = onSaveChange,
+                    onOpenAchievements = onOpenAchievements,
+                    onOpenChallenges = onOpenChallenges,
+                    onStartVolcanoCinematic = onStartVolcanoCinematic,
+                    onStartBeachCinematic = onStartBeachCinematic,
+                    onEnterVille = onEnterVille,
+                    onShowDialog = { dialog = it },
+                    onToast = { toast = it },
+                )
+            }
 
             // #menu-help : proposé après un échec dans la cinématique du volcan.
             if (save.volcanHelpAvailable) {
@@ -169,7 +209,12 @@ internal fun MenuScreen(
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Bold,
                     textDecoration = TextDecoration.Underline,
-                    modifier = Modifier.clickable { dialog = MenuDialog.Help }.padding(top = 6.dp, bottom = 40.dp),
+                    modifier = Modifier
+                        .padding(top = 6.dp, bottom = 40.dp)
+                        .clickable { dialog = MenuDialog.Help }
+                        .heightIn(min = 48.dp)
+                        .wrapContentHeight()
+                        .padding(horizontal = 12.dp),
                 )
             }
         }
@@ -347,42 +392,90 @@ private fun formatPlayTime(seconds: Long): String {
     return if (hours > 0) "$hours h $minutes min" else "$minutes min"
 }
 
-/** `.title-card` : numéro de version souligné, titre blanc, sous-titre bleu nuit. */
+/**
+ * `.title-card` : numéro de version souligné, titre blanc, sous-titre.
+ *
+ * Deux écarts volontaires avec le site, pour la lisibilité sur téléphone :
+ * le titre blanc a un contour sombre et une ombre (blanc sur le ciel clair
+ * ne fait que 1,2:1 de contraste), et le sous-titre est posé sur une
+ * pastille (le bleu nuit du site se perd sur le ciel assombri de la nuit).
+ */
 @Composable
 private fun TitleCard(onOpenChangelog: () -> Unit, onOpenCheats: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            "v$GAME_VERSION",
-            color = TextColor,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.ExtraBold,
-            textDecoration = TextDecoration.Underline,
-            // Toucher : journal des changements. Appui long : les triches
-            // (window.cheats du site, dans sa console — ici tout aussi discrètes).
+        // Toucher : journal des changements. Appui long : les triches
+        // (window.cheats du site, dans sa console — ici tout aussi discrètes).
+        // Zone tactile d'au moins 48dp autour du petit numéro.
+        Box(
             modifier = Modifier
+                .heightIn(min = 48.dp)
+                .widthIn(min = 48.dp)
+                .clip(RoundedCornerShape(999.dp))
                 .pointerInput(Unit) {
                     detectTapGestures(onTap = { onOpenChangelog() }, onLongPress = { onOpenCheats() })
                 }
-                .padding(bottom = 2.dp),
-        )
-        Text(
-            "🎒 Bully the Trousse",
-            color = Color.White,
-            fontSize = 36.sp, // clamp(28px, 6vw, 46px)
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.sp,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            tr("menuSubtitle"),
-            color = TitleSubtitle,
-            fontSize = 14.sp, // clamp(12px, 2.5vw, 15px)
-            fontWeight = FontWeight.SemiBold,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.padding(top = 2.dp),
-        )
+                .padding(horizontal = 14.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                "v$GAME_VERSION",
+                color = TextColor,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.ExtraBold,
+                textDecoration = TextDecoration.Underline,
+            )
+        }
+        OutlinedTitle("🎒 Bully the Trousse")
+        Box(
+            modifier = Modifier
+                .padding(top = 6.dp)
+                .clip(RoundedCornerShape(999.dp))
+                .background(PanelBg)
+                .padding(horizontal = 14.dp, vertical = 5.dp),
+        ) {
+            Text(
+                tr("menuSubtitle"),
+                color = TextColor,
+                fontSize = 14.sp, // clamp(12px, 2.5vw, 15px)
+                fontWeight = FontWeight.SemiBold,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
+
+/**
+ * Le titre du menu : blanc, avec un contour sombre dessiné en dessous et une
+ * ombre portée. Sa taille suit la police système, mais plafonnée à +30 % :
+ * au-delà, « Bully the Trousse » passerait sur trois lignes.
+ */
+// drawStyle était expérimental dans les premières versions de Compose ;
+// l'opt-in est sans effet (simple avertissement) là où il est stable.
+@OptIn(ExperimentalTextApi::class)
+@Composable
+private fun OutlinedTitle(text: String) {
+    val fontScale = LocalDensity.current.fontScale
+    val size = (TITLE_SIZE_SP * fontScale.coerceAtMost(1.3f) / fontScale).sp
+    val base = TextStyle(
+        fontSize = size, // clamp(28px, 6vw, 46px)
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.sp,
+        textAlign = TextAlign.Center,
+    )
+    Box(contentAlignment = Alignment.Center) {
+        Text(
+            text,
+            style = base.copy(
+                color = TitleOutline,
+                drawStyle = Stroke(width = 7f, join = StrokeJoin.Round),
+                shadow = Shadow(color = Color(0x80000000), offset = Offset(0f, 4f), blurRadius = 8f),
+            ),
+        )
+        Text(text, style = base.copy(color = Color.White))
+    }
+}
+
+private const val TITLE_SIZE_SP = 36f
 
 /**
  * `#trousse-preview-wrap` + `@keyframes floaty` : l'image monte de 10px et
@@ -486,91 +579,213 @@ private fun WorldsRow(
 
     val claimable = save.dailyChallenges.count { !it.claimed && it.progress >= it.target }
 
-    FlowRowCentered(gap = 10.dp, modifier = Modifier.widthIn(max = 520.dp)) {
-        WorldCard(WORLD_COUR, playable = true, selected = save.currentWorld == "cour") { click(WORLD_COUR) }
-        WorldCard(
-            WORLD_VOLCANS,
-            playable = save.volcanUnlocked,
-            selected = save.currentWorld == "volcans" && save.volcanUnlocked,
-        ) { click(WORLD_VOLCANS) }
-        WorldCard(
-            World("succes", tr("achvCardName"), "🏆"),
-            playable = true,
-            selected = false,
-            accentBorder = true,
-            badge = "${save.unlockedAchievements.size}/${Achievements.ALL.size}",
-            onClick = onOpenAchievements,
-        )
-        WorldCard(
-            World("defis", tr("challengesCardName"), "📅"),
-            playable = true,
-            selected = false,
-            accentBorder = true,
-            badge = "$claimable/${save.dailyChallenges.size.coerceAtLeast(3)}",
-            onClick = onOpenChallenges,
-        )
-        WorldCard(
-            WORLD_PLAGE,
-            playable = save.plageUnlocked,
-            selected = save.currentWorld == "plage" && save.plageUnlocked,
-        ) { click(WORLD_PLAGE) }
-        WorldCard(
-            WORLD_VILLE,
-            playable = save.villeUnlocked,
-            selected = save.currentWorld == Ville.WORLD_ID && save.villeUnlocked,
-        ) { click(WORLD_VILLE) }
+    // Délai après un échec au volcan : le compte à rebours de la carte se
+    // met à jour chaque seconde, tant qu'il court.
+    val now by produceState(System.currentTimeMillis(), save.volcanFailedUntil) {
+        while (value < save.volcanFailedUntil) {
+            delay(1000)
+            value = System.currentTimeMillis()
+        }
+    }
+    val volcanoLeft = save.volcanFailedUntil - now
+    val volcanoLock = when {
+        save.volcanUnlocked -> null
+        volcanoLeft > 0 -> tr("app.lockCooldown", "time" to "${volcanoLeft / 60_000} min ${(volcanoLeft % 60_000) / 1000} s")
+        else -> tr("app.lockVolcan")
+    }
+    val plageLock = when {
+        save.plageUnlocked -> null
+        !save.hasClaquettes -> tr("app.lockClaquettes")
+        else -> tr("app.lockTapToGo")
+    }
+    val villeLock = if (save.villeUnlocked) null else tr("app.lockVille")
+
+    // Grille de 3 colonnes (2 lignes) plutôt que le flex-wrap du site : à
+    // 108px de large, les 6 cartes tombaient sur 3 lignes de 2 sur un petit
+    // téléphone. Ordre du site conservé.
+    Column(
+        modifier = Modifier.widthIn(max = 520.dp).fillMaxWidth().padding(top = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        GridRow {
+            WorldCard(WORLD_COUR, cardModifier(), selected = save.currentWorld == "cour") { click(WORLD_COUR) }
+            WorldCard(
+                WORLD_VOLCANS,
+                cardModifier(),
+                lockHint = volcanoLock,
+                selected = save.currentWorld == "volcans" && save.volcanUnlocked,
+            ) { click(WORLD_VOLCANS) }
+            WorldCard(
+                World("succes", tr("achvCardName"), "🏆"),
+                cardModifier(),
+                accentBorder = true,
+                badge = "${save.unlockedAchievements.size}/${Achievements.ALL.size}",
+                onClick = onOpenAchievements,
+            )
+        }
+        GridRow {
+            // Défis : un point de notification quand une récompense attend,
+            // plutôt qu'un « 0/3 » qu'on ne remarque pas.
+            WorldCard(
+                World("defis", tr("challengesCardName"), "📅"),
+                cardModifier(),
+                accentBorder = true,
+                notification = claimable.takeIf { it > 0 },
+                notificationDescription = tr("app.challengesReady", "n" to claimable),
+                onClick = onOpenChallenges,
+            )
+            WorldCard(
+                WORLD_PLAGE,
+                cardModifier(),
+                lockHint = plageLock,
+                selected = save.currentWorld == "plage" && save.plageUnlocked,
+            ) { click(WORLD_PLAGE) }
+            WorldCard(
+                WORLD_VILLE,
+                cardModifier(),
+                lockHint = villeLock,
+                selected = save.currentWorld == Ville.WORLD_ID && save.villeUnlocked,
+            ) { click(WORLD_VILLE) }
+        }
     }
 }
 
+/** Une ligne de la grille des cartes : 3 colonnes de même largeur ET de même hauteur. */
+@Composable
+private fun GridRow(content: @Composable RowScope.() -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        content = content,
+    )
+}
+
+private fun RowScope.cardModifier(): Modifier = Modifier.weight(1f).fillMaxHeight()
+
 /**
- * `.world-card` : 108px de large, emoji 26px, nom 12px. Verrouillée = 55 %
- * d'opacité ; sélectionnée (ou carte Succès/Défis) = bordure dorée, avec
- * un `.achv-badge` en haut à droite quand il y a un compteur.
+ * `.world-card` : emoji 26px, nom en gras, bordure dorée si sélectionnée
+ * (ou carte Succès/Défis), avec un `.achv-badge` en haut à droite quand il
+ * y a un compteur.
+ *
+ * Verrouillée ([lockHint] non nul) : estompée comme sur le site, mais avec
+ * en plus un cadenas et la condition de déblocage écrite sur la carte —
+ * plutôt que de ne l'apprendre qu'en la touchant.
  */
 @Composable
 private fun WorldCard(
     world: World,
-    playable: Boolean,
-    selected: Boolean,
+    modifier: Modifier,
+    lockHint: String? = null,
+    selected: Boolean = false,
     accentBorder: Boolean = false,
     badge: String? = null,
+    notification: Int? = null,
+    notificationDescription: String = "",
     onClick: () -> Unit,
 ) {
     val shape = RoundedCornerShape(12.dp)
-    Box {
+    val interaction = remember { MutableInteractionSource() }
+    val locked = lockHint != null
+    Box(modifier = modifier.pressScale(interaction)) {
         Column(
             modifier = Modifier
-                .width(108.dp)
-                .alpha(if (playable) 1f else 0.55f)
+                .fillMaxSize()
+                .heightIn(min = 48.dp)
                 .clip(shape)
                 .background(PanelBg)
                 .border(2.dp, if (selected || accentBorder) Accent else PanelBorder, shape)
-                .clickable(onClick = onClick)
+                .clickable(interactionSource = interaction, indication = LocalIndication.current, onClick = onClick)
                 .padding(horizontal = 6.dp, vertical = 10.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
         ) {
-            Text(world.emoji, fontSize = 26.sp, textAlign = TextAlign.Center)
-            Text(
-                if (world.name.startsWith("app.")) tr(world.name) else world.name,
-                color = TextColor,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.padding(top = 4.dp),
-            )
+            // Seuls l'emoji et le nom sont estompés : la condition de
+            // déblocage, elle, doit rester parfaitement lisible.
+            Column(
+                modifier = Modifier.alpha(if (locked) 0.55f else 1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Text(world.emoji, fontSize = 26.sp, textAlign = TextAlign.Center)
+                FitText(
+                    if (world.name.startsWith("app.")) tr(world.name) else world.name,
+                    color = TextColor,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
+            if (lockHint != null) {
+                Text(
+                    lockHint,
+                    color = TextDim,
+                    fontSize = 12.sp,
+                    lineHeight = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
+            }
         }
-        // .achv-badge : top:-8px; right:-6px
+        if (locked) {
+            Text("🔒", fontSize = 14.sp, modifier = Modifier.align(Alignment.TopStart).padding(6.dp))
+        }
+        // .achv-badge : top:-8px; right:-6px — en 12sp plutôt que 10px.
         if (badge != null) {
             Box(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 6.dp, y = (-8).dp)
+                    .offset(x = 6.dp, y = (-9).dp)
                     .clip(RoundedCornerShape(999.dp))
                     .background(Accent)
-                    .padding(horizontal = 6.dp, vertical = 2.dp),
+                    .border(2.dp, ButtonAccentShadow, RoundedCornerShape(999.dp))
+                    .padding(horizontal = 8.dp, vertical = 2.dp),
             ) {
-                Text(badge, color = OnAccent, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                Text(badge, color = OnAccent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
             }
+        }
+        if (notification != null) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = 6.dp, y = (-9).dp)
+                    .sizeIn(minWidth = 24.dp, minHeight = 24.dp)
+                    .clip(CircleShape)
+                    .background(NotificationRed)
+                    .border(2.dp, Color.White, CircleShape)
+                    .semantics { contentDescription = notificationDescription }
+                    .padding(horizontal = 6.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(notification.toString(), color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+            }
+        }
+    }
+}
+
+/** Pastille de notification des Défis : blanc dessus à 5:1 de contraste. */
+private val NotificationRed = Color(0xFFD32F2F)
+
+/**
+ * Les boutons secondaires du menu (Boutique, Classement, Profil) en tuiles
+ * d'une grille de 3 colonnes : l'emoji du libellé du site au-dessus, le
+ * texte en dessous, rétréci s'il ne tient pas (anglais, grande police).
+ */
+@Composable
+private fun MenuTile(label: String, modifier: Modifier, onClick: () -> Unit) {
+    val emoji = label.substringBefore(' ', missingDelimiterValue = "")
+    val text = if (emoji.isEmpty()) label else label.substringAfter(' ')
+    HardShadowButton(
+        modifier = modifier.heightIn(min = 48.dp),
+        secondary = true,
+        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 10.dp),
+        onClick = onClick,
+    ) { content ->
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            if (emoji.isNotEmpty()) Text(emoji, fontSize = 22.sp)
+            FitText(text, color = content, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
         }
     }
 }

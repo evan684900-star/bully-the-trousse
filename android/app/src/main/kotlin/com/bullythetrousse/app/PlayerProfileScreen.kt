@@ -293,16 +293,16 @@ private fun ProfileBody(
                     .background(Accent)
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             ) {
-                Text("+${data.ownedSkins.size}", color = OnAccent, fontSize = 10.sp, fontWeight = FontWeight.ExtraBold)
+                Text("+${data.ownedSkins.size}", color = OnAccent, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
             }
         }
         ProfileCard(modifier = Modifier.weight(1f), onClick = { onShowDetail(ProfileDetail.Follows(FollowDirection.FOLLOWING)) }) {
             Text(following?.toString() ?: "—", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
-            Text(tr("profileFollowing"), color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text(tr("profileFollowing"), color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }
         ProfileCard(modifier = Modifier.weight(1f), onClick = { onShowDetail(ProfileDetail.Follows(FollowDirection.FOLLOWERS)) }) {
             Text(followers?.toString() ?: "—", color = TextColor, fontSize = 20.sp, fontWeight = FontWeight.Black)
-            Text(tr("profileFollowers"), color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+            Text(tr("profileFollowers"), color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }
     }
 
@@ -345,7 +345,7 @@ private fun ProfileBody(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text(tr("profileAchvTitle"), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(tr("profileAchvTitle"), color = AccentText, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             if (isOwn) GameButton(tr("profileViewAll"), secondary = true, small = true, onClick = onOpenAchievements)
         }
         if (isOwn) {
@@ -483,7 +483,7 @@ private fun ProfileCard(modifier: Modifier = Modifier, onClick: () -> Unit, cont
 private fun SectionTitle(text: String) {
     Text(
         text,
-        color = Accent,
+        color = AccentText,
         fontSize = 15.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 10.dp),
@@ -528,7 +528,7 @@ private fun WeeklyChart(dailyEarnings: Map<String, Long>, today: LocalDate) {
                         .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp, bottomStart = 2.dp, bottomEnd = 2.dp))
                         .background(if (day == today) Accent else PanelBorder),
                 )
-                Text(I18n.weekdayLetter(day.dayOfWeek.value, lang), color = TextDim, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                Text(I18n.weekdayLetter(day.dayOfWeek.value, lang), color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -550,7 +550,7 @@ private fun RowScope.StatTile(icon: String, value: String, label: String, onClic
     ) {
         Text(icon, fontSize = 22.sp)
         Text(value, color = TextColor, fontSize = 17.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 4.dp, bottom = 2.dp))
-        Text(label, color = TextDim, fontSize = 11.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Text(label, color = TextDim, fontSize = 12.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
     }
 }
 
@@ -562,7 +562,7 @@ private fun LevelRow(label: String, value: Int) {
         horizontalArrangement = Arrangement.SpaceBetween,
     ) {
         Text(label, color = TextColor, fontSize = 14.sp)
-        Text(value.toString(), color = Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+        Text(value.toString(), color = AccentText, fontSize = 14.sp, fontWeight = FontWeight.Bold)
     }
 }
 
@@ -598,7 +598,7 @@ private fun SkinsDetailDialog(data: ProfileData, onDismiss: () -> Unit) {
                 Text(name, color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 when {
                     owned && skin.id == data.equippedSkin ->
-                        Text(tr("profileEquippedTag"), color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                        Text(tr("profileEquippedTag"), color = AccentText, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     !owned -> Text("🔒", fontSize = 14.sp)
                 }
             }

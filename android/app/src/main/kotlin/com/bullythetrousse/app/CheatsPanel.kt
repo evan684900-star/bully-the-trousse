@@ -146,13 +146,13 @@ internal fun CheatsPanel(
                 run("resetSave", close = true) { onSaveChange(GameSave()) }
             }
         }
-        shown?.let { Text(it, color = TextDim, fontSize = 10.sp) }
+        shown?.let { Text(it, color = TextDim, fontSize = 12.sp) }
     }
 }
 
 @Composable
 private fun CheatSection(title: String) {
-    Text(title, color = Money, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
+    Text(title, color = MoneyText, fontSize = 13.sp, fontWeight = FontWeight.Bold, modifier = Modifier.fillMaxWidth())
 }
 
 @Composable
@@ -167,7 +167,7 @@ private fun CheatField(label: String, value: String, numeric: Boolean = true, on
             value = value,
             onValueChange = onChange,
             singleLine = true,
-            label = { Text(label, fontSize = 11.sp) },
+            label = { Text(label, fontSize = 12.sp) },
             keyboardOptions = KeyboardOptions(keyboardType = if (numeric) KeyboardType.Number else KeyboardType.Text),
             modifier = Modifier.fillMaxWidth(),
         )

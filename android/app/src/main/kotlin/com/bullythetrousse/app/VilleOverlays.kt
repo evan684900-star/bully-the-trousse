@@ -473,7 +473,7 @@ internal fun TrousserieOverlay(save: GameSave, onSaveChange: (GameSave) -> Unit,
             verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             // Titre et bouton de fermeture : en dur (en français) côté site aussi.
-            Text("👕 La Trousserie", color = Accent, fontSize = 19.sp, fontWeight = FontWeight.Bold)
+            Text("👕 La Trousserie", color = AccentText, fontSize = 19.sp, fontWeight = FontWeight.Bold)
             Text(tr("villeShopNote"), color = TextColor, fontSize = 13.sp, textAlign = TextAlign.Center)
             MoneyPill("💰 ${save.money} $", small = true)
             val lang = LocalLang.current

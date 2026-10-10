@@ -84,7 +84,7 @@ fun TutorialOverlay(tutorial: Tutorial, onDone: () -> Unit) {
             Text(slide.icon, fontSize = 44.sp, textAlign = TextAlign.Center)
             Text(
                 if (english) slide.titleEn else slide.titleFr,
-                color = Accent,
+                color = AccentText,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,

@@ -66,6 +66,17 @@ internal object I18nAppStrings {
         "app.worldVolcans" to ("Volcans" to "Volcanoes"),
         "app.worldPlage" to ("Plage" to "Beach"),
         "app.worldVille" to ("Ville" to "City"),
+
+        // Condition de déblocage affichée sous une carte de monde verrouillée
+        "app.lockVolcan" to ("Survis au voyage" to "Survive the trip"),
+        "app.lockCooldown" to ("⏳ {time}" to "⏳ {time}"),
+        "app.lockClaquettes" to ("🩴 Claquettes requises" to "🩴 Flip-flops needed"),
+        "app.lockTapToGo" to ("Touche pour partir" to "Tap to go"),
+        "app.lockVille" to ("Lancer parfait à la Plage" to "Perfect throw at the Beach"),
+        "app.lockStuck" to ("Bloqué ici" to "Stuck here"),
+        "app.challengesReady" to ("{n} récompense(s) à réclamer" to "{n} reward(s) to claim"),
+        "app.themeDark" to ("🌙 Sombre" to "🌙 Dark"),
+        "app.themeLight" to ("☀️ Clair" to "☀️ Light"),
         "app.trousseDefaultName" to ("Trousse" to "Pencil case"),
         "app.notOnBeach" to ("Tu n'es pas sur la plage." to "You're not on the beach."),
 

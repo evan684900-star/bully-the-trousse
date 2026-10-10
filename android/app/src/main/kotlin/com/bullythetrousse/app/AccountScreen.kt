@@ -113,8 +113,8 @@ fun AccountScreen(
             Text(
                 tr(session.statusKey),
                 color = when (session.state) {
-                    CloudState.LINKED -> Money
-                    CloudState.REVOKED -> Accent
+                    CloudState.LINKED -> MoneyText
+                    CloudState.REVOKED -> AccentText
                     else -> TextDim
                 },
                 fontSize = 13.sp,
@@ -133,7 +133,7 @@ fun AccountScreen(
 
         // --- 🔑 Mon compte ---
         InfoCard {
-            Text(tr("settingsRecoveryTitle"), color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+            Text(tr("settingsRecoveryTitle"), color = AccentText, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
             Text(tr("settingsRecoveryHint"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
             val code = session.accountCode
             if (code.isNotEmpty()) {
@@ -166,7 +166,7 @@ fun AccountScreen(
                         showRegenConfirm = true
                     }
                 }
-                Text(tr("settingsRecoveryWarn"), color = TextDim, fontSize = 11.sp, textAlign = TextAlign.Center)
+                Text(tr("settingsRecoveryWarn"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
             } else if (session.state == CloudState.GUEST || session.state == CloudState.LINKED) {
                 // Compte connecté mais encore sans code (liaison automatique
                 // échouée, ancien compte à vrai e-mail).
@@ -197,7 +197,7 @@ fun AccountScreen(
                 modifier = Modifier.fillMaxWidth(),
             )
             if (suggestion != null && typedCode == suggestion) {
-                Text(tr("settingsRecoverySuggest"), color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+                Text(tr("settingsRecoverySuggest"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
             }
             errorKey?.let { Text(tr(it), color = Color(0xFFFF6B6B), fontSize = 12.sp, textAlign = TextAlign.Center) }
             GameButton(if (busy) "…" else tr("btnRecoverySubmit"), small = true) {
@@ -252,7 +252,7 @@ fun AccountScreen(
                     },
                 )
             }
-            Text(tr("settingsPrivateHint"), color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+            Text(tr("settingsPrivateHint"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
         }
 
         // --- Photo de profil (AVATAR_EMOJIS côté site) ---
@@ -276,7 +276,7 @@ fun AccountScreen(
                 }
             }
             if (showAvatarPicker) {
-                Text(tr("settingsAvatarPickHint"), color = TextDim, fontSize = 11.5.sp)
+                Text(tr("settingsAvatarPickHint"), color = TextDim, fontSize = 12.sp)
                 FlowRowCentered(gap = 8.dp, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
                     for (emoji in AVATAR_EMOJIS) {
                         val selected = save.avatarEmoji == emoji
@@ -302,7 +302,7 @@ fun AccountScreen(
         // --- Déconnexion (btn-logout côté site) ---
         InfoCard {
             GameButton(tr("btnLogout"), secondary = true, small = true) { showLogoutConfirm = true }
-            Text(tr("settingsLogoutHint"), color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+            Text(tr("settingsLogoutHint"), color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
         }
     }
 
@@ -416,7 +416,7 @@ private fun MergeCard(title: String, stats: SaveSummary, modifier: Modifier, onC
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Text(title, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+        Text(title, color = AccentText, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
         Text(stats.pseudo, color = TextColor, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         Text("💰 ${stats.money} $", color = TextColor, fontSize = 12.sp)
         Text("📏 ${"%.1f".format(stats.bestDistance)} m", color = TextColor, fontSize = 12.sp)

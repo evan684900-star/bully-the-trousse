@@ -77,7 +77,7 @@ fun InfoDialog(
         ) {
             Text(
                 title,
-                color = Accent,
+                color = AccentText,
                 fontSize = 19.sp,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
@@ -103,5 +103,5 @@ fun InfoDialog(
 /** `.settings-hint` / texte d'accompagnement d'une boîte, centré et estompé. */
 @Composable
 fun DialogText(text: String, color: Color = TextDim) {
-    Text(text, color = color, fontSize = 13.sp, textAlign = TextAlign.Center, lineHeight = 19.sp)
+    Text(text, color = color, fontSize = 14.sp, textAlign = TextAlign.Center, lineHeight = 20.sp)
 }

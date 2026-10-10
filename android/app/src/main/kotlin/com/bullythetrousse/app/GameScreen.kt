@@ -629,11 +629,11 @@ private fun ResultPanel(
             Text(tr("resultRecord"), color = Accent2, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
         }
         if (isPerfect) {
-            Text(tr("resultPerfect"), color = Money, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
+            Text(tr("resultPerfect"), color = MoneyText, fontWeight = FontWeight.ExtraBold, fontSize = 15.sp)
         }
         Text(
             tr("resultDistanceTitle"),
-            color = Accent,
+            color = AccentText,
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
@@ -646,7 +646,7 @@ private fun ResultPanel(
             fontWeight = FontWeight.Black,
         )
         // .earn
-        Text("+${summary.earn} $", color = Money, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
+        Text("+${summary.earn} $", color = MoneyText, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold)
         // #result-coin / #result-vampire : textes en dur côté site (pas dans STRINGS).
         summary.coinMultiplier?.let { m ->
             ResultNote(

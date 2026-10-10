@@ -226,7 +226,7 @@ fun GiftsReceivedDialog(rows: List<GiftLine>, total: Int, onDismiss: () -> Unit)
         }
         Text(
             tr("giftsReceivedTotal", "amount" to total),
-            color = Money,
+            color = MoneyText,
             fontSize = 14.sp,
             fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(top = 10.dp),

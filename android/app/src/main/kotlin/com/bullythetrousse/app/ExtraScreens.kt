@@ -99,7 +99,7 @@ internal fun ModalScreen(
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             BackButton(onBack)
         }
-        Text(title, color = Accent, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+        Text(title, color = AccentText, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
         content()
     }
 }
@@ -169,12 +169,12 @@ fun AchievementsScreen(save: GameSave, session: CloudSession, onBack: () -> Unit
             fontSize = 13.sp,
         )
         poolStatus?.let {
-            Text(it, color = TextDim, fontSize = 11.5.sp, textAlign = TextAlign.Center)
+            Text(it, color = TextDim, fontSize = 12.sp, textAlign = TextAlign.Center)
         }
         Text(
             tr("app.achvTapHint"),
             color = TextDim,
-            fontSize = 11.5.sp,
+            fontSize = 12.sp,
             textAlign = TextAlign.Center,
         )
         FlowRow(
@@ -254,7 +254,7 @@ private fun AchievementDetailDialog(
             Text(emoji, fontSize = 44.sp)
             Text(
                 name,
-                color = if (unlocked) Accent else TextColor,
+                color = if (unlocked) AccentText else TextColor,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.ExtraBold,
                 textAlign = TextAlign.Center,
@@ -262,12 +262,12 @@ private fun AchievementDetailDialog(
             Text(description, color = TextDim, fontSize = 13.sp, textAlign = TextAlign.Center)
             Text(
                 tr(if (unlocked) "app.achvUnlocked" else "app.achvLocked"),
-                color = if (unlocked) Money else TextDim,
+                color = if (unlocked) MoneyText else TextDim,
                 fontSize = 12.sp,
                 fontWeight = FontWeight.SemiBold,
             )
             percent?.let {
-                Text(tr("app.achvPlayersPct", "pct" to it), color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                Text(tr("app.achvPlayersPct", "pct" to it), color = AccentText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -346,10 +346,10 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
                                 .background(Brush.horizontalGradient(listOf(Color(0xFFFFD23F), Color(0xFFFF9F43)))),
                         )
                     }
-                    Text("$shown / $target$unit", color = TextDim, fontSize = 11.sp, modifier = Modifier.padding(top = 4.dp))
+                    Text("$shown / $target$unit", color = TextDim, fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp))
                 }
                 when {
-                    challenge.claimed -> Text(tr("challengeClaimed"), color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    challenge.claimed -> Text(tr("challengeClaimed"), color = AccentText, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                     done -> GameButton("+${challenge.reward} $", small = true) {
                         // claimDailyChallenge() : sfxBuy() et « 🎯 +X$ ! ».
                         val result = DailyChallenges.claim(save, index)
@@ -359,7 +359,7 @@ fun ChallengesScreen(save: GameSave, onSaveChange: (GameSave) -> Unit, onBack: (
                             toaster("🎯 +${result.reward}$ !")
                         }
                     }
-                    else -> Text("+${challenge.reward} $", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    else -> Text("+${challenge.reward} $", color = AccentText, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
                 }
             }
         }
@@ -412,7 +412,7 @@ fun SettingsScreen(
         // Thème : bascule jour/nuit de toute l'interface (applyTheme()).
         val night = save.theme != "light"
         SettingsRow(tr("settingsThemeLabel")) {
-            GameButton(if (night) "🌙" else "☀️", secondary = true, small = true) {
+            GameButton(tr(if (night) "app.themeDark" else "app.themeLight"), secondary = true, small = true) {
                 onSaveChange(save.copy(theme = if (night) "light" else "dark"))
             }
         }
@@ -452,8 +452,8 @@ fun SettingsScreen(
         }
         Text(
             tr(session.statusKey),
-            color = if (session.state == CloudState.LINKED) Money else TextDim,
-            fontSize = 11.5.sp,
+            color = if (session.state == CloudState.LINKED) MoneyText else TextDim,
+            fontSize = 12.sp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         )
 
@@ -473,7 +473,7 @@ fun SettingsScreen(
         Text(
             tr(qualityKey(quality) + "Hint"),
             color = TextDim,
-            fontSize = 11.5.sp,
+            fontSize = 12.sp,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
         )
 
@@ -534,7 +534,7 @@ private fun qualityKey(quality: GraphicsQuality): String = when (quality) {
 private fun SettingsSection(title: String) {
     Text(
         title,
-        color = Accent,
+        color = AccentText,
         fontSize = 15.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier.fillMaxWidth().padding(top = 10.dp),
@@ -632,7 +632,7 @@ fun ChangelogScreen(onBack: () -> Unit) {
                     .padding(horizontal = 12.dp, vertical = 10.dp),
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
-                Text("v${entry.version}", color = Accent, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+                Text("v${entry.version}", color = AccentText, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
                 if (entry.major.isNotEmpty()) {
                     Text(tr("changelogMajor"), color = TextColor, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                     for (line in entry.major) {
@@ -732,7 +732,7 @@ fun LeaderboardScreen(
         Text(
             tr("app.leaderboardTapHint"),
             color = TextDim,
-            fontSize = 11.5.sp,
+            fontSize = 12.sp,
             textAlign = TextAlign.Center,
         )
         val rows = entries
@@ -791,7 +791,7 @@ private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(tr("pseudoPrompt"), color = Accent, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
+            Text(tr("pseudoPrompt"), color = AccentText, fontSize = 17.sp, fontWeight = FontWeight.ExtraBold)
             Text(
                 tr("app.pseudoHint"),
                 color = TextDim,
@@ -805,7 +805,7 @@ private fun PseudoDialog(current: String, onDismiss: () -> Unit, onConfirm: (Str
                 placeholder = { Text(tr("app.pseudoPlaceholder"), color = TextDim, fontSize = 13.sp) },
                 modifier = Modifier.fillMaxWidth(),
             )
-            Text("${typed.length} / ${Pseudo.MAX_LENGTH}", color = TextDim, fontSize = 11.sp)
+            Text("${typed.length} / ${Pseudo.MAX_LENGTH}", color = TextDim, fontSize = 12.sp)
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 GameButton(tr("app.save"), small = true) { onConfirm(typed) }
                 GameButton(tr("btnCancel"), secondary = true, small = true, onClick = onDismiss)
@@ -837,7 +837,7 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean, on
     ) {
         Text(
             "#$rank",
-            color = if (isMe) Accent else TextDim,
+            color = if (isMe) AccentText else TextDim,
             fontSize = 13.sp,
             fontWeight = FontWeight.ExtraBold,
         )
@@ -852,7 +852,7 @@ private fun LeaderboardRow(rank: Int, entry: LeaderboardEntry, isMe: Boolean, on
         )
         Text(
             "${"%.1f".format(entry.distanceMeters)} m",
-            color = Money,
+            color = MoneyText,
             fontSize = 14.sp,
             fontWeight = FontWeight.ExtraBold,
         )

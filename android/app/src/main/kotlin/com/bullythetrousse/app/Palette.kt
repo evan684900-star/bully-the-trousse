@@ -52,9 +52,28 @@ val ButtonSecondaryShadow = Color(0xFF2F374A)
 /** Ombre portée "dure" du `.btn` principal (`box-shadow: 0 5px 0 #c79a1f`). */
 val ButtonAccentShadow = Color(0xFFC79A1F)
 
-/** Sous-titre de `.title-card p` : bleu nuit fixe, volontairement peu lisible
- *  sur le ciel assombri — c'est exactement le rendu du site. */
-val TitleSubtitle = Color(0xFF2C3550)
+/**
+ * L'or et le vert « argent » du site, mais pour du TEXTE. En thème sombre ce
+ * sont les mêmes que [Accent] et [Money] ; en thème clair, l'or #FFD23F sur
+ * fond blanc ne fait que 1,4:1 de contraste (illisible) : on fonce les deux
+ * teintes juste assez pour dépasser 4,5:1 sur les panneaux et cartes clairs.
+ *
+ * [Accent]/[Money] restent pour les aplats (boutons, bordures, pastilles) :
+ * là, c'est le texte posé dessus ([OnAccent]) qui porte le contraste.
+ */
+val AccentText: Color get() = if (AppTheme.isLight) Color(0xFF8A5F00) else Accent // 5,6:1 sur blanc
+val MoneyText: Color get() = if (AppTheme.isLight) Color(0xFF0B7A44) else Money // 5,4:1 sur blanc
+
+/**
+ * Voile léger posé derrière les puces de stats, les boutons et les cartes
+ * du menu : le dégradé ciel/sol reste fixe pendant que le contenu défile,
+ * et la ligne d'horizon nette passerait sinon en plein milieu d'une carte.
+ */
+val MenuScrim: Color get() = if (AppTheme.isLight) Color(0x40FFFFFF) else Color(0x40000000)
+
+/** Contour sombre du titre blanc du menu, pour qu'il se lise aussi sur le
+ *  ciel clair (blanc sur #CDEFFD ne fait que 1,2:1). */
+val TitleOutline = Color(0xFF1A1F2E)
 
 /**
  * `.screen` : le fond commun à tous les écrans — ciel sur les 60 % du haut,

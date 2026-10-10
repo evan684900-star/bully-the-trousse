@@ -504,7 +504,7 @@ fun BeachCinematicScreen(equippedSkin: String, equippedCosmetic: String = "", on
                     Text(
                         tr("bcineContinue"),
                         color = TextDim,
-                        fontSize = 11.5.sp,
+                        fontSize = 12.sp,
                         modifier = Modifier.padding(top = 8.dp),
                     )
                 }
